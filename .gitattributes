@@ -1,3 +1,0 @@
-# keep LF line endings on Windows checkouts, so the shell, Python and nginx files work inside Docker
-* text=auto eol=lf
-*.png binary

@@ -1,16 +1,9 @@
-# secrets and per-device data: never commit
-config/
-prefs/
-*.key
-.env
-
-# editor / OS clutter
-.vscode/
+# local build output and machine-specific paths
+.gradle/
+.kotlin/
+build/
+app/build/
+local.properties
+*.iml
 .idea/
-.DS_Store
-__pycache__/
-macos/build/
-macos/out/
-
-# local notes for Claude Code: kept on this computer only
-CLAUDE.md
+captures/
