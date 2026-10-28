@@ -425,8 +425,13 @@ private fun Header(modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { if (E.screen != "player" && !E.wide && E.src != "none") ScreenBack() }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(top, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = dim, maxLines = 1)
-            if (sub.isNotEmpty()) Text(sub, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (status != null) Color(0xFFFFD27A) else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // the lines cross-fade when they change (the app that plays, the device, a status)
+            AnimatedContent(top, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
+                Text(t, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = dim, maxLines = 1)
+            }
+            AnimatedContent(sub to (status != null), transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { (t, warn) ->
+                if (t.isNotEmpty()) Text(t, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (warn) Color(0xFFFFD27A) else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
         // the round Settings button is right below while something plays; before that, this is the way in
         if (E.src == "none") MoreButton() else Box(Modifier.size(48.dp))
@@ -442,7 +447,9 @@ private fun MiniHeader(showCover: Boolean = true) {
             Spacer(Modifier.width(12.dp))
         } else Spacer(Modifier.width(8.dp))
         // not a way back: only the Lyrics button (or Back) leaves the lyrics
-        Column(Modifier.weight(1f)) {
+        val rise = remember { Animatable(1f) }
+        LaunchedEffect(E.trackVer) { if (!S.low && !E.reduceMotion()) { rise.snapTo(0f); rise.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
+        Column(Modifier.weight(1f).graphicsLayer { alpha = rise.value; translationY = (1 - rise.value) * 8f * density }) {
             Text(E.title, style = TextStyle(shadow = textShadow), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val st = E.statusLine()
             if (st != null) Text(st, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFFFD27A), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -619,8 +626,11 @@ private fun PlayButton(size: Dp) {
 @Composable
 private fun SeekRow(inline: Boolean = false) {
     var drag by remember { mutableStateOf<Float?>(null) }
-    val glide by animateFloatAsState(E.seekFrac, if (E.settingsPage != null) androidx.compose.animation.core.snap() else tween(260, easing = androidx.compose.animation.core.LinearEasing), label = "seek")   // under Settings' blur it steps (a glide re-blurs the screen every frame)
-    val frac = drag ?: if (kotlin.math.abs(E.seekFrac - glide) > .02f) E.seekFrac else glide   // a jump (seek, new song) isn't glided
+    val glide = animateFloatAsState(E.seekFrac, if (E.settingsPage != null) androidx.compose.animation.core.snap() else tween(260, easing = androidx.compose.animation.core.LinearEasing), label = "seek")   // under Settings' blur it steps (a glide re-blurs the screen every frame)
+    // read by the bar as it draws: the glide repaints the bar alone instead of rebuilding this whole row every frame
+    val frac = { drag ?: run { val g = glide.value; val s = E.seekFrac; if (kotlin.math.abs(s - g) > .02f) s else g } }   // a jump (seek, new song) isn't glided
+    val d0 = drag   // while dragging, the times and the bubble follow the finger
+    E.timeText   // the row itself is rebuilt with the time ticker (once a second or so): the times and a new song's length
     val dur = E.curDur()
     val thick = when (S.str("aSeek")) { "thin" -> 6.dp; "thick" -> 18.dp; else -> 12.dp }   // Settings → Player screen → Seek bar
     // Scrub preview (Experiments): while you drag, a bubble above your finger with the time you'd jump to, and the
@@ -629,11 +639,12 @@ private fun SeekRow(inline: Boolean = false) {
     val bar = @Composable { m: Modifier ->
         Box(m) {
             ThickSeek(frac, thick = thick, onDrag = { f -> drag = f; E.seekDrag(true) }, onDone = { f -> if (drag == null) E.seekDrag(true); drag = null; E.seekFraction(f); E.seekDrag(false) }, enabled = E.src != "none" && dur > 0, modifier = Modifier.quietTouch())
-            if (scrub) ScrubTip(drag != null, frac, fmtTime(frac * dur))
+            if (scrub) ScrubTip(d0 != null, d0 ?: 0f, fmtTime((d0 ?: 0f) * dur))
         }
     }
-    val now = @Composable { Text(fmtTime(if (drag != null && scrub) frac * dur else E.curTime()), fontSize = 14.sp, color = if (drag != null && scrub) Color.White else dim, fontWeight = FontWeight.Medium) }
-    val end = @Composable { Text(if (drag != null && scrub) "-" + fmtTime(dur - frac * dur) else fmtTime(dur), fontSize = 14.sp, color = dim, fontWeight = FontWeight.Medium) }
+    // the time moves on with the app's time ticker (a few times a second), not every frame
+    val now = @Composable { Text(fmtTime(if (d0 != null && scrub) d0 * dur else E.curTime()), fontSize = 14.sp, color = if (d0 != null && scrub) Color.White else dim, fontWeight = FontWeight.Medium) }
+    val end = @Composable { Text(if (d0 != null && scrub) "-" + fmtTime(dur - d0 * dur) else fmtTime(dur), fontSize = 14.sp, color = dim, fontWeight = FontWeight.Medium) }
     // inline: the times on either side of the bar (under a cover in landscape)
     if (inline) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { now(); Spacer(Modifier.width(12.dp)); bar(Modifier.weight(1f)); Spacer(Modifier.width(12.dp)); end() }
     else Column(Modifier.fillMaxWidth()) {

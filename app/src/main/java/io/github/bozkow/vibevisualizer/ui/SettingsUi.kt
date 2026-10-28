@@ -348,6 +348,7 @@ fun SettingsScreen() {
     LaunchedEffect(E.settingsPage) { E.settingsPage?.takeIf { p -> all.any { it.id == p } }?.let { page = it } }
     LaunchedEffect(page) { page?.let { SettingsUi.last = it; if (it == "cache") Lyr.refreshCounts() } }
     val listState = rememberLazyListState()   // the list keeps its place while a page is open
+    remember(page) { Stagger.shownAt = android.os.SystemClock.uptimeMillis(); 0 }   // Settings or a page just opened: its cards slide in
     var pageFrom by remember { mutableStateOf(androidx.compose.ui.graphics.TransformOrigin.Center) }
     var paneBox by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }   // where pages show: they grow out of the row you tapped
     val open = { id: String -> q = ""; pageFrom = Pop.origin(paneBox); page = id }
@@ -435,8 +436,8 @@ private fun SearchResults(all: List<Page>, q: String, modifier: Modifier) {
     if (hits.isEmpty()) { Text("No setting matches that.", Modifier.padding(24.dp), color = Color.White.copy(alpha = .6f)); return }
     LazyColumn(modifier.navBarsSpace().fadeEdges(20.dp, 28.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 40.dp)) {
         hits.forEach { (p, its) ->
-            item(key = "h" + p.id) { CardLabel(Item.Sub(p.name)) }
-            item(key = "c" + p.id) { CardGroup { its.forEachIndexed { i, x -> if (i > 0) CardDivider(); Box(Modifier.padding(horizontal = 18.dp, vertical = 2.dp)) { ItemView(x) } } } }
+            item(key = "h" + p.id) { Box(Modifier.animateItem()) { CardLabel(Item.Sub(p.name)) } }
+            item(key = "c" + p.id) { Box(Modifier.animateItem()) { CardGroup { its.forEachIndexed { i, x -> if (i > 0) CardDivider(); Box(Modifier.padding(horizontal = 18.dp, vertical = 2.dp)) { ItemView(x) } } } } }
         }
     }
 }
@@ -463,7 +464,7 @@ fun ItemView(it: Item) {
         // a Column, not a Box: rows that put several things one under another (the server field, its Test and save
         // button and its answer) were drawn over each other
         is Item.Custom -> Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) { it.c() }
-        is Item.Sw -> Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { E.haptic(); S.set(it.k, !S.b(it.k)) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        is Item.Sw -> Row(Modifier.fillMaxWidth().squishClick { E.haptic(); S.set(it.k, !S.b(it.k)) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
                 if (it.d.isNotEmpty()) Text(it.d, fontSize = 13.5.sp, lineHeight = 19.sp, color = Color.White.copy(alpha = .62f), modifier = Modifier.padding(top = 2.dp))
@@ -531,7 +532,7 @@ private fun TrService() {
 /** A switch row for a setting that isn't a plain on/off key. */
 @Composable
 private fun SwitchRow(t: String, d: String, on: Boolean, set: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { E.haptic(); set(!on) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().squishClick { E.haptic(); set(!on) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
             if (d.isNotEmpty()) Text(d, fontSize = 13.5.sp, lineHeight = 19.sp, color = Color.White.copy(alpha = .62f), modifier = Modifier.padding(top = 2.dp))
@@ -878,7 +879,7 @@ private fun LazyListScope.cardItems(items: List<Item>) {
     }
     groups.forEachIndexed { gi, (h, its) ->
         if (h != null) item(key = "h$gi") { CardLabel(h) }
-        if (its.isNotEmpty()) item(key = "c$gi") { CardGroup { its.forEachIndexed { i, x -> if (i > 0) CardDivider(); Box(Modifier.padding(horizontal = 18.dp, vertical = 2.dp)) { ItemView(x) } } } }
+        if (its.isNotEmpty()) item(key = "c$gi") { Box(Modifier.animateItem().staggerIn(gi)) { CardGroup { its.forEachIndexed { i, x -> if (i > 0) CardDivider(); Box(Modifier.padding(horizontal = 18.dp, vertical = 2.dp)) { ItemView(x) } } } } }
     }
 }
 
@@ -887,11 +888,11 @@ private fun LazyListScope.cardItems(items: List<Item>) {
 private fun LazyListScope.cardPages(all: List<Page>, page: String?, wide: Boolean, pick: (String) -> Unit) {
     all.groupBy { it.group }.toSortedMap().values.forEachIndexed { gi, g ->
         item(key = "g$gi") {
-            CardGroup {
+            Box(Modifier.staggerIn(gi)) { CardGroup {
                 g.forEachIndexed { i, p ->
                     if (i > 0) CardDivider()
                     val on = wide && (page ?: SettingsUi.last) == p.id
-                    Row(Modifier.fillMaxWidth().background(if (on) Color.White.copy(alpha = .08f) else Color.Transparent).clickable { E.haptic(); pick(p.id) }
+                    Row(Modifier.fillMaxWidth().background(if (on) Color.White.copy(alpha = .08f) else Color.Transparent).squishClick(androidx.compose.ui.graphics.RectangleShape, .985f) { E.haptic(); pick(p.id) }
                         .padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(Color.White.copy(alpha = .09f)), contentAlignment = Alignment.Center) {
                             Icon(p.icon, null, Modifier.size(20.dp), tint = Color.White.copy(alpha = .92f))
@@ -905,7 +906,7 @@ private fun LazyListScope.cardPages(all: List<Page>, page: String?, wide: Boolea
                         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, Modifier.size(20.dp), tint = Color.White.copy(alpha = .35f))
                     }
                 }
-            }
+            } }
         }
     }
 }

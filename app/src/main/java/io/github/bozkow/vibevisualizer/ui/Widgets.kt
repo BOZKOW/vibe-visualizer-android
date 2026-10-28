@@ -91,14 +91,15 @@ fun WavySeek(frac: Float, wavy: Boolean, onDrag: (Float) -> Unit, onDone: (Float
     }
 }
 
-/** The seek bar as Spicy Lyrics Mobile draws it: a thick pill with a soft outline that fills from the left, no thumb. */
+/** The seek bar as Spicy Lyrics Mobile draws it: a thick pill with a soft outline that fills from the left, no thumb.
+ *  [frac] is read when it's drawn, so a playing song only repaints the bar (it rebuilt the whole row every frame). */
 @Composable
-fun ThickSeek(frac: Float, onDrag: (Float) -> Unit, onDone: (Float) -> Unit, enabled: Boolean, thick: androidx.compose.ui.unit.Dp = 12.dp, modifier: Modifier = Modifier) {
+fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Unit, enabled: Boolean, thick: androidx.compose.ui.unit.Dp = 12.dp, modifier: Modifier = Modifier) {
     val drag by rememberUpdatedState(onDrag); val done by rememberUpdatedState(onDone)
     var last by remember { mutableFloatStateOf(0f) }
     Canvas(modifier.fillMaxWidth().height(30.dp)
         .semantics {
-            contentDescription = "Seek"; progressBarRangeInfo = ProgressBarRangeInfo(frac, 0f..1f)
+            contentDescription = "Seek"; progressBarRangeInfo = ProgressBarRangeInfo(frac(), 0f..1f)
             if (enabled) setProgress { v -> done(v.coerceIn(0f, 1f)); true }
         }
         .pointerInput(enabled) { if (!enabled) return@pointerInput; detectTapGestures { o -> done((o.x / size.width).coerceIn(0f, 1f)) } }
@@ -111,7 +112,7 @@ fun ThickSeek(frac: Float, onDrag: (Float) -> Unit, onDone: (Float) -> Unit, ena
         val h = thick.toPx(); val y = (size.height - h) / 2; val r = CornerRadius(h / 2); val w = size.width
         drawRoundRect(Color.White.copy(alpha = if (enabled) .14f else .07f), Offset(0f, y), Size(w, h), r)
         drawRoundRect(Color.White.copy(alpha = .22f), Offset(.5f, y + .5f), Size(w - 1f, h - 1f), r, style = Stroke(1.dp.toPx()))
-        val x = frac.coerceIn(0f, 1f) * w
+        val x = frac().coerceIn(0f, 1f) * w
         if (x > 0f) drawRoundRect(Color.White, Offset(0f, y), Size(maxOf(x, h), h), r)
     }
 }

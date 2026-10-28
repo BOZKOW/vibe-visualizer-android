@@ -216,3 +216,25 @@ fun Modifier.cheapBlur(k: Float, radius: Dp, dim: Float = 0f): Modifier {
         if (dim > 0f) drawRect(Color.Black.copy(alpha = dim * k))
     }
 }
+
+/** A row that squishes a little while pressed (and ripples), clipped to [shape]. */
+@Composable
+fun Modifier.squishClick(shape: Shape = RoundedCornerShape(16.dp), to: Float = .975f, onClick: () -> Unit): Modifier {
+    val src = remember { MutableInteractionSource() }
+    return this.pressScale(src, to).clip(shape).clickable(src, androidx.compose.material3.ripple(), onClick = onClick)
+}
+
+/** Settings' cards slide in one after another when a page opens ([i]: the card's place); cards that come later
+ *  (scrolled to) just show. */
+object Stagger { var shownAt = 0L }
+
+@Composable
+fun Modifier.staggerIn(i: Int): Modifier {
+    val fresh = remember { android.os.SystemClock.uptimeMillis() - Stagger.shownAt < 450 && !Pop.calm }
+    val k = remember { androidx.compose.animation.core.Animatable(if (fresh) 0f else 1f) }
+    if (fresh) androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(i.coerceAtMost(8) * 45L)
+        k.animateTo(1f, androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+    }
+    return this.graphicsLayer { alpha = k.value; translationY = (1 - k.value) * 18.dp.toPx() }
+}

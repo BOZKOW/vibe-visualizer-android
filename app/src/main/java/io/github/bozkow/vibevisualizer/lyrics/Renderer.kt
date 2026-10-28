@@ -671,8 +671,10 @@ class LyricsRenderer {
 
     /* ================= drawing ================= */
 
-    private val shadowCache = HashMap<Int, RenderEffect>()
-    private fun effect(blurPx: Float, shadow: Boolean): RenderEffect? {
+    // kept as the layer's own kind of effect: a new wrapper every frame (even around the same effect) counted as a new
+    // effect, and every blurred line was blurred again each frame instead of reusing its finished picture
+    private val shadowCache = HashMap<Int, androidx.compose.ui.graphics.RenderEffect>()
+    private fun effect(blurPx: Float, shadow: Boolean): androidx.compose.ui.graphics.RenderEffect? {
         val q = (blurPx * 2).roundToInt()
         if (q <= 0 && !shadow) return null
         val key = q * 2 + if (shadow) 1 else 0
@@ -681,8 +683,8 @@ class LyricsRenderer {
                 // drop-shadow(0 6px 16px rgba(0,0,0,.35)): a soft dark halo under the line being sung
                 val r = 16f / 40f * F * .5f; val m = ColorMatrix(floatArrayOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, .35f, 0f))
                 val sh = RenderEffect.createOffsetEffect(0f, 6f / 40f * F, RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(m), RenderEffect.createBlurEffect(r, r, Shader.TileMode.DECAL)))
-                RenderEffect.createBlendModeEffect(sh, RenderEffect.createOffsetEffect(0f, 0f), BlendMode.SRC_OVER)
-            } else RenderEffect.createBlurEffect(q / 2f, q / 2f, Shader.TileMode.DECAL)
+                RenderEffect.createBlendModeEffect(sh, RenderEffect.createOffsetEffect(0f, 0f), BlendMode.SRC_OVER).asComposeRenderEffect()
+            } else RenderEffect.createBlurEffect(q / 2f, q / 2f, Shader.TileMode.DECAL).asComposeRenderEffect()
         }
     }
 
@@ -720,7 +722,7 @@ class LyricsRenderer {
             val sc = if (tapK < 1f) .97f + .03f * Ease.easeOut(tapK.toDouble()).toFloat() else 1f
             layer.scaleX = sc; layer.scaleY = sc
             layer.pivotOffset = androidx.compose.ui.geometry.Offset(if (d.opp) pad + avail else pad.toFloat(), h / 2f)
-            layer.renderEffect = effect(blurPx, d.a && !S.low && !st)?.asComposeRenderEffect()
+            val fx2 = effect(blurPx, d.a && !S.low && !st); if (layer.renderEffect !== fx2) layer.renderEffect = fx2
             ds.drawLayer(layer)
         }
         if (enterAt > 0 && t - enterAt > 1300) enterAt = -1e9
