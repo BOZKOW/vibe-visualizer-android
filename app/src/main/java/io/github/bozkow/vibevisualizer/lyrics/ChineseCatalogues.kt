@@ -9,7 +9,7 @@ import kotlin.math.abs
 
 /* The Chinese catalogues (KuGou, QQ Music, Kuwo): telling their search hits apart and reading their lyrics formats.
    Ported from Spicy Lyrics Mobile by TheX24 (github.com/spicylyrics/mobile, AGPL-3.0): CatalogueTitles, KrcCodec,
-   QrcCodec and KuwoLyrics. Plain Kotlin, no network: engine/Lyr asks the catalogues. */
+   QrcCodec and KuwoLyrics. Plain Kotlin, no network: engine/LyricsLookup asks the catalogues. */
 
 /** Whether a catalogue's search hit is the song asked for. */
 object CatalogueTitles {

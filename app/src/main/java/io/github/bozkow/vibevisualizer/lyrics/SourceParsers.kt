@@ -4,7 +4,7 @@ import org.json.JSONObject
 import kotlin.math.abs
 
 /** Each lyrics source's answer, turned into lyrics. Plain functions (no network, no Android), so the unit tests can
- *  feed them real answers. Asking the sources is engine/Lyr's job. */
+ *  feed them real answers. Asking the sources is engine/LyricsLookup's job. */
 object SourceParse {
     /** Spotify's own lyrics (your server's /api/spotify-lyrics): line-synced or not synced, with romanization. */
     fun spotify(j: JSONObject?): LyricsResult? {

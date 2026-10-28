@@ -243,7 +243,7 @@ object Lyr {
         return get("https://unison.boidu.dev/lyrics/" + enc(id))?.json()?.optJSONObject("data")?.let(SourceParse::unison)
     }
 
-    /* ---- more catalogues (as Spicy Lyrics Mobile asks them; their formats in lyrics/Catalogues.kt) ---- */
+    /* ---- more catalogues (as Spicy Lyrics Mobile asks them; their formats in lyrics/ChineseCatalogues.kt) ---- */
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
     /** A catalogue's search hit is this song: title, artist and length. */
