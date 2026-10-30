@@ -1,10 +1,18 @@
-Vibe Visualizer for Android 0.27.1 (beta). Android 12 or newer; it installs over 0.27.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.28.0 (beta). Android 12 or newer; it installs over 0.27.1 (Settings → Help & about → Update now).
 
-### Fixed
+### The visualizer steps aside when the music plays elsewhere
 
-- **The top line's text no longer starts under its fade**: a name too long for its side now begins whole, just after the fade, and slides through it from there.
-- **More room to the camera**: the texts at either side of it keep a wider gap.
-- **Long names keep sliding**: the song's name and the top line's texts slide on and on while they don't fit, instead of stopping after three times (they rest while Settings are open).
+- **When Spotify plays on another device** (a computer, a speaker, another phone), or a music app casts to one, the bars fade away: they only hear what this phone plays, so they'd just sit there. The bars under the cover or the lyrics take their room with them; on the Visualizer screen a short note says where it plays, with a button to what the bars hear. With the microphone, or Vibe Bridge on that computer, the bars can hear it, so they stay.
+
+### Crash detection
+
+- **If the app ever closes because of a crash**, what went wrong is written down on the phone, and at the next start "Vibe Visualizer closed unexpectedly last time" shows at the top with a Copy details button. It also goes to the error log on your server, like the app's other errors.
+
+### The top line
+
+- **"PLAYING ON …" looks like "PLAYING FROM …"**: the device is now in the same small capitals, at the other side of the camera.
+- **On its side**, "Playing from", the device and the error space sit at the top of the cover / Canvas side, so they never push the lyrics down.
+- **More room beside the camera on its side**: everything keeps 16 dp from the camera hole (was 8 dp).
 
 ## From 0.27.0
 

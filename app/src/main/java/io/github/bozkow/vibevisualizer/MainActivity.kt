@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
 
         // the Spotify app's link let go when the app was last closed: ask Android to bind it again
         if (SpotifyApp.hasAccess(this)) runCatching { android.service.notification.NotificationListenerService.requestRebind(android.content.ComponentName(this, io.github.bozkow.vibevisualizer.spotify.SessionListener::class.java)) }
-        if (savedInstanceState == null) first()
+        if (savedInstanceState == null) { first(); io.github.bozkow.vibevisualizer.engine.Crashes.tell() }
         setContent { VibeRoot() }
         handle(intent)
 

@@ -166,7 +166,7 @@ fun circle() = CircleShape
 @Suppress("unused") private val keepTheme = MaterialTheme
 
 /** What the camera cutout takes, per side: the larger of the room Android reports as safe and where the hole
- *  actually is, with a little air beside it, on the left and right (a phone on its side). Some phones report less
+ *  actually is, with room beside it (16 dp), on the left and right (a phone on its side). Some phones report less
  *  than the hole takes there. The top and bottom are Android's (the status bar covers the hole in portrait). */
 @Composable
 fun cutoutInsets(): androidx.compose.foundation.layout.WindowInsets {
@@ -177,7 +177,7 @@ fun cutoutInsets(): androidx.compose.foundation.layout.WindowInsets {
     val v = androidx.compose.ui.platform.LocalView.current
     val w = v.width; val h = v.height
     if (w > 0 && h > 0) {
-        val air = with(d) { 8.dp.roundToPx() }
+        val air = with(d) { 16.dp.roundToPx() }   // clear of the hole, not just beside it
         v.rootWindowInsets?.displayCutout?.boundingRects?.forEach { rc ->
             val toL = rc.left; val toR = w - rc.right
             if (minOf(toL, toR) > minOf(rc.top, h - rc.bottom)) return@forEach   // at the top or bottom

@@ -6,6 +6,7 @@ import io.github.bozkow.vibevisualizer.core.Vibe
 class VibeApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        io.github.bozkow.vibevisualizer.engine.Crashes.watch(this)   // first: a crash from here on is written down
         Vibe.init(this)
         io.github.bozkow.vibevisualizer.spotify.Spotify.connected   // sets up Spotify, which listens to the Spotify app from the start
         io.github.bozkow.vibevisualizer.widget.Widgets.refresh()      // placed home screen widgets follow the music

@@ -55,6 +55,9 @@ object Audio {
     var label by mutableStateOf("No audio"); private set      // what the bars follow (the audio chip)
     var labelTip by mutableStateOf(""); private set
     var bridgeOn by mutableStateOf(false); private set
+    /** The music plays on another device (Spotify on a computer or a speaker, a music app casting) and nothing the bars
+     *  hear can hear it: this phone's sound can't, the microphone or Vibe Bridge can. The visualizer steps aside then. */
+    var away by mutableStateOf(false); private set
 
     fun permitted() = Vibe.app.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
@@ -99,7 +102,18 @@ object Audio {
 
     fun sampleRate() = if (filePlaying()) FileTap.sampleRate else 48000
 
+    private fun elsewhere(): Boolean = when (E.src) {
+        // the Spotify app following the song knows best (Connect plays it remotely); else the device the Web API names:
+        // a phone with another name, or anything that isn't a phone
+        "spotify" -> if (Spotify.appTiming()) !io.github.bozkow.vibevisualizer.spotify.SpotifyApp.local
+            else Spotify.device?.let { d -> !(d.type.equals("smartphone", true) && (phoneName == null || d.name.equals(phoneName, true))) } ?: false
+        "media" -> !io.github.bozkow.vibevisualizer.media.MediaApps.local
+        else -> false
+    }
+    private val phoneName by lazy { runCatching { android.provider.Settings.Global.getString(Vibe.app.contentResolver, "device_name") }.getOrNull()?.ifBlank { null } }
+
     fun sample(dt: Double, t: Double) {
+        val aw = elsewhere() && S.str("aCap") != "mic" && !bridgeLive(); if (aw != away) away = aw
         if (bandRate != curRate()) setupBands()
         val aA = 1 - exp(-dt / (6 + S.i("resp") * .5)); val aR = 1 - exp(-dt / (30 + S.i("resp") * 3.5)); val boost = S.i("boost") / 100f
         val fp = filePlaying(); val ml = !fp && micLive(); val pl = !fp && !ml && phoneLive()

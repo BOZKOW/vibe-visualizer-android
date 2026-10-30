@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -23,7 +25,10 @@ import kotlin.math.pow
 @Composable
 fun BarsView(modifier: Modifier = Modifier) {
     val st = remember { BarsState() }
-    Canvas(modifier) {
+    // the music plays on another device that the bars can't hear: they fade away
+    val k by androidx.compose.animation.core.animateFloatAsState(if (Audio.away) 0f else 1f, androidx.compose.animation.core.tween(600), label = "baraway")
+    if (k <= 0f) return
+    Canvas(modifier.then(if (k < 1f) Modifier.graphicsLayer { alpha = k } else Modifier)) {
         E.barsTick.longValue
         val n = Audio.N; val vals = Audio.vals; val pal = Visuals.pal
         if (n == 0 || vals.size < n || pal.size < n || size.width <= 0f) return@Canvas

@@ -137,6 +137,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.bozkow.vibevisualizer.core.S
+import io.github.bozkow.vibevisualizer.audio.Audio
 import io.github.bozkow.vibevisualizer.core.Server
 import io.github.bozkow.vibevisualizer.core.clockLeft
 import io.github.bozkow.vibevisualizer.core.fmtTime
@@ -190,7 +191,7 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
         Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
             if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
         }
-        if (S.view == "both") BarsView(Modifier.fillMaxWidth().height(48.dp).padding(bottom = 6.dp))
+        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(48.dp).padding(bottom = 6.dp))
         SongInfo(big = true, note = noLyricsNote)
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column { Transport(big = true); if (S.b("volshow")) VolumeRow(); BottomBar() }
@@ -223,7 +224,7 @@ private fun LyricsWithLyrics() {
                 CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
         }
-        if (S.view == "both") BarsView(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
+        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
         Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
@@ -241,6 +242,7 @@ private fun VizScreen() {
         Box(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
             if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) Box(Modifier.fillMaxWidth(.5f).aspectRatio(1f).ambientOut()) { CoverArt(Modifier.fillMaxSize(), corner = 18.dp) }
             BarsView(Modifier.fillMaxWidth().fillMaxHeight(.44f).align(Alignment.BottomCenter).padding(horizontal = 10.dp))
+            AwayNote(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp))
         }
         Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
@@ -266,7 +268,7 @@ private fun Tablet() {
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
                 if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
-            if (solo && S.view == "both") BarsView(Modifier.fillMaxWidth().height(56.dp).padding(bottom = 6.dp))
+            if (solo && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(56.dp).padding(bottom = 6.dp))
             TitleRow(big = true)
             if (solo) NoLyricsNote()
             SeekRow()
@@ -298,9 +300,10 @@ private val hideCtl = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(
 @Composable
 private fun LandscapeSplit() {
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        LandscapeNotice()
         Row(Modifier.weight(1f).fillMaxWidth()) {
-            Column(Modifier.fillMaxHeight().weight(.42f).padding(top = 8.dp)) {
+            Column(Modifier.fillMaxHeight().weight(.42f)) {
+                // where it plays and what's wrong: at the top of this side, clear of the lyrics
+                TopBar(side = true)
                 Box(Modifier.weight(1f).fillMaxWidth().padding(bottom = 10.dp), contentAlignment = Alignment.BottomStart) {
                     ArtUnlessCanvas()
                 }
@@ -353,12 +356,12 @@ private fun AmbientBlack() {
 private fun LandscapeSolo() {
     val art = !CanvasVideo.cvmode
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        LandscapeNotice()
+        Box(Modifier.widthIn(max = 560.dp).fillMaxWidth()) { TopBar(side = true) }
         Box(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp, bottom = 10.dp), contentAlignment = Alignment.Center) {
             ArtUnlessCanvas()
         }
         Column(Modifier.widthIn(max = 560.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (S.view == "both") BarsView(Modifier.fillMaxWidth().height(40.dp).padding(bottom = 4.dp))
+            if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(40.dp).padding(bottom = 4.dp))
             if (art) { SeekRow(inline = true); TitleRow(big = true, center = true, year = true) }
             else { TitleRow(big = true, center = true); Spacer(Modifier.height(4.dp)); SeekRow() }
         }
@@ -381,10 +384,10 @@ private fun RightPane(modifier: Modifier) {
     Column(modifier) {
         var areaH by remember { mutableFloatStateOf(0f) }
         Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
-            if (E.screen == "viz") BarsView(Modifier.fillMaxSize().padding(vertical = 16.dp))
+            if (E.screen == "viz") { BarsView(Modifier.fillMaxSize().padding(vertical = 16.dp)); AwayNote(Modifier.align(Alignment.Center)) }
             else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 8f, padEnd = 16f, problems = false)
         }
-        if (E.screen != "viz" && S.view == "both") BarsView(Modifier.fillMaxWidth().height(64.dp))
+        if (E.screen != "viz" && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(64.dp))
         LyricsCredits()
     }
 }
@@ -420,13 +423,14 @@ private fun EmptyState() {
 /** The top of every screen: where the music plays from at the left and on what device at the right, and under them the
  *  space for what's wrong. Always there, also with the controls away. */
 @Composable
-private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false) {
+private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false) {
     E.sec.intValue
     val top = when (E.src) { "spotify" -> "PLAYING FROM SPOTIFY"; "file" -> "PLAYING ON THIS PHONE"; "media" -> "PLAYING FROM " + io.github.bozkow.vibevisualizer.media.MediaApps.appName().uppercase(); else -> "VIBE VISUALIZER" }
-    val dev = when (E.src) { "spotify" -> Spotify.device?.name?.let { "on $it" } ?: if (Spotify.meta == null) "Nothing playing" else ""; "file" -> Local.position(); else -> "" }
+    // the device in the same style: "PLAYING ON PETR'S S25"
+    val dev = when (E.src) { "spotify" -> Spotify.device?.name?.let { "PLAYING ON $it" } ?: if (Spotify.meta == null) "NOTHING PLAYING" else ""; "file" -> Local.position(); else -> "" }.uppercase()
     Column(modifier.fillMaxWidth().reportTop()) {
         // the status bar hidden: the line goes up where it was, either side of the camera, and takes no room here
-        TopLine(top, dev, Modifier, beside = S.b("aHideStatus"))
+        TopLine(top, dev, Modifier, beside = !side && S.b("aHideStatus"))
         NoticeSpace(home)
     }
 }
@@ -469,7 +473,7 @@ private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolea
             TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
         }
         AnimatedContent(dev, Modifier.align(Alignment.CenterEnd).width(rw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { t ->
-            TopText(t, 12.sp, FontWeight.SemiBold, Color.White)
+            TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
         }
     }
 }
@@ -523,15 +527,22 @@ private fun NoticeLines(p: E.Prob, row: Boolean = false) {
     }
 }
 
-/** On its side there's no "Playing from" line: what's wrong comes in at the top while it lasts. */
 @Composable
-private fun LandscapeNotice() {
-    E.sec.intValue
-    val p = E.notice()
-    val last = remember { arrayOfNulls<E.Prob>(1) }   // still shown while it slides away
-    if (p != null) last[0] = p
-    AnimatedVisibility(p != null, Modifier.reportTop(), enter = showCtl, exit = hideCtl) {
-        last[0]?.let { Box(Modifier.fillMaxWidth().padding(top = 6.dp)) { NoticeLines(it, row = true) } }
+private fun ExtraBars(modifier: Modifier) {
+    AnimatedVisibility(!Audio.away, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) { BarsView(modifier) }
+}
+
+/** Where the bars were on the Visualizer: why they're gone (the music plays elsewhere), and how they could hear it. */
+@Composable
+private fun AwayNote(modifier: Modifier) {
+    AnimatedVisibility(Audio.away, modifier, enter = fadeIn(tween(600)), exit = fadeOut()) {
+        val where = when (E.src) { "spotify" -> Spotify.device?.name ?: "another device"; else -> "another device" }
+        Column(Modifier.widthIn(max = 360.dp).padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Playing on $where", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("The bars only hear this phone. The microphone, or Vibe Bridge on that computer, can hear it.", Modifier.padding(top = 4.dp),
+                fontSize = 13.sp, color = dim, textAlign = TextAlign.Center)
+            TextButton(onClick = { E.haptic(); E.openSheet("audio") }) { Text("What the bars hear") }
+        }
     }
 }
 
@@ -863,12 +874,9 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
     val d = androidx.compose.ui.platform.LocalDensity.current
     val topPx = TopArea.bottom; val rampPx = with(d) { 28.dp.toPx() }
     val r = with(d) { (S.i("cvBlurAmt").coerceIn(5, 100) / 100f * 48f).dp.toPx() }
-    // the top's blur, shade and softening while something's up there: the status bar, or the top line (always there
-    // upright; side by side only while something's wrong). Two sizes: just behind the top line, or down past what's
-    // wrong under it (it follows the error space as it opens and closes)
-    val noted by remember { androidx.compose.runtime.derivedStateOf { E.notice() != null } }
-    val topOn = !S.b("aHideStatus") || !wide || noted
-    val topK by animateFloatAsState(if (topOn) 1f else 0f, tween(500, easing = FastOutSlowInEasing), label = "cvtop")
+    // the top's blur, shade and softening behind the top line (always there, on its side over the Canvas side). Two
+    // sizes: just behind the line, or down past what's wrong under it (it follows the error space as it opens and closes)
+    val topK = 1f
 
     Box((if (wide) Modifier.fillMaxHeight().fillMaxWidth(.68f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f))
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.16f / .68f) * c }.drawWithContent {
