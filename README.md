@@ -33,9 +33,11 @@ Android 12 or newer. The app is a beta.
      bars, the widget…). Spicy Lyrics, Spotify's own lyrics and Vibe Bridge need a server and are left out.
 
    You can switch later in *Settings → Server & connection*.
-3. Spotify logs in with your developer app's Client ID. With a server, Spotify comes back to your server's page (the
-   web app's Redirect URI), which hands the login to the app; without one, add `vibevisualizer://callback` to the app's
-   Redirect URIs.
+3. Spotify (optional): create an app on the [Spotify developer dashboard](https://developer.spotify.com/dashboard)
+   and put its Client ID in *Settings → Music apps & Spotify*. With a server, Spotify comes back to your server's page
+   (the web app's Redirect URI), which hands the login to the app; without one, add `vibevisualizer://callback` to the
+   app's Redirect URIs. For exact timing with the Spotify app on the phone, give Vibe Visualizer notification access
+   when it asks (it reads the player, never your notifications).
 
 Updates install from inside the app: *Settings → Help & about → Update now*. Versions before 0.24 came from the
 main repository's Releases page; 0.24 and later come from here.
@@ -48,16 +50,21 @@ main repository's Releases page; 0.24 and later come from here.
   (Google, DeepL, LibreTranslate, any OpenAI-compatible AI, Gemini).
 - **Following the music**: your files (with background playback and media controls), Spotify, the Spotify app on
   the phone and other music apps through their media sessions (with notification access; no notification is read).
+  The lyrics stay in step through Spotify's crossfade, gapless playback, Automix and the DJ.
 - **The player**: Now Playing, full-screen lyrics and the visualizer, a landscape layout, picture-in-picture, a home
-  screen widget, Ambient mode (an always-on display while music plays), Spotify Canvas, and two designs (Android and
-  Glass).
+  screen widget, Ambient mode (an always-on display while music plays), Spotify Canvas, two designs (Android and
+  Glass), and the buttons under the controls are yours to pick.
+- **Focus mode**: the line being sung stays sharp in the middle until it's sung to the end, the next one flies in from
+  below and finished ones fly away; in long breaks the cover takes the lyrics' place.
 - **The bars** hear everything the phone plays (Android's Visualizer; it needs the microphone permission, and nothing
   is recorded or sent), the microphone, or [Vibe Bridge](https://github.com/BOZKOW/vibe-visualizer#vibe-bridge-bars-from-the-spotify-app)
   through your server.
-- The next song in the queue (Spotify's, the music app's or your files') gets its lyrics, Canvas and cover ready while
-  the song before it plays; Canvas videos are kept on the phone.
-- Lyrics timing per audio output, a heat warning and Low performance mode with Power saving, keyboard shortcuts, and
-  settings that can be copied to the web app and back (*Settings → Help & about → Back up settings*).
+- **Ready before they play**: the next five songs in your Spotify queue (the next one in another music app's or your
+  files') get their lyrics, Canvas and cover while the song before plays, so skipping shows them at once; Canvas
+  videos are kept on the phone.
+- Lyrics timing per audio output and a desync check that listens to the music, a heat warning (from a 40 °C battery)
+  and Low performance mode with Power saving, keyboard shortcuts, and settings that can be copied to the web app and
+  back (*Settings → Help & about → Back up settings*).
 
 ## Building
 
@@ -84,11 +91,11 @@ by Spikerko and the Spicy Lyrics contributors (GNU AGPL-3.0). Its spring model i
 
 From [Spicy Lyrics Mobile](https://github.com/spicylyrics/mobile) by TheX24 (GNU AGPL-3.0): background vocals in
 brackets and a song's own lyrics delay, the lyric clock that reads music apps' position reports, the timing kept per
-audio output, the lookup order (the first source alone, then the rest at once, better timing winning), the back-off for
-failing sources, the 20-second limit per source, the cleaning of file names, word timing in LRC lyrics and the
-translations under their lines, the Unison, LRCMux, lrc.red, KuGou, QQ Music and Kuwo sources, the
-translation services, session stickiness, Spicy Lyrics' Canvas service, Ambient mode, the widget and the Now Playing
-layout. Its LRCMux source is itself adapted from Lyrica's lrcmux adapter (MIT).
+audio output, the lookup order (the first source alone, then the rest at once, better timing winning), the back-off
+for failing sources, the 20-second limit per source, the song-change handling at the end of a track, the cleaning of
+file names, word timing in LRC lyrics and the translations under their lines, the Unison, LRCMux, lrc.red, KuGou, QQ
+Music and Kuwo sources, the translation services, session stickiness, Spicy Lyrics' Canvas service, Ambient mode, the
+widget and the Now Playing layout. Its LRCMux source is itself adapted from Lyrica's lrcmux adapter (MIT).
 
 The lyrics font option "Spicy Lyrics" uses [Inter](https://rsms.me/inter/) by Rasmus Andersson (SIL Open Font
 License 1.1). Japanese romanization uses [kuromoji](https://github.com/atilika/kuromoji) (Apache 2.0).
