@@ -1,17 +1,21 @@
-Vibe Visualizer for Android 0.24.1 (beta). Android 12 or newer; it installs over 0.24.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.25.0 (beta). Android 12 or newer; it installs over 0.24.1 (Settings → Help & about → Update now).
 
-### Faster
+### One layout for every screen
 
-- **The lyrics draw less**: each line's blur was handed over as a new effect every frame, so every blurred line was blurred again 60 or more times a second even when it hadn't changed. Now an unchanged line keeps its finished picture
-- **The seek bar repaints alone**: while music plays its glide rebuilt the whole seek row (and its times) every frame; now only the bar is redrawn, and the times move on a few times a second as before
+Now Playing, Lyrics and the Visualizer are laid out the same way when the phone is upright:
 
-Nothing looks or works differently.
+- **At the top**: only where the music plays from and on what device ("PLAYING FROM SPOTIFY · on Galaxy S25"). When something is wrong (no internet, the server can't be reached, Spotify isn't answering or has paused requests), that space shows it instead, in red or yellow, with the one button that fixes it. It stays there even while the controls are hidden, and goes back to the device once it's solved.
+- **At the bottom**: the song's name, the seek bar and where the lyrics are from ("Provided by …", with who made and uploaded community lyrics, and the songwriters when the source names them). These stay on screen when the controls slide away.
+- The translate and romanize buttons of the Lyrics screen sit at the right of the top bar.
 
-### More animation
+The phone on its side keeps its own layout.
 
-- Settings' cards slide in one after another when a page opens, rows squish a little when you press them, and search results glide into place as you type
-- The "Playing from …" line and the one under it cross-fade when they change, and a new song's name rises in at the top of the Lyrics screen, as it does on Now Playing
+### Your own files run smoothly
 
-All of them follow *Settings → Performance → Animations* (and Android's Remove animations).
+- **The lyrics and the visualizer ran at about 4 frames a second** while your own files played: the player reports where it is only a few times a second, and the lyrics followed those jumps. Now the time between them is filled in, so they move every frame again.
+
+### More colour
+
+- **The background is far more vivid**: the colours from the cover (and the blurred Canvas) are turned up a lot, and a little brighter. *Settings → Look → Saturation* and *Brightness* still tune them from there.
 
 From 0.24.0: the app has its own repository.

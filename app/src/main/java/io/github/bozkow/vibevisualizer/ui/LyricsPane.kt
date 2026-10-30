@@ -90,15 +90,15 @@ import kotlin.math.roundToInt
 /** The lyrics area: the lyrics themselves (scroll with a finger, tap a line to jump there), or a message where they go
  *  (looking for them, none, an error, problems). */
 @Composable
-fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact: Boolean = false, padStart: Float = 22f, padEnd: Float = 30f) {
+fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact: Boolean = false, padStart: Float = 22f, padEnd: Float = 30f, problems: Boolean = true) {
     val gc = LocalGraphicsContext.current
     val view = Lyr.view
     val dens = LocalDensity.current
     val conf = LocalConfiguration.current
     remember(gc) { view.releaser = { gc.releaseGraphicsLayer(it) }; 0 }
     val n = Lyr.lines
-    // problems never sit on the lyrics: with lyrics on screen they're a line in the header; without, the empty state
-    val prob = if (n == 0) E.problems(false).firstOrNull() else null
+    // problems never sit on the lyrics: without lyrics they're the empty state here, unless the top bar shows them
+    val prob = if (n == 0 && problems) E.problems(false).firstOrNull() else null
     BoxWithConstraints(modifier) {
         val wDp = maxWidth.value
         // the lyrics' size: big and bold on a phone, as the web app sizes them on a computer (times Text size)
@@ -250,6 +250,28 @@ fun CornerCredits(c: Credit, modifier: Modifier = Modifier, alignEnd: Boolean = 
             c.uploader?.let { Who(it, "Uploaded by ") }   // the uploader as the uploader, the maker only when one is given (Spicy Lyrics terms s.6)
         }
         if (c.source == "unison") c.uploader?.let { Who(it, "Synced by ") }
+    }
+}
+
+/** The credit at the foot of the portrait screens, in two lines: who wrote the song, then where the lyrics are from and
+ *  who made and uploaded community lyrics (linked, as Spicy Lyrics' terms ask). */
+@Composable
+fun CreditsLine(c: Credit, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        val soft = Color.White.copy(alpha = .6f)
+        if (c.source == "file") { Text("From your file: " + c.name, color = soft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis); return@Column }
+        if (c.writers.isNotEmpty()) Text("Written by " + c.writers.joinToString(", "), color = soft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+            val name = c.source?.let { Lyr.PROVIDERS[it] ?: it } ?: "Unknown"
+            Text("Provided by " + name + (c.via?.let { " ($it)" } ?: ""), color = Color.White.copy(alpha = .8f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = when (c.source) { "lrclib" -> Modifier.clickable { openUrl("https://lrclib.net") }; "unison" -> Modifier.clickable { openUrl("https://unison.boidu.dev") }; else -> Modifier })
+            if (c.source == "spicy_lyrics") {
+                c.maker?.let { Text("·", color = soft, fontSize = 12.sp); Who(it, "Made by") }
+                c.uploader?.let { Text("·", color = soft, fontSize = 12.sp); Who(it, "Uploaded by") }
+            }
+            if (c.source == "unison") c.uploader?.let { Text("·", color = soft, fontSize = 12.sp); Who(it, "Synced by") }
+        }
     }
 }
 

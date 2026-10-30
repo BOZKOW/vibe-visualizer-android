@@ -167,6 +167,12 @@ object Visuals {
     }
 
     /** A box blur (three passes ≈ a gaussian) with a fractional radius, then saturation and brightness. */
+    /** The background's colours, boosted to be vivid: the Saturation and Brightness sliders (Settings → Look) times a
+     *  little more of each, for every background (the moving one, a still image, the blurred Canvas). */
+    const val VIVID_SAT = 1.45; const val VIVID_BRI = 1.15
+    fun bgSat() = S.sat / 100.0 * VIVID_SAT
+    fun bgBri() = S.bri / 100.0 * VIVID_BRI
+
     fun blurBitmap(bm: Bitmap, rf: Double, sat: Double, bri: Double) {
         val w = bm.width; val h = bm.height; val px = IntArray(w * h); bm.getPixels(px, 0, w, 0, 0, w, h)
         val r0 = floor(rf).toInt(); val fr = rf - r0
@@ -205,7 +211,7 @@ object Visuals {
             val s = 128
             val pb = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
             paint(Canvas(pb), s)
-            blurBitmap(pb, S.bgblur * .06, S.sat / 100.0, S.bri / 100.0)
+            blurBitmap(pb, S.bgblur * .06, bgSat(), bgBri())
             if (fade && baked != null && !S.low) { bakedPrev = baked; spritesPrev = sprites.copyOf(); fadeAt = now() } else { bakedPrev = null; fadeAt = 0.0 }
             baked = pb
             val kw = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)

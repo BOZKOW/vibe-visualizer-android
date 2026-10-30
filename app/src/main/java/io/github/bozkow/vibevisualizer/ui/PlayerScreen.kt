@@ -121,6 +121,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import kotlin.math.roundToInt
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -181,15 +182,12 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         // while music plays untouched, the controls slide away (as in Spicy Lyrics Mobile): the cover, the song and the
         // seek bar stay; a tap brings the rest back
-        AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) { Header() }
+        TopBar()
         Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
             if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
         }
         if (S.view == "both") BarsView(Modifier.fillMaxWidth().height(48.dp).padding(bottom = 6.dp))
-        TitleRow(big = true)
-        if (noLyricsNote) NoLyricsNote(Modifier.fillMaxWidth())
-        Spacer(Modifier.height(10.dp))
-        SeekRow()
+        SongInfo(big = true, note = noLyricsNote)
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column { Transport(big = true); if (S.b("volshow")) VolumeRow(); BottomBar() }
         }
@@ -202,28 +200,24 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
 private fun LyricsScreen() {
     // a song without lyrics: the Lyrics screen looks like Now Playing (big cover, the song, the seek bar, controls that
     // slide away), with a short note under the song; the arrow at the top goes back to Now Playing
-    Crossfade(noLyrics(), label = "nolyrics") { big -> if (big) NowPlaying(noLyricsNote = true) else LyricsWithLyrics() }
+    Crossfade(Lyr.empty && Lyr.lines == 0, label = "nolyrics") { big -> if (big) NowPlaying(noLyricsNote = true) else LyricsWithLyrics() }
 }
 
 @Composable
 private fun LyricsWithLyrics() {
     val hidden = E.uiHidden
     Column(Modifier.fillMaxSize()) {
-        // Ambient mode: the lyrics take the whole page and the song docks at the bottom
-        AnimatedVisibility(!E.ambient, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(tween(900))) { MiniHeader() }
-        if (E.ambient) Spacer(Modifier.height(8.dp))
+        TopBar(Modifier.padding(horizontal = 24.dp), lyricsToggles = true)
         var areaH by remember { mutableFloatStateOf(0f) }
         Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
-            LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 24f, padEnd = 24f)
+            LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false)
         }
-        if (S.view == "both") BarsView(Modifier.fillMaxWidth().height(if (hidden) 96.dp else 64.dp).padding(horizontal = 12.dp))
-        LyricsCredits()
-        AnimatedVisibility(E.ambient, enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(tween(900)), exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()) {
-            Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp)) { TitleRow(big = false); SeekRow() }
-        }
+        if (S.view == "both") BarsView(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
+        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
-            Column(Modifier.padding(horizontal = 24.dp)) { SeekRow(); Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
+            Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
         }
+        if (hidden) Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -232,19 +226,16 @@ private fun LyricsWithLyrics() {
 private fun VizScreen() {
     val hidden = E.uiHidden
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Header(Modifier.padding(horizontal = 24.dp))
-        Spacer(Modifier.height(8.dp))
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) Box(Modifier.fillMaxWidth(.5f).aspectRatio(1f).ambientOut()) { CoverArt(Modifier.fillMaxSize(), corner = 18.dp) }
-                Spacer(Modifier.height(16.dp))
-                Column(Modifier.padding(horizontal = 24.dp)) { TitleRow(big = false, center = true) }
-            }
+        TopBar(Modifier.padding(horizontal = 24.dp))
+        Box(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.TopCenter) {
+            if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) Box(Modifier.fillMaxWidth(.5f).aspectRatio(1f).ambientOut()) { CoverArt(Modifier.fillMaxSize(), corner = 18.dp) }
             BarsView(Modifier.fillMaxWidth().fillMaxHeight(.44f).align(Alignment.BottomCenter).padding(horizontal = 10.dp))
         }
+        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
-            Column(Modifier.padding(horizontal = 24.dp)) { SeekRow(); Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
+            Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
         }
+        if (hidden) Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -389,7 +380,7 @@ private fun RightPane(modifier: Modifier) {
 @Composable
 private fun EmptyState() {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Header()
+        Header(problem = false)
         Spacer(Modifier.weight(1f))
         AppLogo(96.dp)
         Spacer(Modifier.height(20.dp))
@@ -414,50 +405,74 @@ private fun EmptyState() {
 
 /* ================= parts ================= */
 
-/** Where the music comes from, and the ⋮ menu. */
+/** The top of every portrait screen: where the music plays from and on what device, or what's wrong when something is.
+ *  It slides away with the controls, and stays (or comes back) while something's wrong. */
 @Composable
-private fun Header(modifier: Modifier = Modifier) {
+private fun TopBar(modifier: Modifier = Modifier, lyricsToggles: Boolean = false) {
+    val show = !E.uiHidden || E.problems(false).isNotEmpty() || Updates.downloading
+    AnimatedVisibility(show, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
+        Header(modifier, lyricsToggles = lyricsToggles)
+    }
+    if (!show) Spacer(Modifier.height(8.dp))
+}
+
+/** Where the music comes from and on what device; in its place, what's wrong and the one thing to do about it. */
+@Composable
+private fun Header(modifier: Modifier = Modifier, problem: Boolean = true, lyricsToggles: Boolean = false) {
     E.sec.intValue
-    val sp = E.src == "spotify"
-    val status = if (Updates.downloading) "Downloading the update · " + (Updates.progress * 100).toInt() + "%" else E.statusLine()
+    val prob = if (problem) E.problems(false).firstOrNull() else null
     val top = when (E.src) { "spotify" -> "PLAYING FROM SPOTIFY"; "file" -> "PLAYING ON THIS PHONE"; "media" -> "PLAYING FROM " + io.github.bozkow.vibevisualizer.media.MediaApps.appName().uppercase(); else -> "VIBE VISUALIZER" }
-    val sub = status ?: when (E.src) { "spotify" -> Spotify.device?.name?.let { "on $it" } ?: if (Spotify.meta == null) "Nothing playing" else ""; "file" -> Local.position(); else -> "" }
-    Row(modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { if (E.screen != "player" && !E.wide && E.src != "none") ScreenBack() }
-        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            // the lines cross-fade when they change (the app that plays, the device, a status)
-            AnimatedContent(top, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
-                Text(t, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = dim, maxLines = 1)
-            }
-            AnimatedContent(sub to (status != null), transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { (t, warn) ->
-                if (t.isNotEmpty()) Text(t, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (warn) Color(0xFFFFD27A) else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    val sub = if (Updates.downloading) "Downloading the update · " + (Updates.progress * 100).toInt() + "%"
+        else when (E.src) { "spotify" -> Spotify.device?.name?.let { "on $it" } ?: if (Spotify.meta == null) "Nothing playing" else ""; "file" -> Local.position(); else -> "" }
+    val toggles = lyricsToggles && (Lyr.needTr || Lyr.needRom)
+    val side = if (toggles) 96.dp else 48.dp   // the same on both sides, so the lines sit in the middle
+    Row(modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(side), contentAlignment = Alignment.CenterStart) { if (E.screen != "player" && !E.wide && E.src != "none") ScreenBack() }
+        // the lines cross-fade when they change: where it plays, the device, or a problem (a countdown in it just counts)
+        AnimatedContent(prob, Modifier.weight(1f), contentKey = { it?.let { p -> p.id + p.t } }, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hd") { p ->
+            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (p == null) {
+                    AnimatedContent(top, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
+                        Text(t, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = dim, maxLines = 1)
+                    }
+                    AnimatedContent(sub, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { t ->
+                        if (t.isNotEmpty()) Text(t, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (Updates.downloading) Color(0xFFFFD27A) else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                } else {
+                    // red for what's broken, yellow for what's waiting
+                    val tint = if (p.k == "err") Color(0xFFFFB4AB) else Color(0xFFFFD27A)
+                    Text(p.t, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (p.s.isNotEmpty()) Text(p.s, fontSize = 12.sp, color = dim, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                    p.act?.let { a ->
+                        TextButton(onClick = { E.haptic(); a.fn?.invoke() }, Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text(a.label, fontSize = 13.sp, color = tint) }
+                    }
+                }
             }
         }
-        // the round Settings button is right below while something plays; before that, this is the way in
-        if (E.src == "none") MoreButton() else Box(Modifier.size(48.dp))
+        Row(Modifier.width(side), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            if (toggles) {
+                if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
+                if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
+            }
+            // the round Settings button is at the foot while something plays; before that, this is the way in
+            if (E.src == "none") MoreButton()
+        }
     }
 }
 
-/** Lyrics: a small cover, the song, and the ⋮ menu. */
+/** The foot of every portrait screen: the song, the seek bar and where the lyrics are from. They stay when the
+ *  controls slide away. */
 @Composable
-private fun MiniHeader(showCover: Boolean = true) {
-    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (showCover) {   // with no lyrics the big cover is right below
-            Box(Modifier.size(52.dp).clip(RoundedCornerShape(10.dp))) { CoverArt(Modifier.fillMaxSize(), corner = 10.dp, small = true) }
-            Spacer(Modifier.width(12.dp))
-        } else Spacer(Modifier.width(8.dp))
-        // not a way back: only the Lyrics button (or Back) leaves the lyrics
-        val rise = remember { Animatable(1f) }
-        LaunchedEffect(E.trackVer) { if (!S.low && !E.reduceMotion()) { rise.snapTo(0f); rise.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
-        Column(Modifier.weight(1f).graphicsLayer { alpha = rise.value; translationY = (1 - rise.value) * 8f * density }) {
-            Text(E.title, style = TextStyle(shadow = textShadow), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val st = E.statusLine()
-            if (st != null) Text(st, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFFFD27A), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            else if (E.artist.isNotEmpty()) Text(E.artist, fontSize = 14.sp, color = dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun SongInfo(big: Boolean, note: Boolean = false) {
+    Column(Modifier.fillMaxWidth()) {
+        TitleRow(big = big)
+        if (note) NoLyricsNote(Modifier.fillMaxWidth())
+        Spacer(Modifier.height(if (big) 10.dp else 6.dp))
+        SeekRow()
+        val c = Lyr.credit
+        AnimatedVisibility(c != null && Lyr.lines > 0, enter = fadeIn(tween(600)) + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            if (c != null) CreditsLine(c, Modifier.fillMaxWidth().padding(bottom = 4.dp))
         }
-        if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
-        if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
-        MoreButton()
     }
 }
 

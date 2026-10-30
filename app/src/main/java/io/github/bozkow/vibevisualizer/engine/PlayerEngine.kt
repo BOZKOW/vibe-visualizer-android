@@ -82,7 +82,8 @@ object E {
     val activity: Activity? get() = actRef?.get()
 
     /* ---- notices, the Android way: a snackbar at the bottom (one at a time, one action at most), a dialog only for a
-       question you asked for, and problems as the empty state where the lyrics go (never on top of anything) ---- */
+       question you asked for, and problems in the top bar of the upright screens, or as the empty state where the lyrics go
+       on its side and in picture-in-picture (never on top of anything) ---- */
     class Act(val label: String, val pri: Boolean = false, val fn: (() -> Unit)? = null)
     class Snack(val msg: String, val kind: String = "ok", val action: Act? = null, val long: Boolean = false, val onDismiss: (() -> Unit)? = null) { val id = ++noteSeq }
     class Ask(val title: String, val msg: String, val actions: List<Act>)
@@ -125,12 +126,6 @@ object E {
             if (sp && wall() < Spotify.backoff) out.add(Prob(40, "wait", "wait", "Spotify paused requests", "Back in " + clockLeft((Spotify.backoff - wall()) / 1000.0) + (if (homeScreen) "" else " · the lyrics keep running")))
         }
         return out.sortedByDescending { it.pr }
-    }
-
-    /** The most important problem, in a few words, for the header. */
-    fun statusLine(): String? {
-        val p = problems(false).firstOrNull() ?: return null
-        return if (p.id == "wait") "Spotify paused · " + p.s.substringBefore(" ·").lowercase() else p.t
     }
 
     private fun openTailscale() {

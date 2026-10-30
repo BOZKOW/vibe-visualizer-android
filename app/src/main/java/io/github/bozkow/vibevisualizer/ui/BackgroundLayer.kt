@@ -148,8 +148,8 @@ private fun LiquidBackground() {
             shader.setFloatUniform("res", size.width, size.height)
             shader.setFloatUniform("t", Background.kwTime.toFloat() * 2.2f)
             shader.setFloatUniform("mixv", Visuals.kwFade(now()))
-            shader.setFloatUniform("sat", (1.5f * S.sat / 170f))
-            shader.setFloatUniform("dim", (1f - S.bri / 100f).coerceIn(0f, .85f))
+            shader.setFloatUniform("sat", (1.5f * S.sat / 170f * Visuals.VIVID_SAT.toFloat()))   // vivid (CoverColors)
+            shader.setFloatUniform("dim", (1f - Visuals.bgBri().toFloat()).coerceIn(0f, .85f))
             shader.setFloatUniform("pulse", Background.pulse.coerceIn(0f, 1f))
             drawRect(brush)
         }
@@ -189,7 +189,7 @@ private fun LayersBackground() {
 private fun StillBackground() {
     val bm = Background.still ?: return
     val img = remember(bm) { bm.asImageBitmap() }
-    val m = remember(S.bri, S.sat) { ColorMatrix().apply { setToSaturation(S.sat / 100f) }.also { cm -> val b = S.bri / 100f; cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) } }
+    val m = remember(S.bri, S.sat) { ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) } }
     Image(img, null, Modifier.fillMaxSize().scale(1.12f).blur((S.bgblur * .6f).dp), contentScale = ContentScale.Crop, colorFilter = ColorFilter.colorMatrix(m))
 }
 

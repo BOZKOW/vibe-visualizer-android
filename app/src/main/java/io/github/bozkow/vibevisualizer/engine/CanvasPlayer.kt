@@ -161,7 +161,7 @@ object CanvasVideo {
         val bm = grabs[grabI] ?: Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888).also { grabs[grabI] = it }
         if (runCatching { tv.getBitmap(bm) }.isFailure) return
         grabI = 1 - grabI
-        Visuals.blurBitmap(bm, S.bgblur * .025, S.sat / 100.0, S.bri / 100.0)
+        Visuals.blurBitmap(bm, S.bgblur * .025, Visuals.bgSat(), Visuals.bgBri())
         blurred = bm; blurVer++
     }
 

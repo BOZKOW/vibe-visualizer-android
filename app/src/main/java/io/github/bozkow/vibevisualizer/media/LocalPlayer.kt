@@ -81,7 +81,22 @@ object Local {
     /** "Song 2 of 5" while a queue plays, nothing for one song. */
     fun position(): String { val p = player ?: return ""; val n = p.mediaItemCount; return if (n > 1) "Song ${p.currentMediaItemIndex + 1} of $n" else "" }
     fun loaded() = (player?.mediaItemCount ?: 0) > 0
-    fun positionMs(): Double = player?.currentPosition?.toDouble() ?: 0.0
+    // the player's position only moves when it reports (about 4 times a second), so the lyrics and the bars stepped at
+    // 4 fps: between reports it runs on from the last one with the clock, and a report that agrees doesn't move it back
+    private var rawPos = Long.MIN_VALUE; private var rawAt = 0.0; private var lastEst = 0.0
+    fun positionMs(): Double {
+        val p = player ?: return 0.0
+        val raw = p.currentPosition
+        val now = android.os.SystemClock.elapsedRealtimeNanos() / 1e6
+        if (raw != rawPos) { rawPos = raw; rawAt = now }
+        if (!p.isPlaying) { lastEst = raw.toDouble(); return lastEst }
+        var est = raw + (now - rawAt) * p.playbackParameters.speed
+        val d = durationMs(); if (d > 0) est = minOf(est, d)
+        // no small steps back (a report landing a little behind the guess); a seek or a new song still jumps
+        if (est < lastEst && lastEst - est < 150) est = lastEst
+        lastEst = est
+        return est
+    }
     fun durationMs(): Double = player?.duration?.takeIf { it > 0 }?.toDouble() ?: 0.0
     fun hasNext() = player?.hasNextMediaItem() == true
 
