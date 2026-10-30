@@ -115,6 +115,8 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
@@ -970,6 +972,9 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
     // sizes: just behind the line, or down past what's wrong under it (it follows the error space as it opens and closes)
     val topK = 1f
 
+    // the video, recorded as it's drawn, so the background can draw it again blurred (on the GPU, see CanvasBlur)
+    val vid = rememberGraphicsLayer()
+    CanvasBlur(vid)
     Box((if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f))
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.22f / .56f) * c }.drawWithContent {
             drawContent()
@@ -992,7 +997,8 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
                 if (dark) drawRect(shade)
             }
         }) {
-        Box(Modifier.fillMaxSize().graphicsLayer { if (frost) renderEffect = if (size.height < 1f) null else frostBands(size.height, r, topPx / size.height, rampPx / size.height, from, topK) }) { CanvasVideoView() }
+        Box(Modifier.fillMaxSize().graphicsLayer { if (frost) renderEffect = if (size.height < 1f) null else frostBands(size.height, r, topPx / size.height, rampPx / size.height, from, topK) }
+            .drawWithContent { vid.record { this@drawWithContent.drawContent() }; drawLayer(vid) }) { CanvasVideoView() }
     }
 }
 

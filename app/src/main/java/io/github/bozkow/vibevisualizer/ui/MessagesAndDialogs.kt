@@ -36,6 +36,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedVisibility
@@ -72,11 +74,17 @@ fun TopNotes(modifier: Modifier = Modifier) {
     AnimatedVisibility(cur != null && over && !E.inPip, modifier, enter = slideInVertically { -it } + fadeIn(), exit = slideOutVertically { -it } + fadeOut()) {
         val n = last[0] ?: return@AnimatedVisibility
         val err = n.kind == "err"
-        Surface(Modifier.padding(horizontal = 12.dp).widthIn(max = 560.dp), shape = RoundedCornerShape(16.dp), color = if (err) Color(0xFF3A1F22) else Color(0xFF3A321F), contentColor = Color.White, shadowElevation = 6.dp) {
-            Row(Modifier.heightIn(min = 48.dp).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(n.msg, Modifier.weight(1f, fill = false).padding(vertical = 8.dp), fontSize = 14.sp)
+        // frosted glass: a dark pill that lets a little through (what's under it never shows through its words), lightly
+        // tinted by its kind (red for errors, amber for waits and warnings), lit from the top, with a thin light edge; in
+        // the middle, clear of the close button on either side, its words centred
+        val tint = when (n.kind) { "err" -> Color(0xFFFF6B6B); "warn" -> Color(0xFFFFC857); else -> Color.White }
+        Surface(Modifier.padding(horizontal = 60.dp).widthIn(max = 560.dp), shape = RoundedCornerShape(22.dp), color = Color(0xFF202027).copy(alpha = .9f),
+            contentColor = Color.White, shadowElevation = 8.dp, border = BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .38f), Color.White.copy(alpha = .08f))))) {
+            Row(Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = .2f), tint.copy(alpha = .06f)))).heightIn(min = 44.dp)
+                .padding(start = 16.dp, end = if (err) 4.dp else 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(n.msg, Modifier.weight(1f, fill = false).padding(vertical = 8.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                 if (err) TextButton(onClick = { E.haptic(); E.noteDone(n, n.action != null) }) {   // notices have nothing to press
-                    Text(n.action?.label ?: "OK", fontWeight = FontWeight.Bold, color = if (err) Color(0xFFFFB4AB) else Color(0xFFFFD27A))
+                    Text(n.action?.label ?: "OK", fontWeight = FontWeight.Bold, color = Color(0xFFFFB4AB))
                 }
             }
         }
@@ -125,9 +133,9 @@ fun AskDialog() {
 fun HeatWarning() {
     val w = io.github.bozkow.vibevisualizer.engine.Perf.warn.takeIf { !S.low } ?: 0
     val vis = androidx.compose.runtime.remember { androidx.compose.animation.core.MutableTransitionState(false) }; vis.targetState = w > 0
-    val last = androidx.compose.runtime.remember { object { var w = 1; var c: Double? = null } }
+    val last = androidx.compose.runtime.remember { object { var w = 1; var c = "" } }
     if (w > 0 && last.w != w) { last.w = w }
-    if (w > 0 && !vis.currentState) last.c = io.github.bozkow.vibevisualizer.engine.Perf.batteryC()
+    if (w > 0) last.c = io.github.bozkow.vibevisualizer.engine.Perf.cause   // what set it off (kept while it fades)
     if (w > 0) androidx.activity.compose.BackHandler { io.github.bozkow.vibevisualizer.engine.Perf.warnDone(false) }
     if (!vis.currentState && !vis.targetState) return
     val hot = last.w >= 2
@@ -144,7 +152,7 @@ fun HeatWarning() {
                     Icon(androidx.compose.material.icons.Icons.Rounded.DeviceThermostat, null, Modifier.size(if (short) 32.dp else 52.dp), tint = tint)
                 }
                 Text(if (hot) "Your phone is hot" else "Your phone is getting warm", Modifier.padding(top = if (short) 10.dp else 24.dp), fontSize = if (short) 22.sp else 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
-                last.c?.let { Text("Battery at " + Math.round(it) + " °C", Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint) }
+                last.c.takeIf { it.isNotEmpty() }?.let { Text(it.replaceFirstChar { ch -> ch.uppercase() }, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint, textAlign = TextAlign.Center) }
                 Text("Low performance mode keeps it cooler: the moving background and the live blurs rest, and the app draws fewer frames a second. You can turn it off again in Settings → Performance & battery.",
                     Modifier.padding(top = if (short) 8.dp else 14.dp), fontSize = if (short) 13.sp else 15.sp, lineHeight = if (short) 18.sp else 21.sp, color = Color.White.copy(alpha = .75f), textAlign = TextAlign.Center)
                 Button(onClick = { E.haptic(); io.github.bozkow.vibevisualizer.engine.Perf.warnDone(true) }, Modifier.padding(top = if (short) 14.dp else 28.dp).fillMaxWidth().height(if (short) 46.dp else 54.dp)) { Text("Turn on Low performance mode", fontSize = 16.sp) }

@@ -29,6 +29,13 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -55,7 +62,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** The background: the cover, alive (a liquid warp of it, as Spicy Lyrics' Kawarp; or drifting layers), a still
- *  image, a color, or the Canvas video blurred while one plays. */
+ *  image or a color. While a Canvas plays, the player draws it blurred over this ([CanvasBlur]), which then rests. */
 @Composable
 fun BackgroundLayer(modifier: Modifier = Modifier) {
     val style = S.bgStyle
@@ -70,10 +77,6 @@ fun BackgroundLayer(modifier: Modifier = Modifier) {
                 style == "color" -> Box(Modifier.fillMaxSize().background(Visuals.plainColor()))
                 else -> {}
             }
-        }
-        if (cvA > 0f) {
-            CanvasBlur(cvA)
-            Shade(cvA)
         }
     }
 }
@@ -193,23 +196,36 @@ private fun StillBackground() {
     Image(img, null, Modifier.fillMaxSize().scale(1.12f).blur((S.bgblur * .6f).dp), contentScale = ContentScale.Crop, colorFilter = ColorFilter.colorMatrix(m))
 }
 
-/** The Canvas video, blurred, as the background (from small frames of it). */
+/** The Canvas video, blurred, as the background behind everything: [vid] (the video as the player draws it, recorded)
+ *  drawn a second time on the GPU, 96 px along the screen's longer side, blurred there and stretched over the screen,
+ *  then shaded. Nothing comes back from the GPU: until 0.35.0 a small frame was copied back 12 times a second, and
+ *  each copy held up the frame being drawn, so the lyrics stuttered (the more the video moved, the worse). */
 @Composable
-private fun CanvasBlur(alpha: Float) {
-    CanvasVideo.blurVer
-    val bm = CanvasVideo.blurred ?: return
+fun CanvasBlur(vid: GraphicsLayer) {
+    val cvA by animateFloatAsState(if (CanvasVideo.cvlive) 1f else 0f, tween(800), label = "cv")
+    if (cvA <= 0f) return
+    val small = rememberGraphicsLayer()
+    val cf = remember(S.bri, S.sat) { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) }) }
     Canvas(Modifier.fillMaxSize()) {
-        drawIntoCanvas { c ->
-            val s = maxOf(size.width, size.height)
-            val p = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG).apply { this.alpha = (alpha * 255).toInt() }
-            c.nativeCanvas.drawBitmap(bm, null, android.graphics.RectF((size.width - s) / 2, (size.height - s) / 2, (size.width + s) / 2, (size.height + s) / 2), p)
+        val lw = vid.size.width; val lh = vid.size.height
+        if (lw > 0 && lh > 0) {
+            val k = 96f / maxOf(size.width, size.height)
+            val sw = maxOf(1, (size.width * k).roundToInt()); val sh = maxOf(1, (size.height * k).roundToInt())
+            // as soft as before: the background's Blur as the old three box passes over a 48-px frame, with that frame's
+            // own softness, here in 96-px pixels (a blur radius r is a sigma of .577 r + .5)
+            val rf = S.bgblur * .025
+            val sigma = 2f * kotlin.math.sqrt(.36 + rf * (rf + 1)).toFloat()
+            val r = ((sigma - .5f) / .57735f).coerceAtLeast(.5f)
+            small.renderEffect = BlurEffect(r, r, TileMode.Clamp)
+            small.colorFilter = cf
+            small.alpha = cvA
+            small.record(IntSize(sw, sh)) {
+                // the video covering the screen (upright it's the whole screen already; side by side, the left side's)
+                val sc = maxOf(sw / lw.toFloat(), sh / lh.toFloat())
+                translate((sw - lw * sc) / 2f, (sh - lh * sc) / 2f) { scale(sc, sc, pivot = Offset.Zero) { drawLayer(vid) } }
+            }
+            scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(small) }
         }
-    }
-}
-
-@Composable
-private fun Shade(alpha: Float) {
-    Canvas(Modifier.fillMaxSize()) {
-        drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = .15f * alpha), Color.Black.copy(alpha = .55f * alpha)), Offset(size.width * .7f, size.height * .5f), maxOf(size.width, size.height) * .8f))
+        drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = .15f * cvA), Color.Black.copy(alpha = .55f * cvA)), Offset(size.width * .7f, size.height * .5f), maxOf(size.width, size.height) * .8f))
     }
 }

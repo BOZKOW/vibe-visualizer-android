@@ -118,7 +118,7 @@ object E {
         out.addAll(problems(homeScreen))
         val h = Perf.hot
         if (h > 0 && S.b("perfAsk")) out.add(Prob(0, if (h >= 2) "err" else "wait", "heat", if (h >= 2) "Your phone is hot" else "Your phone is getting warm",
-            listOfNotNull(Perf.hotC?.let { "Battery at " + Math.round(it) + " °C" }, if (S.low) "Low performance mode is on" else null).joinToString(" · "),
+            listOfNotNull(Perf.cause.ifEmpty { null }, if (S.low) "Low performance mode is on" else null).joinToString(" · "),
             if (S.low || h < 2) null else Act("Low performance mode") { S.set("low", true) }))   // warm is a notice (no button); hot is a hard one
         val m = Lyr.msg
         if (!homeScreen && m != null && m.err) out.add(Prob(0, "err", "lyrics", m.msg, m.sub, m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull()))
@@ -529,7 +529,6 @@ object E {
         uiTick(t)
         if (Visuals.palDirty) Visuals.buildPal()
         val palMoving = Visuals.palTick(t)
-        CanvasVideo.frame(t)
         val pl = playing()
         val active = pl || Audio.mxv > .003f || Audio.idleK > .005f || palMoving
         if ((active || wasActive) && step) barsTick.longValue++

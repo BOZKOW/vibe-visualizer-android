@@ -1,11 +1,9 @@
 package io.github.bozkow.vibevisualizer.engine
 
-import android.graphics.Bitmap
 import android.net.Uri
 import android.view.TextureView
 import androidx.annotation.OptIn
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.media3.common.MediaItem
@@ -37,7 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Spotify Canvas videos (from your server, or the endpoint set in Settings) and your own canvas video. While one
- *  plays, the layout makes room for it and the background is the video itself, blurred. */
+ *  plays, the layout makes room for it and the background is the video itself, blurred (on the GPU: CanvasBlur). */
 @OptIn(UnstableApi::class)
 object CanvasVideo {
     private var player: ExoPlayer? = null
@@ -47,11 +45,7 @@ object CanvasVideo {
     var active by mutableStateOf(false); private set     // a Canvas is loading or playing: its video needs a view to play in
     var cvmode by mutableStateOf(false); private set     // the Canvas layout (once its first frame is shown)
     var cvlive by mutableStateOf(false); private set     // the blurred Canvas behind everything
-    var blurred: Bitmap? = null; private set
-    var blurVer by mutableIntStateOf(0); private set
     private var view: WeakReference<TextureView>? = null
-    private var lastCv = 0.0
-    private val grabs = arrayOfNulls<Bitmap>(2); private var grabI = 0   // two small frames, taken in turn (no new bitmap each time)
     private var revealAt = 0.0
 
     private val listener = object : Player.Listener {
@@ -92,7 +86,7 @@ object CanvasVideo {
     fun clear(keepLayout: Boolean) {
         url = null; ready = false; active = false; spicyId = null
         player?.let { it.stop(); it.clearMediaItems() }
-        blurred = null; cvlive = false
+        cvlive = false
         if (!keepLayout) cvmode = false
     }
 
@@ -188,20 +182,6 @@ object CanvasVideo {
     }
 
     fun onBackground() { player?.pause() }
-
-    /** The blurred Canvas: 12 times a second (it's a blur: more looks the same and costs a copy from the GPU each
-     *  time), a small frame of the video, blurred, as the background. */
-    fun frame(t: Double) {
-        if (!cvlive || t - lastCv < 80 || !E.visible) return
-        lastCv = t
-        val tv = view?.get() ?: return
-        if (!tv.isAvailable) return
-        val bm = grabs[grabI] ?: Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888).also { grabs[grabI] = it }
-        if (runCatching { tv.getBitmap(bm) }.isFailure) return
-        grabI = 1 - grabI
-        Visuals.blurBitmap(bm, S.bgblur * .025, Visuals.bgSat(), Visuals.bgBri())
-        blurred = bm; blurVer++
-    }
 
     /** How far the Canvas has faded in (0-1), for the layout change. */
     fun reveal(t: Double) = if (!hasVideo) 0f else ((t - revealAt) / 800).coerceIn(0.0, 1.0).toFloat()

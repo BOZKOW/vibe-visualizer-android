@@ -3,6 +3,7 @@ package io.github.bozkow.vibevisualizer.engine
 import android.os.PowerManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.core.Vibe
@@ -28,25 +29,35 @@ object Perf {
         if (secs >= 12) { if (bad >= 9) suggest("slow", sum / secs); secs = 0; bad = 0; sum = 0.0 }   // most of the last 12 seconds
     }
 
-    /** How warm Android says the phone is (the same signal it slows itself down by): getting warm (or about to be, by
-     *  its forecast for the next 10 s) or hot shows the warning. While the battery is cooling it never shows. Cooled
-     *  down, the next warm spell starts over. */
+    /** How warm the phone is: the battery at 40 °C or more (45: hot), or Android saying it's warm (its thermal status,
+     *  the same signal it slows itself down by, or its forecast for the next 10 s). Either shows the warning, saying
+     *  what set it off ([cause]). While the battery is cooling it never shows. Cooled down, the next warm spell starts
+     *  over. */
     private fun heat(t: Double) {
         val pm = Vibe.app.getSystemService(PowerManager::class.java) ?: return
         val st = runCatching { pm.currentThermalStatus }.getOrDefault(PowerManager.THERMAL_STATUS_NONE)
-        var level = when { st >= PowerManager.THERMAL_STATUS_SEVERE -> 2; st >= PowerManager.THERMAL_STATUS_MODERATE -> 1; else -> 0 }
+        val c = batteryC()
+        val why = ArrayList<String>()
+        var level = 0
+        if (c != null && c >= WARM_C) { level = if (c >= HOT_C) 2 else 1; why.add("Battery at " + Math.round(c) + " °C") }
+        if (st >= PowerManager.THERMAL_STATUS_MODERATE) {
+            level = maxOf(level, if (st >= PowerManager.THERMAL_STATUS_SEVERE) 2 else 1)
+            why.add("Android says it’s " + when (st) { PowerManager.THERMAL_STATUS_MODERATE -> "warm"; PowerManager.THERMAL_STATUS_SEVERE -> "hot"; else -> "very hot" } + " inside")
+        }
         if (level == 0 && t - roomAt > 10000) {   // Android asks for at most one forecast every few seconds
             roomAt = t
             room = runCatching { pm.getThermalHeadroom(10) }.getOrDefault(Float.NaN)
         }
-        if (level == 0 && !room.isNaN() && room >= .9f) level = 1   // 1.0: it would slow itself down
+        if (level == 0 && !room.isNaN() && room >= .9f) { level = 1; why.add("Android expects it to slow itself down within seconds") }   // 1.0: it would
+        // the battery's own reading always goes with what set it off
+        if (c != null && why.none { it.startsWith("Battery") }) why.add("battery " + Math.round(c) + " °C")
+        cause = why.joinToString(" · ")
         // the battery's temperature over the last minute (one reading every 5 s), to tell rising from dropping
-        val c = batteryC()
         if (c != null) { temps.addLast(c); while (temps.size > 13) temps.removeFirst() }
         val dropping = c != null && temps.size >= 7 && c <= temps.first() - .2   // cooled 0.2 °C or more within the minute
         hotC = c; hot = level   // shown at the top of the screen for as long as it lasts
         // cooled down for real (not just between two forecasts): the next warm spell may ask again
-        if (level == 0) { if (st <= PowerManager.THERMAL_STATUS_LIGHT && (room.isNaN() || room < .75f)) { spell = 0; notNowAt = 0.0; refC = null }; return }
+        if (level == 0) { if (st <= PowerManager.THERMAL_STATUS_LIGHT && (room.isNaN() || room < .75f) && (c == null || c < WARM_C - 1)) { spell = 0; notNowAt = 0.0; refC = null }; return }
         if (S.low || warn > 0 || dropping) return   // it's cooling: no warning
         // after "Not now", again while it's still warm: at each whole degree above the one it was at then (41.7 → at 42.0),
         // or every 10 minutes while it isn't dropping
@@ -55,6 +66,9 @@ object Perf {
         spell = maxOf(spell, level); notNowAt = 0.0
         asked = true; warn = level   // a warning over the whole screen
     }
+
+    private const val WARM_C = 40.0   // the battery's warm (the warning starts here) and hot, in °C
+    private const val HOT_C = 45.0
 
     private var battAt = 0.0
     private val temps = ArrayDeque<Double>()
@@ -87,6 +101,8 @@ object Perf {
     /** How warm the phone is now (checked every 5 s): 0 fine, 1 getting warm, 2 hot; and the battery then, in °C. */
     var hot by mutableIntStateOf(0); private set
     var hotC: Double? = null; private set
+    /** What made it warm: the battery's temperature, Android's thermal status or its forecast (with the battery's). */
+    var cause by mutableStateOf(""); private set
 
     /** The heat warning over the whole screen: 0 none, 1 getting warm, 2 hot. */
     var warn by mutableIntStateOf(0); private set
