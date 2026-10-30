@@ -161,7 +161,9 @@ private val dim = Color.White.copy(alpha = .68f)
 @Composable
 fun PlayerScreen() {
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 600.dp || (maxWidth > maxHeight && maxHeight < 520.dp)
+        // side by side: a big screen held wide (a tablet, an open foldable on its side), or a phone on its side; held
+        // upright they get the phone's layout, no wider than 600 dp
+        val wide = (maxWidth >= 600.dp && maxWidth >= maxHeight) || (maxWidth > maxHeight && maxHeight < 520.dp)
         if (E.wide != wide) E.wide = wide
         BackHandler(enabled = !wide && E.screen != "player" && E.settingsPage == null && !E.wizard) { E.show("player") }
         if (CanvasVideo.active) CanvasBackdrop(wide, centred = wide && maxHeight >= 560.dp && soloWide())
@@ -175,7 +177,9 @@ fun PlayerScreen() {
             wide -> Box(pad) { WideLayout() }
             // Lyrics and the Visualizer grow out of the button that opened them
             else -> AnimatedContent(E.screen, pad, transitionSpec = { (fadeIn(tween(320)) + scaleIn(spring(.86f, 400f), initialScale = if (Pop.calm) 1f else .9f, transformOrigin = Pop.origin())) togetherWith fadeOut(tween(220)) using SizeTransform(clip = false) }, label = "screen") { s ->
-                when (s) { "lyrics" -> LyricsScreen(); "viz" -> VizScreen(); else -> NowPlaying() }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                    Box(Modifier.widthIn(max = 600.dp).fillMaxSize()) { when (s) { "lyrics" -> LyricsScreen(); "viz" -> VizScreen(); else -> NowPlaying() } }
+                }
             }
         }
     }
@@ -445,8 +449,22 @@ private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolea
     val x0 = (at?.x ?: 0f) - (if (beside) e else 0f)
     val ww = w + (if (beside) 2 * e else 0f)
     val c = cut?.takeIf { beside && it.right > x0 && it.left < x0 + ww }
-    val lw = with(dens) { ((if (c != null) c.left - x0 else ww / 2) - gap).coerceAtLeast(1f).toDp() }
-    val rw = with(dens) { ((if (c != null) x0 + ww - c.right else ww / 2) - gap).coerceAtLeast(1f).toDp() }
+    // where each text goes (px from the row's start, and how wide): either side of a camera in the middle; with the
+    // camera near a corner, both share the side that has room; without one, a half each
+    val minSide = with(dens) { 90.dp.toPx() }
+    val half = gap / 2
+    val spots = if (c == null) floatArrayOf(0f, ww / 2 - half, ww / 2 + half, ww / 2 - half) else {
+        val l1 = c.left - x0 - gap; val r0 = c.right - x0 + gap
+        when {
+            l1 >= minSide && ww - r0 >= minSide -> floatArrayOf(0f, l1, r0, ww - r0)
+            // a corner: the side with room, shared (or all of it when there's no device to name)
+            l1 < minSide -> if (dev.isEmpty()) floatArrayOf(r0, ww - r0, ww, 0f) else { val m = (r0 + ww) / 2; floatArrayOf(r0, m - half - r0, m + half, ww - m - half) }
+            else -> if (dev.isEmpty()) floatArrayOf(0f, l1, l1, 0f) else { val m = l1 / 2; floatArrayOf(0f, m - half, m + half, l1 - m - half) }
+        }
+    }
+    val lx = spots[0]; val rx = spots[2]
+    val lw = with(dens) { spots[1].coerceAtLeast(1f).toDp() }
+    val rw = with(dens) { spots[3].coerceAtLeast(1f).toDp() }
     Box(modifier.fillMaxWidth()
         .onGloballyPositioned { lc ->
             val p = lc.positionInWindow(); at = p; w = lc.size.width.toFloat()
@@ -461,10 +479,10 @@ private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolea
         } else Modifier.height(32.dp))
         .graphicsLayer { alpha = if (at == null) 0f else 1f }) {
         // each in the middle of its side
-        AnimatedContent(top, Modifier.align(Alignment.CenterStart).width(lw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
+        AnimatedContent(top, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
             TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
         }
-        AnimatedContent(dev, Modifier.align(Alignment.CenterEnd).width(rw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { t ->
+        AnimatedContent(dev, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(rx.roundToInt(), 0) }.width(rw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { t ->
             TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
         }
     }
@@ -672,7 +690,9 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
 @Composable
 private fun BottomBar(big: Boolean = true, mid: Boolean = false) {
     val sp = E.src == "spotify"
-    val d = if (big) 54.dp else if (mid) 50.dp else 44.dp
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    // five that fit with room between them (a narrow phone, or the largest display size)
+    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 32.dp) / 5)
     Row(Modifier.fillMaxWidth().padding(top = if (big) 6.dp else 2.dp, bottom = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         BarIcon(VIcons.lyrics, "Lyrics", E.screen == "lyrics" && !E.wide || E.wide && E.screen != "viz", d) { E.show(if (E.screen == "lyrics" && !E.wide) "player" else "lyrics") }
         if (sp) BarIcon(Icons.Rounded.Cast, Spotify.device?.let { "Playing on ${it.name}" } ?: "Choose where Spotify plays", false, d) { E.openSheet("devices") }
@@ -680,6 +700,7 @@ private fun BottomBar(big: Boolean = true, mid: Boolean = false) {
         BarIcon(VIcons.bars, "Visualizer", E.screen == "viz", d) { E.show(if (E.screen == "viz") (if (E.wide) "lyrics" else "player") else "viz") }
         BarIcon(VIcons.resync, "Resync the lyrics", false, d) { Lyr.resync() }
         BarIcon(Icons.Rounded.Settings, "Settings", false, d) { E.openSettings() }
+    }
     }
 }
 

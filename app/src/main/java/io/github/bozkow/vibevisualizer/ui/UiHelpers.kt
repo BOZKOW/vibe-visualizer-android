@@ -180,6 +180,9 @@ fun cutoutInsets(): androidx.compose.foundation.layout.WindowInsets {
         val air = with(d) { 16.dp.roundToPx() }   // clear of the hole, not just beside it
         v.rootWindowInsets?.displayCutout?.boundingRects?.forEach { rc ->
             val toL = rc.left; val toR = w - rc.right
+            // inside the room Android keeps at the top or the bottom (a hole in a corner of a phone held upright): that
+            // room clears it already, so nothing at the side
+            if (rc.bottom <= t + 1 || rc.top >= h - b - 1) return@forEach
             if (minOf(toL, toR) > minOf(rc.top, h - rc.bottom)) return@forEach   // at the top or bottom
             if (toL <= toR) l = maxOf(l, rc.right + air) else r = maxOf(r, w - rc.left + air)
         }

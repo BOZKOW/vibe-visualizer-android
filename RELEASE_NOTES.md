@@ -1,4 +1,14 @@
-Vibe Visualizer for Android 0.30.1 (beta). Android 12 or newer; it installs over 0.30.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.30.2 (beta). Android 12 or newer; it installs over 0.30.1 (Settings → Help & about → Update now).
+
+Checked on other screen shapes this time (a small phone, the largest display and font sizes, a tablet both ways, a camera hole in a corner), which found these:
+
+### Fixed
+
+- **A camera hole in a corner no longer pushes everything to the side**: on phones with the hole near a top corner, the player and Settings were shifted right by about 64 dp when held upright. The room Android keeps at the top already clears such a hole.
+- **The top line with a corner camera**: both texts now share the side with room (or "Playing from" takes all of it when there's no device to name), instead of one squeezed next to the hole.
+- **The round buttons always fit**: at the largest display size (or on a narrow phone) the five round buttons touched each other; they now size themselves to fit with room between.
+- **Tablets and open foldables held upright** get the phone's layout (a big cover, the song, the controls), no wider than 600 dp and centred, instead of two narrow columns. Held wide, they keep the side-by-side layout.
+
 
 ### Fixed
 
