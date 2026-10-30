@@ -445,7 +445,7 @@ private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolea
     var w by remember { mutableFloatStateOf(0f) }
     var cut by remember { mutableStateOf<android.graphics.Rect?>(null) }   // the camera hole above the row
     val e = with(dens) { 8.dp.toPx() }      // up there it reaches a little further out (the corners are clear at that height)
-    val gap = with(dens) { 12.dp.toPx() }   // room to the camera
+    val gap = with(dens) { 22.dp.toPx() }   // room to the camera
     val x0 = (at?.x ?: 0f) - (if (beside) e else 0f)
     val ww = w + (if (beside) 2 * e else 0f)
     val c = cut?.takeIf { beside && it.right > x0 && it.left < x0 + ww }
@@ -474,8 +474,9 @@ private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolea
     }
 }
 
-/** A text of the top line, in the middle of its side; too long for it, it slides as a long song name does, fading out at
- *  both ends (or ends in "…" with Scroll long names off). */
+/** A text of the top line, in the middle of its side; too long for it, it slides on and on, as a long song name does,
+ *  fading out at both ends of its side. At rest its first letter is whole, just after the fade (or it ends in "…" with
+ *  Scroll long names off). */
 @Composable
 private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp) {
     var boxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -483,7 +484,8 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
     val over = boxW > 0 && textW > boxW
     Box(Modifier.fillMaxWidth().onSizeChanged { boxW = it.width }, contentAlignment = Alignment.Center) {
         if (!S.b("aMarquee")) Text(text, fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        else Text(text, (if (over) Modifier.fadeSides(10.dp, 14.dp) else Modifier).basicMarquee(iterations = if (E.settingsPage == null) 3 else 0, initialDelayMillis = 2500),
+        else Text(text, (if (over) Modifier.fadeSides(10.dp, 14.dp) else Modifier).basicMarquee(iterations = if (E.settingsPage == null) Int.MAX_VALUE else 0, initialDelayMillis = 2500)
+            .then(if (over) Modifier.padding(start = 10.dp) else Modifier),
             fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
     }
 }
@@ -585,7 +587,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, year: Boolean = fals
     }
 }
 
-/** A name that scrolls when it's too long for its row, fading out at both sides. */
+/** A name that scrolls on and on when it's too long for its row, fading out at both sides (it rests under Settings). */
 @Composable
 private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp) {
     var boxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -601,8 +603,8 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
     // whole. The right edge fades too, showing there's more. A name that fits isn't moved (a centred one would sit
     // off centre)
     val scroll = if (over) Modifier.layout { mm, c -> val p = mm.measure(c.copy(minWidth = 0, maxWidth = c.maxWidth + m)); layout(c.maxWidth, p.height) { p.place(-m, 0) } }
-        .fadeSides(20.dp, 28.dp).basicMarquee(iterations = if (E.settingsPage == null) 3 else 0, initialDelayMillis = 2500).padding(start = 20.dp)
-        else Modifier.basicMarquee(iterations = if (E.settingsPage == null) 3 else 0, initialDelayMillis = 2500)
+        .fadeSides(20.dp, 28.dp).basicMarquee(iterations = if (E.settingsPage == null) Int.MAX_VALUE else 0, initialDelayMillis = 2500).padding(start = 20.dp)
+        else Modifier.basicMarquee(iterations = if (E.settingsPage == null) Int.MAX_VALUE else 0, initialDelayMillis = 2500)
     Box(Modifier.onSizeChanged { boxW = it.width }) {
         Text(text, scroll, style = TextStyle(shadow = textShadow),
             fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
