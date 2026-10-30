@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -563,9 +564,16 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     AnimatedVisibility(p != null, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
         Column(Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally) {
-            // a different one cross-fades in; a countdown in the same one just counts
-            AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
-                Column(Modifier.fillMaxWidth().padding(vertical = if (row) 0.dp else 6.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
+            // on frosted glass, as the seek bar's track: a soft white pill with a light edge (no blur of its own: what's
+            // under it is the blurred background already); it grows and shrinks to each notice
+            val shape = RoundedCornerShape(if (row) 14.dp else 18.dp)
+            Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).clip(shape)
+                .background(Color.White.copy(alpha = .12f)).border(1.dp, Color.White.copy(alpha = .22f), shape).animateContentSize(tween(260))) {
+                // a different one cross-fades in; a countdown in the same one just counts
+                AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
+                    Column(Modifier.padding(start = 16.dp, end = if (q?.act != null) 6.dp else 16.dp, top = if (row) 4.dp else 8.dp, bottom = if (row) 4.dp else if (q?.act != null) 2.dp else 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
+                }
             }
             if (all.size > 1) Row(Modifier.padding(bottom = if (row) 2.dp else 4.dp)) {
                 all.indices.forEach { i ->
@@ -585,7 +593,7 @@ private fun NoticeLines(p: E.Prob, row: Boolean = false) {
     val act: @Composable () -> Unit = {
         p.act?.let { a -> TextButton(onClick = { E.haptic(); a.fn?.invoke() }, Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text(a.label, fontSize = 13.sp, color = tint) } }
     }
-    if (row) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+    if (row) Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
         // one text: the title whole first, the detail after it cut short if the row runs out
         Text(androidx.compose.ui.text.buildAnnotatedString {
             withStyle(androidx.compose.ui.text.SpanStyle(color = tint, fontWeight = FontWeight.Bold)) { append(p.t) }

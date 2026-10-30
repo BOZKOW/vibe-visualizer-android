@@ -1,6 +1,12 @@
-Vibe Visualizer for Android 0.35.2 (beta). Android 12 or newer; it installs over 0.35.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.35.3 (beta). Android 12 or newer; it installs over 0.35.2 (Settings → Help & about → Update now).
 
-### The line at the top, tidied
+### Notices on frosted glass
+
+- **What's wrong (or worth knowing) under the top line now sits on frosted glass**, the same soft white pill with a light edge as the seek bar's track, growing and shrinking to each notice. It isn't blurred live: what's under it is the blurred background already.
+
+## From 0.35.2
+
+#### The line at the top, tidied
 
 - **Where it plays from and where it plays now fit either side of the camera**: "PLAYING FROM SPOTIFY" and "PLAYING ON …" were too long for the room beside the camera, so both crawled along and mostly showed their first words ("PLAYING FROM SPO", "PLAYING ON LIVING"). Now it's an icon and the name: Spotify's logo and SPOTIFY (or the music app, or THIS PHONE) at the left, and the device's icon (a speaker, a phone, a computer, a TV) with its name at the right. Only a very long device name still scrolls.
 - **They sit at the edges**, as a status bar's clock and icons do, in line with the rest of the screen (each floated in the middle of its side). On its side the app keeps the one line in words: "PLAYING FROM SPOTIFY ON …".
