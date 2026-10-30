@@ -1,6 +1,13 @@
-Vibe Visualizer for Android 0.35.3 (beta). Android 12 or newer; it installs over 0.35.2 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.35.4 (beta). Android 12 or newer; it installs over 0.35.3 (Settings → Help & about → Update now).
 
-### Notices on frosted glass
+### Frosted glass everywhere
+
+- **In the Glass design, everything is the same frosted glass as the seek bar's track and the notices**: clear white over what's under it with a light edge, never blurred live (what's under it is blurred already). The cards in Settings, the search field, every button (the main ones tinted with the cover's colour, so they're still the ones to press), the switches while they're off (on, they keep the cover's colour, so on and off are told apart at a glance) and the menus' edges.
+- **The round buttons on the player** (under the controls, and translate and romanize) are frosted glass while they're off, in both designs; on, they're filled white as before.
+
+## From 0.35.3
+
+#### Notices on frosted glass
 
 - **What's wrong (or worth knowing) under the top line now sits on frosted glass**, the same soft white pill with a light edge as the seek bar's track, growing and shrinking to each notice. It isn't blurred live: what's under it is the blurred background already.
 

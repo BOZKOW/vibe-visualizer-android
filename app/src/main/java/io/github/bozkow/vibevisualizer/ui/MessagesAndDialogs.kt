@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.rounded.DeviceThermostat
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -155,7 +154,7 @@ fun HeatWarning() {
                 last.c.takeIf { it.isNotEmpty() }?.let { Text(it.replaceFirstChar { ch -> ch.uppercase() }, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint, textAlign = TextAlign.Center) }
                 Text("Low performance mode keeps it cooler: the moving background and the live blurs rest, and the app draws fewer frames a second. You can turn it off again in Settings → Performance & battery.",
                     Modifier.padding(top = if (short) 8.dp else 14.dp), fontSize = if (short) 13.sp else 15.sp, lineHeight = if (short) 18.sp else 21.sp, color = Color.White.copy(alpha = .75f), textAlign = TextAlign.Center)
-                Button(onClick = { E.haptic(); io.github.bozkow.vibevisualizer.engine.Perf.warnDone(true) }, Modifier.padding(top = if (short) 14.dp else 28.dp).fillMaxWidth().height(if (short) 46.dp else 54.dp)) { Text("Turn on Low performance mode", fontSize = 16.sp) }
+                VButton(onClick = { E.haptic(); io.github.bozkow.vibevisualizer.engine.Perf.warnDone(true) }, Modifier.padding(top = if (short) 14.dp else 28.dp).fillMaxWidth().height(if (short) 46.dp else 54.dp)) { Text("Turn on Low performance mode", fontSize = 16.sp) }
                 TextButton(onClick = { io.github.bozkow.vibevisualizer.engine.Perf.warnDone(false) }, Modifier.padding(top = 6.dp)) { Text("Not now", fontSize = 15.sp, color = Color.White.copy(alpha = .8f)) }
             }
         }

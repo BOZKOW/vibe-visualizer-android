@@ -38,14 +38,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -115,13 +112,13 @@ fun SetupWizard() {
             }
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
                 if (cur == "finish" && (useFile || (useSp && !Spotify.connected))) Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (useFile) FilledTonalButton(onClick = { done(); FilePicker.pickAudio() }, Modifier.weight(1f)) { Text("Play songs", maxLines = 1) }
-                    if (useSp && !Spotify.connected) FilledTonalButton(onClick = { done(); E.spLogin() }, Modifier.weight(1f)) { Text("Connect Spotify", maxLines = 1) }
+                    if (useFile) VTonalButton(onClick = { done(); FilePicker.pickAudio() }, Modifier.weight(1f)) { Text("Play songs", maxLines = 1) }
+                    if (useSp && !Spotify.connected) VTonalButton(onClick = { done(); E.spLogin() }, Modifier.weight(1f)) { Text("Connect Spotify", maxLines = 1) }
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     if (i > 0) TextButton(onClick = { i-- }) { Text("Back") }
                     Spacer(Modifier.weight(1f))
-                    Button(onClick = { if (i >= steps.size - 1) { done(); if (Spotify.connected) E.setSource("spotify") } else i++ }, enabled = !(cur == "welcome" && !useFile && !useSp)) {
+                    VButton(onClick = { if (i >= steps.size - 1) { done(); if (Spotify.connected) E.setSource("spotify") } else i++ }, enabled = !(cur == "welcome" && !useFile && !useSp)) {
                         Text(if (i >= steps.size - 1) "Start" else "Next")
                     }
                 }
@@ -183,7 +180,7 @@ fun ServerField(onDone: () -> Unit = {}, importPrefs: Boolean = false) {
     // the field shows https:// itself: a pasted address loses its own, so it never reads https://https://
     OutlinedTextField(t, { t = it.trim().replace(Regex("^https?://", RegexOption.IGNORE_CASE), "") }, Modifier.fillMaxWidth(), label = { Text("Your server") }, placeholder = { Text("name.your-tailnet.ts.net") }, singleLine = true, prefix = { Text("https://") },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done), keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { test() }))
-    FilledTonalButton(onClick = { test() }, Modifier.padding(top = 8.dp)) { Text("Test and save") }
+    VTonalButton(onClick = { test() }, Modifier.padding(top = 8.dp)) { Text("Test and save") }
     // the answer under the button, the whole width: an error with its advice is too long to sit beside it
     if (stat.isNotEmpty()) Text(stat, fontSize = 13.sp, color = Color.White.copy(alpha = .8f), modifier = Modifier.fillMaxWidth().padding(top = 6.dp))
     h?.let { j ->
@@ -257,7 +254,7 @@ private fun SpotifyStep() {
     Step(4, "Your Spotify account must be listed under the app’s User Management (development mode).")
     Step(5, "Connect and allow access. Play, pause, skip and seek through the Web API need Spotify Premium; with the Spotify app on this phone they work without it.", ok = Spotify.connected) {
         Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = { E.spLogin() }, enabled = !Spotify.connected && id.isNotEmpty()) { Text(if (Spotify.connected) "Connected ✓" else "Connect now") }
+            VButton(onClick = { E.spLogin() }, enabled = !Spotify.connected && id.isNotEmpty()) { Text(if (Spotify.connected) "Connected ✓" else "Connect now") }
         }
     }
 }
@@ -283,11 +280,11 @@ private fun SoundStep() {
     P("The bars react to sound. Your own files work straight away. For Spotify, the phone can listen to what it plays.")
     val perm = remember { mutableStateOf(Audio.permitted()) }
     Step(1, "Phone sound: everything this phone plays, the Spotify app included. Android asks for microphone access, which is only how apps may read the sound’s spectrum; nothing is recorded.", ok = perm.value) {
-        if (!perm.value) FilledTonalButton(onClick = { Perms.mic { ok -> perm.value = ok; if (ok) S.set("aCap", "phone") } }, Modifier.padding(top = 6.dp)) { Text("Allow") }
+        if (!perm.value) VTonalButton(onClick = { Perms.mic { ok -> perm.value = ok; if (ok) S.set("aCap", "phone") } }, Modifier.padding(top = 6.dp)) { Text("Allow") }
     }
     val acc = SpotifyApp.access.value
     Step(2, "Exact timing and controls from the Spotify app on this phone (no Premium needed for play, pause, skip and seek): allow notification access. No notification is read; it only lets the app see the Spotify app’s player.", ok = acc) {
-        if (!acc) FilledTonalButton(onClick = { Perms.notificationAccess() }, Modifier.padding(top = 6.dp)) { Text("Open notification access") }
+        if (!acc) VTonalButton(onClick = { Perms.notificationAccess() }, Modifier.padding(top = 6.dp)) { Text("Open notification access") }
     }
     if (!Vibe.cfg.local) Step(3, "Music on another device: run Vibe Bridge there with your server’s address, and the bars here follow it too.", ok = Audio.bridgeOn)
     LaunchedEffect(Unit) { SpotifyApp.refresh(Vibe.app) }
@@ -299,17 +296,17 @@ private fun FinishStep() {
     P("Last couple of preferences.")
     Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) { Text("Bars in every view", fontWeight = FontWeight.Bold, color = Color.White); Text("The visualizer as a strip under the cover and the lyrics, not only on the Visualizer screen.", fontSize = 13.sp, color = Color.White.copy(alpha = .65f)) }
-        Switch(S.view == "both", { S.set("view", if (it) "both" else "lyrics") })
+        VSwitch(S.view == "both", { S.set("view", if (it) "both" else "lyrics") })
     }
     Text("Lyrics credits", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(top = 8.dp))
     Row(Modifier.padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf("corner" to "Bottom-left corner", "lyrics" to "Under the lyrics").forEach { (k, l) ->
-            if (S.credPos == k) Button(onClick = {}) { Text(l) } else FilledTonalButton(onClick = { S.set("credPos", k) }) { Text(l) }
+            if (S.credPos == k) VButton(onClick = {}) { Text(l) } else VTonalButton(onClick = { S.set("credPos", k) }) { Text(l) }
         }
     }
     Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) { Text("Low performance mode", fontWeight = FontWeight.Bold, color = Color.White); Text("Turns off blur and glow effects. Useful on older phones.", fontSize = 13.sp, color = Color.White.copy(alpha = .65f)) }
-        Switch(S.low, { S.set("low", it) })
+        VSwitch(S.low, { S.set("low", it) })
     }
     Text("Good to know", fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(top = 16.dp))
     Hint("Lyrics and Visualizer are buttons under the player · tap a lyric line to jump there · swipe the lyrics to look around · tap the screen to bring the controls back · ⋮ has translation, timing and the rest.")

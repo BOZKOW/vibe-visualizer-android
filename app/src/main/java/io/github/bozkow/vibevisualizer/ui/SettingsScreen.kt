@@ -79,11 +79,9 @@ import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Storage
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -93,7 +91,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -541,7 +538,7 @@ fun ItemView(it: Item) {
             }
             if (on) ResetBtn(it.k)
             Spacer(Modifier.width(8.dp))
-            Switch(S.b(it.k), { v -> S.set(it.k, v); E.haptic() }, enabled = on)
+            VSwitch(S.b(it.k), { v -> S.set(it.k, v); E.haptic() }, enabled = on)
         } }
         is Item.Sl -> Needs(it.k) { on -> Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -611,7 +608,7 @@ private fun SwitchRow(t: String, d: String, on: Boolean, set: (Boolean) -> Unit)
             if (d.isNotEmpty()) Text(d, fontSize = 13.5.sp, lineHeight = 19.sp, color = Color.White.copy(alpha = .62f), modifier = Modifier.padding(top = 2.dp))
         }
         Spacer(Modifier.width(8.dp))
-        Switch(on, { E.haptic(); set(it) })
+        VSwitch(on, { E.haptic(); set(it) })
     }
 }
 
@@ -620,15 +617,15 @@ private fun SwitchRow(t: String, d: String, on: Boolean, set: (Boolean) -> Unit)
 private fun YourMusic() {
     val sp = E.src == "spotify"
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilledTonalButton(onClick = { E.haptic(); E.settingsPage = null; FilePicker.pickAudio() }) { Text("Play songs from your phone") }
-        if (!sp) FilledTonalButton(onClick = { E.haptic(); E.settingsPage = null; if (Spotify.connected) E.setSource("spotify") else E.spLogin() }) { Text(if (Spotify.connected) "Use Spotify" else "Connect Spotify") }
-        else FilledTonalButton(onClick = { E.haptic(); E.settingsPage = null; E.sheet = "devices" }) { Text("Choose where Spotify plays") }
+        VTonalButton(onClick = { E.haptic(); E.settingsPage = null; FilePicker.pickAudio() }) { Text("Play songs from your phone") }
+        if (!sp) VTonalButton(onClick = { E.haptic(); E.settingsPage = null; if (Spotify.connected) E.setSource("spotify") else E.spLogin() }) { Text(if (Spotify.connected) "Use Spotify" else "Connect Spotify") }
+        else VTonalButton(onClick = { E.haptic(); E.settingsPage = null; E.sheet = "devices" }) { Text("Choose where Spotify plays") }
     }
 }
 
 @Composable
 fun Buttons(vararg b: Pair<String, () -> Unit>) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { b.forEach { (l, f) -> FilledTonalButton(onClick = { E.haptic(); f() }) { Text(l) } } }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { b.forEach { (l, f) -> VTonalButton(onClick = { E.haptic(); f() }) { Text(l) } } }
 }
 
 @Composable
@@ -683,7 +680,7 @@ private fun Sources() {
                 }
                 IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i - 1].also { l[i - 1] = l[i] }; Lyr.setProv(l) }, enabled = i > 0) { Icon(Icons.Rounded.KeyboardArrowUp, "Move up") }
                 IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i + 1].also { l[i + 1] = l[i] }; Lyr.setProv(l) }, enabled = i < list.size - 1) { Icon(Icons.Rounded.KeyboardArrowDown, "Move down") }
-                Switch(p.on, { v -> Lyr.setProv(list.map { x -> if (x.k == p.k) x.copy(on = v) else x }) })
+                VSwitch(p.on, { v -> Lyr.setProv(list.map { x -> if (x.k == p.k) x.copy(on = v) else x }) })
             }
         }
         Hint("The first source that has the song is used. The arrows reorder, the switch turns a source off.")
@@ -752,7 +749,7 @@ private fun CacheButtons() {
         @Composable fun row(t: String, d: String, b: String, f: () -> Unit) {
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) { Text(t, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color.White); Text(d, fontSize = 12.5.sp, color = Color.White.copy(alpha = .6f)) }
-                Spacer(Modifier.width(10.dp)); FilledTonalButton(onClick = { E.haptic(); f() }) { Text(b) }
+                Spacer(Modifier.width(10.dp)); VTonalButton(onClick = { E.haptic(); f() }) { Text(b) }
             }
         }
         row("Clear this song’s cache", "Remove everything saved for the song that’s playing (lyrics, romanization, translation) and fetch it again.", "Clear") { Lyr.clearSong() }
@@ -773,8 +770,8 @@ private fun SpotifySection() {
             TextButton(onClick = { Lyr.copy(Spotify.redirectUri()); E.copied("Redirect URI") }) { Text("Copy URI") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!Spotify.connected) Button(onClick = { E.spLogin() }) { Text("Connect") }
-            else FilledTonalButton(onClick = { Spotify.disconnect(); if (E.src == "spotify") { E.setSource("none"); E.title = ""; E.artist = ""; Lyr.clear(""); E.goHome() } }) { Text("Disconnect") }
+            if (!Spotify.connected) VButton(onClick = { E.spLogin() }) { Text("Connect") }
+            else VTonalButton(onClick = { Spotify.disconnect(); if (E.src == "spotify") { E.setSource("none"); E.title = ""; E.artist = ""; Lyr.clear(""); E.goHome() } }) { Text("Disconnect") }
         }
         Text(if (!Spotify.connected) (if (id.isNotEmpty()) "Client ID saved. Press Connect." else "Not connected.") else if (E.src == "spotify") (if (Spotify.meta != null) "Connected · " + (if (Spotify.isPlaying) "playing" else "paused") else "Connected · nothing playing") else "Connected. Tap the Spotify chip to use it.",
             Modifier.padding(top = 8.dp), fontSize = 13.5.sp, color = Color.White)
@@ -828,8 +825,8 @@ private fun AppUpdates() {
         if (Updates.downloading) LinearProgressIndicator({ Updates.progress }, Modifier.fillMaxWidth().padding(vertical = 8.dp))
         if (Updates.stage.isNotEmpty()) Text(Updates.stage + if (Updates.downloading) " " + (Updates.progress * 100).toInt() + "%" else "", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-            FilledTonalButton(onClick = { Updates.checkApp(true) }) { Text("Check for updates") }
-            Updates.latest?.let { r -> Button(onClick = { Updates.install(r) }, enabled = !Updates.downloading) { Text("Update now") } }
+            VTonalButton(onClick = { Updates.checkApp(true) }) { Text("Check for updates") }
+            Updates.latest?.let { r -> VButton(onClick = { Updates.install(r) }, enabled = !Updates.downloading) { Text("Update now") } }
         }
         Hint("Update now downloads the new version from GitHub and installs it over this one; your settings and saved lyrics stay. The first time, Android asks you to allow it; after that, updates install by themselves.")
         if (Updates.notes.isNotEmpty()) {
@@ -871,8 +868,8 @@ private fun ServerUpdates() {
     Column {
         Text(Updates.serverStat, fontSize = 13.5.sp, color = Color.White)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-            FilledTonalButton(onClick = { Updates.checkServer(true) }, enabled = Server.set) { Text("Check") }
-            if (Updates.serverNew && Updates.serverCan) Button(onClick = { Updates.updateServer() }) { Text("Update now") }
+            VTonalButton(onClick = { Updates.checkServer(true) }, enabled = Server.set) { Text("Check") }
+            if (Updates.serverNew && Updates.serverCan) VButton(onClick = { Updates.updateServer() }) { Text("Update now") }
         }
         Hint("The web app (what a browser opens from your server) lives on your server; this downloads its newest version from GitHub onto the server (its settings, keys and saved lyrics stay).")
         Updates.serverNotes.take(5).forEachIndexed { i, n -> NoteView(n, i == 0) }
@@ -923,7 +920,7 @@ private fun About() {
 private fun glassMenu(): Modifier = Modifier.fadeEdges(10.dp, 10.dp)
 @Composable
 private fun glassMenuColor(): Color = Color(0xFF1D1D26)
-private val menuEdge = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = .12f))
+private val menuEdge = androidx.compose.foundation.BorderStroke(1.dp, GlassEdge)
 
 /* ================= Glass (Settings → Appearance → Design) =================
    Frosted glass over your cover: Settings shows the blurred cover behind it, and its rows sit in glass cards. */
@@ -1011,7 +1008,7 @@ private fun WidgetList() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ids.forEachIndexed { i, id ->
             val (w, h) = io.github.bozkow.vibevisualizer.widget.Widgets.sizeDp(id)
-            FilledTonalButton(onClick = { E.haptic(); ctx.startActivity(android.content.Intent(ctx, io.github.bozkow.vibevisualizer.widget.WidgetSetupActivity::class.java)
+            VTonalButton(onClick = { E.haptic(); ctx.startActivity(android.content.Intent(ctx, io.github.bozkow.vibevisualizer.widget.WidgetSetupActivity::class.java)
                 .putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, id)) }) {
                 Text(if (ids.size == 1) "Set up the widget" else "Set up widget ${i + 1} (${w}×$h)")
             }

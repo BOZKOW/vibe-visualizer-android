@@ -26,6 +26,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,13 +68,54 @@ import androidx.compose.ui.unit.sp
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.engine.E
 
-/** Frosted glass (the Glass design): a dark tint that keeps white text readable, a frost that's lighter at the top,
- *  and a shiny edge, bright along the top, as light catches glass. strong: for panels over busy content. */
+/* ---- Frosted glass, as the seek bar's track and the player's notices have it: clear white over what's under it, with
+   a light edge. Never blurred live: what's under it is blurred already. The Glass design puts it on every card,
+   button and switch; the player's round buttons have it in both designs. ---- */
+val GlassFill = Color.White.copy(alpha = .12f)
+val GlassEdge = Color.White.copy(alpha = .22f)
+
+/** Frosted glass on a card or panel: the glass over a little shade, so white text stays readable on a bright cover.
+ *  strong: more shade, for panels over busy content. */
 fun Modifier.glass(shape: Shape, strong: Boolean = false): Modifier {
     return this.clip(shape)
-        .background(Color(0xFF101018).copy(alpha = if (strong) .58f else .34f), shape)
-        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .17f), Color.White.copy(alpha = .06f), Color.White.copy(alpha = .09f))), shape)
-        .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .5f), Color.White.copy(alpha = .1f), Color.White.copy(alpha = .24f))), shape)
+        .background(Color(0xFF101018).copy(alpha = if (strong) .5f else .22f), shape)
+        .background(GlassFill, shape)
+        .border(1.dp, GlassEdge, shape)
+}
+
+/** Material's tonal button, or in the Glass design a frosted one. */
+@Composable
+fun VTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape = ButtonDefaults.filledTonalShape, content: @Composable RowScope.() -> Unit) {
+    if (!S.glass) return androidx.compose.material3.FilledTonalButton(onClick, modifier, enabled, shape = shape, content = content)
+    androidx.compose.material3.FilledTonalButton(onClick, modifier, enabled, shape = shape, border = BorderStroke(1.dp, if (enabled) GlassEdge else Color.White.copy(alpha = .08f)),
+        colors = ButtonDefaults.filledTonalButtonColors(containerColor = GlassFill, contentColor = Color.White, disabledContainerColor = Color.White.copy(alpha = .04f), disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+}
+
+/** Material's main button, or in the Glass design frosted glass tinted with the cover's colour (still the one to press). */
+@Composable
+fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
+    if (!S.glass) return androidx.compose.material3.Button(onClick, modifier, enabled, content = content)
+    val acc = MaterialTheme.colorScheme.primary
+    androidx.compose.material3.Button(onClick, modifier, enabled, border = BorderStroke(1.dp, if (enabled) Color.White.copy(alpha = .34f) else Color.White.copy(alpha = .08f)),
+        colors = ButtonDefaults.buttonColors(containerColor = acc.copy(alpha = .34f), contentColor = Color.White, disabledContainerColor = Color.White.copy(alpha = .04f), disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+}
+
+/** Material's outlined button, or in the Glass design a fainter frosted one. */
+@Composable
+fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
+    if (!S.glass) return androidx.compose.material3.OutlinedButton(onClick, modifier, enabled, content = content)
+    androidx.compose.material3.OutlinedButton(onClick, modifier, enabled, border = BorderStroke(1.dp, if (enabled) GlassEdge else Color.White.copy(alpha = .08f)),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White.copy(alpha = .05f), contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+}
+
+/** Material's switch; in the Glass design an off switch is frosted glass (on, it keeps the cover's colour, so on and
+ *  off are told apart at a glance). */
+@Composable
+fun VSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    if (!S.glass) return androidx.compose.material3.Switch(checked, onCheckedChange, modifier, enabled = enabled)
+    androidx.compose.material3.Switch(checked, onCheckedChange, modifier, enabled = enabled, colors = SwitchDefaults.colors(
+        uncheckedTrackColor = GlassFill, uncheckedBorderColor = Color.White.copy(alpha = .34f), uncheckedThumbColor = Color.White.copy(alpha = .7f),
+        disabledUncheckedTrackColor = Color.White.copy(alpha = .04f), disabledUncheckedBorderColor = Color.White.copy(alpha = .12f)))
 }
 
 /** Glass: a scrolling list fades out at its edges instead of being cut off in a hard line where it scrolls under

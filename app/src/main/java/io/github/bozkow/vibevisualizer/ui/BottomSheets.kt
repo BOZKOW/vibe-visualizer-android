@@ -37,17 +37,14 @@ import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -117,7 +114,7 @@ private fun MoreRow(icon: ImageVector, title: String, sub: String? = null, check
         headlineContent = { Text(title, fontWeight = FontWeight.SemiBold) },
         supportingContent = sub?.let { { Text(it, color = Color.White.copy(alpha = .6f)) } },
         leadingContent = { Icon(icon, null, tint = Color.White.copy(alpha = .85f)) },
-        trailingContent = checked?.let { c -> { Switch(c, { E.haptic(); onClick() }) } },
+        trailingContent = checked?.let { c -> { VSwitch(c, { E.haptic(); onClick() }) } },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.clip(RoundedCornerShape(16.dp)).clickable { E.haptic(); onClick() },
     )
@@ -157,7 +154,7 @@ private fun AudioSheet() {
             Text("Vibe Bridge", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
             Text("Real bars from the device that plays the music, through your server.", fontSize = 12.5.sp, color = Color.White.copy(alpha = .65f))
         }
-        Switch(S.b("bridge"), { S.set("bridge", it) })
+        VSwitch(S.b("bridge"), { S.set("bridge", it) })
     }
     val b = Audio.bridge
     Hint(when {
@@ -259,9 +256,9 @@ private fun TimingSheet() {
     Text("All songs: " + (if (off > 0) "+" else "") + off + " ms" + if (off > 0) " (earlier)" else if (off < 0) " (later)" else "", fontWeight = FontWeight.Bold, color = Color.White)
     Hint("Lyrics behind the music? Move them earlier.")
     Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedButton(onClick = { Lyr.nudge(-100) }) { Text("Later") }
+        VOutlinedButton(onClick = { Lyr.nudge(-100) }) { Text("Later") }
         Slider(off / 3000f, { S.set("loff", (Math.round(it * 3000 / 50f) * 50)) }, Modifier.weight(1f).padding(horizontal = 10.dp), valueRange = -1f..1f)
-        OutlinedButton(onClick = { Lyr.nudge(100) }) { Text("Earlier") }
+        VOutlinedButton(onClick = { Lyr.nudge(100) }) { Text("Earlier") }
     }
     Spacer(Modifier.height(14.dp))
     LaunchedEffect(Unit) { Outputs.refresh() }
@@ -270,22 +267,22 @@ private fun TimingSheet() {
     Hint(if (Outputs.here(E.src)) "Headphones, a car or a speaker can run behind: each output keeps its own timing, used whenever it plays (as Spicy Lyrics Mobile does)."
         else "The music plays on another device now, so this phone’s output timing isn’t used.")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { Outputs.set(oo - 50) }) { Text("−50 ms") }
-        OutlinedButton(onClick = { Outputs.set(oo + 50) }) { Text("+50 ms") }
-        if (oo != 0) FilledTonalButton(onClick = { Outputs.set(0) }) { Text("Reset") }
+        VOutlinedButton(onClick = { Outputs.set(oo - 50) }) { Text("−50 ms") }
+        VOutlinedButton(onClick = { Outputs.set(oo + 50) }) { Text("+50 ms") }
+        if (oo != 0) VTonalButton(onClick = { Outputs.set(0) }) { Text("Reset") }
     }
     Spacer(Modifier.height(14.dp))
     val so = Lyr.songOffMs
     Text("This song: " + (if (so > 0) "+" else "") + so + " ms", fontWeight = FontWeight.Bold, color = Color.White)
     Hint("Only for the song that’s playing, on top of the setting above (as Spicy Lyrics Mobile’s song delay).")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { Lyr.songOffSet(so - 100) }) { Text("−100 ms") }
-        OutlinedButton(onClick = { Lyr.songOffSet(so + 100) }) { Text("+100 ms") }
-        if (so != 0) FilledTonalButton(onClick = { Lyr.songOffSet(0) }) { Text("Reset") }
+        VOutlinedButton(onClick = { Lyr.songOffSet(so - 100) }) { Text("−100 ms") }
+        VOutlinedButton(onClick = { Lyr.songOffSet(so + 100) }) { Text("+100 ms") }
+        if (so != 0) VTonalButton(onClick = { Lyr.songOffSet(0) }) { Text("Reset") }
     }
     Spacer(Modifier.height(14.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
-        FilledTonalButton(onClick = { Lyr.resync() }) { Icon(VIcons.resync, null, Modifier.size(18.dp)); HSpace(6.dp); Text("Resync now") }
+        VTonalButton(onClick = { Lyr.resync() }) { Icon(VIcons.resync, null, Modifier.size(18.dp)); HSpace(6.dp); Text("Resync now") }
         Spacer(Modifier.width(12.dp))
         Text(if (Spotify.appTiming()) "Timing comes from the Spotify app on this phone." else "", fontSize = 12.sp, color = Color.White.copy(alpha = .6f), modifier = Modifier.weight(1f))
     }

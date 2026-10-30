@@ -42,10 +42,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Text
@@ -160,7 +158,7 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
         if (prob != null) ProblemState(prob, Modifier.align(Alignment.CenterStart).padding(start = padStart.dp, end = padEnd.dp))
         else if (n == 0 && m != null && (problems || !m.err)) LyricsMessage(m, Modifier.fillMaxSize().padding(start = padStart.dp, end = padEnd.dp), compact)
         AnimatedVisibility(view.lyFree, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp), enter = fadeIn() + slideInVertically { it }, exit = fadeOut() + slideOutVertically { it }) {
-            FilledTonalButton(onClick = { view.freeEnd() }, shape = pillShape) {
+            VTonalButton(onClick = { view.freeEnd() }, shape = pillShape) {
                 Icon(Icons.Rounded.ArrowDownward, null, Modifier.size(18.dp)); HSpace(6.dp); Text("Back to the lyrics being sung")
             }
         }
@@ -204,7 +202,7 @@ private fun EmptyLines(icon: ImageVector, title: String, sub: String, act: E.Act
     Text(title, fontSize = if (compact) 16.sp else 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
     if (sub.isNotEmpty()) Text(sub, Modifier.padding(top = 4.dp).widthIn(max = 460.dp), fontSize = if (compact) 13.sp else 15.sp, color = Color.White.copy(alpha = .65f))
     if (act != null || act2 != null) Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        act?.let { a -> FilledTonalButton(onClick = { E.haptic(); a.fn?.invoke() }) { Text(a.label) } }
+        act?.let { a -> VTonalButton(onClick = { E.haptic(); a.fn?.invoke() }) { Text(a.label) } }
         act2?.let { a -> TextButton(onClick = { E.haptic(); a.fn?.invoke() }) { Text(a.label) } }
     }
 }

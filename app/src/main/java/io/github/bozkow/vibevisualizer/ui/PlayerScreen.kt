@@ -84,8 +84,6 @@ import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -417,9 +415,9 @@ private fun EmptyState() {
         Text("Play a song from your phone, connect Spotify, or play something in YouTube Music, SoundCloud or another music app: the app follows it, with its cover and lyrics.",
             Modifier.padding(top = 8.dp).widthIn(max = 420.dp), fontSize = 15.sp, color = dim, textAlign = TextAlign.Center)
         Spacer(Modifier.height(22.dp))
-        Button(onClick = { E.haptic(); FilePicker.pickAudio() }, Modifier.fillMaxWidth().widthIn(max = 360.dp).height(52.dp)) { Text("Play songs from your phone", fontSize = 15.sp) }
+        VButton(onClick = { E.haptic(); FilePicker.pickAudio() }, Modifier.fillMaxWidth().widthIn(max = 360.dp).height(52.dp)) { Text("Play songs from your phone", fontSize = 15.sp) }
         Spacer(Modifier.height(10.dp))
-        FilledTonalButton(onClick = { E.haptic(); if (Spotify.connected) E.setSource("spotify") else E.spLogin() }, Modifier.fillMaxWidth().widthIn(max = 360.dp).height(52.dp)) {
+        VTonalButton(onClick = { E.haptic(); if (Spotify.connected) E.setSource("spotify") else E.spLogin() }, Modifier.fillMaxWidth().widthIn(max = 360.dp).height(52.dp)) {
             Icon(VIcons.spotify, null, Modifier.size(20.dp)); HSpace(8.dp); Text(if (Spotify.connected) "Use Spotify" else "Connect Spotify", fontSize = 15.sp)
         }
         Spacer(Modifier.weight(1f))
@@ -654,12 +652,13 @@ private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = fal
 
 @Composable
 private fun SmallToggle(icon: ImageVector?, desc: String, on: Boolean, text: String? = null, onClick: () -> Unit) {
-    val bg by androidx.compose.animation.animateColorAsState(if (on) Color.White else Color.White.copy(alpha = 0f), tween(220), label = "tglbg")
+    val bg by androidx.compose.animation.animateColorAsState(if (on) Color.White else GlassFill, tween(220), label = "tglbg")   // off: frosted glass
     val fg by androidx.compose.animation.animateColorAsState(if (on) Color(0xFF111116) else Color.White, tween(220), label = "tglfg")
     val pop = remember { Animatable(1f) }
     LaunchedEffect(on) { if (!S.low && !E.reduceMotion() && pop.value == 1f) { pop.snapTo(.82f); pop.animateTo(1f, spring(.45f, Spring.StiffnessMedium)) } }
     // like the seek bar: tapped while the controls are hidden, it only does its job (they stay away)
-    IconButton(onClick = { E.haptic(); onClick() }, Modifier.quietTouch().graphicsLayer { scaleX = pop.value; scaleY = pop.value }.semantics { contentDescription = desc },
+    IconButton(onClick = { E.haptic(); onClick() }, Modifier.quietTouch().graphicsLayer { scaleX = pop.value; scaleY = pop.value }
+        .border(1.dp, if (on) Color.Transparent else GlassEdge, CircleShape).semantics { contentDescription = desc; selected = on },
         colors = IconButtonDefaults.iconButtonColors(containerColor = bg, contentColor = fg)) {
         if (icon != null) Icon(icon, null, Modifier.size(20.dp)) else Text(text ?: "", fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
@@ -795,8 +794,9 @@ private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp
     val a by animateFloatAsState(if (enabled) 1f else .4f, tween(220), label = "barok")
     // on: filled white with a dark icon, as the translate and romanize buttons, so on and off can't be mistaken
     val fg = androidx.compose.ui.graphics.lerp(Color.White, Color(0xFF111116), k)
-    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).background(Color.White.copy(alpha = .92f * k))
-        .border(1.dp, Color.White.copy(alpha = .32f + .6f * k), CircleShape).clickable(src, androidx.compose.material3.ripple(), enabled = enabled) { E.haptic(); onClick() }
+    // off: frosted glass (GlassFill and GlassEdge, as the seek bar's track)
+    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).background(Color.White.copy(alpha = .12f + .8f * k))
+        .border(1.dp, Color.White.copy(alpha = .22f + .7f * k), CircleShape).clickable(src, androidx.compose.material3.ripple(), enabled = enabled) { E.haptic(); onClick() }
         .semantics { contentDescription = desc; selected = on }, contentAlignment = Alignment.Center) {
         if (icon != null) Icon(icon, null, Modifier.size(d * .42f), tint = fg)
         else Text(text ?: "", fontSize = (d.value * .3f).sp, fontWeight = FontWeight.Bold, color = fg)
