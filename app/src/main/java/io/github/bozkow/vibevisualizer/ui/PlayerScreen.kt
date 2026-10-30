@@ -74,6 +74,8 @@ import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.SkipNext
@@ -704,7 +706,7 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
     val sp = E.src == "spotify"
     val main = if (big) 56.dp else if (mid) 50.dp else 42.dp
     Row(Modifier.fillMaxWidth().padding(vertical = if (big) 6.dp else 0.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        if (sp) CtlIcon(Icons.Rounded.Shuffle, "Shuffle", size = 24.dp, enabled = Spotify.spState != null && "toggling_shuffle" !in Spotify.disallows, on = Spotify.shuffle) { Spotify.toggleShuffle() }
+        if (sp) CtlIcon(Icons.Rounded.Shuffle, "Shuffle", size = 24.dp, enabled = Spotify.spState != null && "toggling_shuffle" !in Spotify.disallows, on = Spotify.shuffle, dot = true) { Spotify.toggleShuffle() }
         else CtlIcon(if (Local.muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, if (Local.muted) "Unmute" else "Mute", enabled = E.src == "file") { Local.muted = !Local.muted }
         CtlIcon(Icons.Rounded.FastRewind, "Previous", size = main, enabled = E.src != "none", nudge = -1) { E.prev() }
         PlayButton(if (big) 76.dp else if (mid) 68.dp else 58.dp)
@@ -712,45 +714,70 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
         if (sp) {
             val r = Spotify.repeat
             CtlIcon(if (r == "track") Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat: " + when (r) { "context" -> "all"; "track" -> "this song"; else -> "off" },
-                size = 24.dp, enabled = Spotify.spState != null, on = r != "off") { Spotify.cycleRepeat() }
+                size = 24.dp, enabled = Spotify.spState != null, on = r != "off", dot = true) { Spotify.cycleRepeat() }
         } else Box(Modifier.size(48.dp))
     }
 }
 
-/** Lyrics · where it plays · Visualizer: the music app's bottom row. */
+/** The music app's bottom row: four buttons you pick (Settings → Player screen → Buttons under the controls; by
+ *  default Lyrics · where it plays · Visualizer · Resync), then Settings, always last: it's the way into them. */
 @Composable
 private fun BottomBar(big: Boolean = true, mid: Boolean = false) {
-    val sp = E.src == "spotify"
     BoxWithConstraints(Modifier.fillMaxWidth()) {
     // five that fit with room between them (a narrow phone, or the largest display size)
     val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 32.dp) / 5)
     Row(Modifier.fillMaxWidth().padding(top = if (big) 6.dp else 2.dp, bottom = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        BarIcon(VIcons.lyrics, "Lyrics", E.screen == "lyrics" && !E.wide || E.wide && E.screen != "viz", d) { E.show(if (E.screen == "lyrics" && !E.wide) "player" else "lyrics") }
-        if (sp) BarIcon(Icons.Rounded.Cast, Spotify.device?.let { "Playing on ${it.name}" } ?: "Choose where Spotify plays", false, d) { E.openSheet("devices") }
-        else BarIcon(Icons.Rounded.GraphicEq, "What the bars hear", false, d) { E.openSheet("audio") }
-        BarIcon(VIcons.bars, "Visualizer", E.screen == "viz", d) { E.show(if (E.screen == "viz") (if (E.wide) "lyrics" else "player") else "viz") }
-        BarIcon(VIcons.resync, "Resync the lyrics", false, d) { Lyr.resync() }
+        for (i in 1..4) BarButton(S.str("aBar$i"), d)
         BarIcon(Icons.Rounded.Settings, "Settings", false, d) { E.openSettings() }
     }
     }
 }
 
+/** One of the bottom row's buttons you pick (the keys of BAR_CHOICES in Settings). */
+@Composable
+private fun BarButton(k: String, d: Dp) {
+    val sp = E.src == "spotify"
+    when (k) {
+        "lyrics" -> BarIcon(VIcons.lyrics, "Lyrics", E.screen == "lyrics" && !E.wide || E.wide && E.screen != "viz", d) { E.show(if (E.screen == "lyrics" && !E.wide) "player" else "lyrics") }
+        "where" -> if (sp) BarIcon(Icons.Rounded.Cast, Spotify.device?.let { "Playing on ${it.name}" } ?: "Choose where Spotify plays", false, d) { E.openSheet("devices") }
+            else BarIcon(Icons.Rounded.GraphicEq, "What the bars hear", false, d) { E.openSheet("audio") }
+        "audio" -> BarIcon(Icons.Rounded.GraphicEq, "What the bars hear", false, d) { E.openSheet("audio") }
+        "viz" -> BarIcon(VIcons.bars, "Visualizer", E.screen == "viz", d) { E.show(if (E.screen == "viz") (if (E.wide) "lyrics" else "player") else "viz") }
+        "timing" -> BarIcon(Icons.Rounded.Timer, "Lyrics timing", false, d) { E.openSheet("timing") }
+        "tr" -> BarIcon(VIcons.translate, "Translate lyrics", S.tr, d) { toggleTr() }
+        "rom" -> BarIcon(null, "Romanize lyrics", S.romMode != "off", d, text = "あa") { toggleRom() }
+        "canvas" -> BarIcon(Icons.Rounded.Movie, "Canvas", S.canvasOn, d) { S.set("canvasOn", !S.canvasOn) }
+        "like" -> {
+            Spotify.version
+            val liked = sp && Spotify.liked == true
+            BarIcon(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Remove from Liked Songs" else "Save to Liked Songs", liked, d,
+                enabled = sp && Spotify.meta?.ep == false) { Spotify.toggleLike() }
+        }
+        "none" -> Spacer(Modifier.size(d))
+        else -> BarIcon(VIcons.resync, "Resync the lyrics", false, d) { Lyr.resync() }
+    }
+}
+
 /** A round outlined button (filled softly while it's the screen you're on). */
 @Composable
-private fun BarIcon(icon: ImageVector, desc: String, on: Boolean, d: Dp = 54.dp, onClick: () -> Unit) {
+private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp, text: String? = null, enabled: Boolean = true, onClick: () -> Unit) {
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val k by animateFloatAsState(if (on) 1f else 0f, tween(260), label = "baron")   // the highlight fades between screens
-    Box(Modifier.size(d).pressScale(src).clip(CircleShape).background(Color.White.copy(alpha = .16f * k))
-        .border(1.dp, Color.White.copy(alpha = .32f + .23f * k), CircleShape).clickable(src, androidx.compose.material3.ripple()) { E.haptic(); onClick() }
+    val a by animateFloatAsState(if (enabled) 1f else .4f, tween(220), label = "barok")
+    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).background(Color.White.copy(alpha = .16f * k))
+        .border(1.dp, Color.White.copy(alpha = .32f + .23f * k), CircleShape).clickable(src, androidx.compose.material3.ripple(), enabled = enabled) { E.haptic(); onClick() }
         .semantics { contentDescription = desc }, contentAlignment = Alignment.Center) {
-        Icon(icon, null, Modifier.size(d * .42f), tint = Color.White)
+        if (icon != null) Icon(icon, null, Modifier.size(d * .42f), tint = Color.White)
+        else Text(text ?: "", fontSize = (d.value * .3f).sp, fontWeight = FontWeight.Bold, color = Color.White)
     }
 }
 
 @Composable
-private fun CtlIcon(icon: ImageVector, desc: String, size: Dp = 24.dp, enabled: Boolean = true, on: Boolean = false, nudge: Int = 0, onClick: () -> Unit) {
+private fun CtlIcon(icon: ImageVector, desc: String, size: Dp = 24.dp, enabled: Boolean = true, on: Boolean = false, nudge: Int = 0, dot: Boolean = false, onClick: () -> Unit) {
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val tint by androidx.compose.animation.animateColorAsState(if (on) MaterialThemeAccent() else Color.White, tween(220), label = "ctlon")   // shuffle / repeat light up softly
+    // [dot]: a toggle (shuffle, repeat) has a small dot under it while it's on, popping in and shrinking away
+    val dk by animateFloatAsState(if (dot && on) 1f else 0f, if (Pop.calm) tween(0) else spring(.5f, Spring.StiffnessMedium), label = "ctldot")
     // previous / next ([nudge] -1 / 1): the arrows slide out the way you skip, fading, and spring back in from the other side
     val k = remember { Animatable(0f) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -759,7 +786,8 @@ private fun CtlIcon(icon: ImageVector, desc: String, size: Dp = 24.dp, enabled: 
         if (nudge != 0 && !Pop.calm) scope.launch { k.snapTo(0f); k.animateTo(1f, tween(130, easing = androidx.compose.animation.core.FastOutLinearInEasing)); k.snapTo(-1f); k.animateTo(0f, spring(.62f, 520f)) }
     }, enabled = enabled, interactionSource = src, modifier = Modifier.size(maxOf(48.dp, size + 12.dp)).pressScale(src, .86f).semantics { contentDescription = desc },
         colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent, contentColor = tint, disabledContentColor = Color.White.copy(alpha = .3f))) {
-        Icon(icon, null, Modifier.size(size).graphicsLayer { val x = k.value; translationX = x * nudge * size.toPx() * .38f; alpha = 1f - kotlin.math.abs(x) * .9f })
+        Icon(icon, null, Modifier.size(size).graphicsLayer { val x = k.value; translationX = x * nudge * size.toPx() * .38f; alpha = 1f - kotlin.math.abs(x) * .9f }
+            .drawWithContent { drawContent(); if (dk > .01f) drawCircle(tint, 2.2.dp.toPx() * dk.coerceAtMost(1.2f), Offset(this.size.width / 2, this.size.height + 5.dp.toPx()), alpha = dk.coerceIn(0f, 1f)) })
     }
 }
 

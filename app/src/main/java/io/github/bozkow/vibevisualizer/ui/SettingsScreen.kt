@@ -71,6 +71,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.PhoneAndroid
@@ -154,6 +155,11 @@ class Page(val id: String, val name: String, val icon: ImageVector, val items: L
 
 private val pct: (Int) -> String = { "$it%" }
 
+/** What the buttons under the controls can be (PlayerScreen's BarButton). */
+private val BAR_CHOICES = listOf("lyrics" to "Lyrics", "where" to "Where it plays (Spotify) / what the bars hear", "audio" to "What the bars hear",
+    "viz" to "Visualizer", "resync" to "Resync the lyrics", "timing" to "Lyrics timing", "tr" to "Translate", "rom" to "Romanize",
+    "canvas" to "Canvas on or off", "like" to "Like (Spotify)", "none" to "Nothing")
+
 private fun pages(): List<Page> = listOf(
     Page("look", "Look", Icons.Rounded.Palette, listOf(
         Item.Sub("Design"),
@@ -174,6 +180,12 @@ private fun pages(): List<Page> = listOf(
         Item.Ch("aHideSec", "Hide them after", listOf("2" to "2 seconds", "3" to "3 seconds", "5" to "5 seconds", "10" to "10 seconds"), "How long untouched while music plays."),
         Item.Sw("volshow", "Volume slider"),
         Item.Sw("aLike", "Like button", "The heart beside a Spotify song’s name, to save it to your Liked Songs."),
+        Item.Sub("Buttons under the controls"),
+        Item.Txt("The round buttons under play and pause. Settings is always the last one."),
+        Item.Ch("aBar1", "First button", BAR_CHOICES),
+        Item.Ch("aBar2", "Second button", BAR_CHOICES),
+        Item.Ch("aBar3", "Third button", BAR_CHOICES),
+        Item.Ch("aBar4", "Fourth button", BAR_CHOICES),
         Item.Sub("Song name and seek bar"),
         Item.Ch("aTitle", "Song name size", listOf("s" to "Small", "m" to "Medium", "l" to "Large")),
         Item.Sw("aMarquee", "Scroll long names", "A song name too long for its row scrolls through, fading at the sides. Off, it ends in “…”."),
@@ -189,7 +201,8 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("aHideStatus", "Hide the status bar", "The bar with the time and notifications at the top. Swipe down from the top to see it for a moment."),
         Item.Sw("aHideNav", "Hide the navigation bar", "The gesture bar or buttons at the bottom. Swipe up from the bottom to see it for a moment."),
         Item.Sw("aHaptics", "Haptic feedback", "A light tick on taps and toggles."),
-        Item.Sub("Ambient mode"),
+    ), sub = "Controls and their buttons, song name, seek bar, cover, lock screen, status and navigation bars", group = 0),
+    Page("ambient", "Ambient mode", Icons.Rounded.Bedtime, listOf(
         Item.Sw("aAmbient", "Ambient mode", "Left untouched while music plays, the screen dims to an always-on display: what you pick below on black. Any touch brings everything back."),
         Item.Ch("aAmbientSec", "Dim after", listOf("15" to "15 seconds", "30" to "30 seconds", "60" to "1 minute", "120" to "2 minutes", "300" to "5 minutes"), "How long untouched before Ambient mode dims the screen."),
         Item.Sw("aAmbClock", "Clock and date"),
@@ -201,7 +214,7 @@ private fun pages(): List<Page> = listOf(
         Item.Ch("aAmbBg", "Background", listOf("black" to "Black", "dim" to "The player, dimmed right down")),
         Item.Sl("aAmbBright", "Brightness", 3, 60, 1, "How bright the screen is at most while it's dimmed (never brighter than it was)."),
         Item.Sw("aAmbShift", "Drift a little every minute", "Moves everything a few pixels now and then, so nothing stays lit on the same spot (protects OLED screens from burn-in)."),
-    ), sub = "Controls, song name, seek bar, cover, Ambient mode, lock screen, status and navigation bars", group = 0),
+    ), sub = "The dimmed always-on screen while music plays untouched", group = 0),
     Page("canvas", "Canvas", Icons.Rounded.Movie, listOf(
         Item.Sw("canvasOn", "Canvas", "Spotify’s short looping video plays as the background behind the player (found by your server, or Spicy Lyrics’ Canvas service)."),
         Item.Sw("cvNoArt", "Hide the cover while a Canvas plays", "Only the Canvas, no cover in front of it."),
@@ -238,28 +251,34 @@ private fun pages(): List<Page> = listOf(
         Item.Custom("Sources, in priority order Spicy Lyrics LRCLIB NetEase AMLL Spotify your lyrics files") { Sources() },
         Item.Sw("lnotice", "No lyrics notice", "Say so when a song has no lyrics."),
         Item.Sw("aPreload", "Get the next songs ready", "A few seconds into a song, the next ones in the queue (the next five in Spotify’s, the next one in the music app’s or your files’) have their lyrics, Canvas and cover looked up, so they show the moment one starts, also when you skip a few. One more request to Spotify a song."),
-        Item.Sw("aRestCover", "Cover in long breaks", "With Focus mode: when nothing is sung for 10 s or more, the cover takes the lyrics’ place, until 2 s before the next line."),
         Item.Sub("Text"),
         Item.Sl("lsize", "Text size", 70, 150),
         Item.Ch("lfont", "Lyrics font", listOf("vv" to "Vibe Visualizer", "spicy" to "Spicy Lyrics", "system" to "System font"), "Spicy Lyrics: the display cut Spicy Lyrics shows lyrics in."),
-        Item.Sw("lblur", "Blur inactive lines"),
         Item.Sub("Style"),
         Item.Sw("lsimple", "Simple lyrics mode", "Drop the extra effects: words only fill, without growing, lifting or glowing."),
+        Item.Sw("xRefSimple", "Refreshed simple lyrics mode", "In Simple lyrics mode, the sung part fades in behind one soft edge, words float up as they’re sung, and the letters of a short held word swell, spread, lift and glow. From Spicy Lyrics 6.4.50."),
+        Item.Sw("xBgPop", "Background vocal pop-out", "Background vocals stay tucked under their line until it’s sung, then slide out while the lines below make room. Only with Simple lyrics and Refreshed simple lyrics on. From Spicy Lyrics 6.4.70."),
         Item.Sw("ljoin", "Join split words", "Show a word sung in syllables as one word, when its parts line up evenly. From Spicy Lyrics 6.4.50."),
         Item.Sw("lminimal", "Minimal lyrics mode", "Hide lines that have already been sung."),
+        Item.Sw("xKeep", "Keep overlapping lines", "In Minimal lyrics mode, a line that ends while one above it is still being sung stays on screen, dimmed. From Spicy Lyrics 6.4.50."),
+        Item.Sw("lblur", "Blur inactive lines"),
         Item.Sw("lhover", "Highlight on press", "Show a soft box behind a line while your finger is on it."),
         Item.Sw("lduet", "Duet line padding", "Indent each singer’s lines toward their side, so duets read as two columns."),
         Item.Sw("lbgBr", "Background vocals in brackets", "Show background vocals as (like this), as Spicy Lyrics Mobile can."),
+        Item.Sub("Focus mode"),
+        Item.Sw("xFocus", "Focus mode", "The line being sung is sharp in the middle and stays until it’s sung to the end. The next line flies in from the bottom 200 ms before it’s sung; finished lines fly up and disappear."),
+        Item.Sw("aRestCover", "Cover in long breaks", "With Focus mode: when nothing is sung for 10 s or more, the cover takes the lyrics’ place, until 2 s before the next line."),
         Item.Sub("Scrolling"),
         Item.Sw("lsmooth", "Smooth scrolling", "Glide from line to line instead of jumping."),
         Item.Sw("learly", "Early scroll", "Start scrolling to the next line just before it’s sung."),
         Item.Sl("learlyMs", "Early scroll time (ms)", 0, 800, 10, "How far ahead of the line the scroll starts.", fmt = { "$it ms" }),
         Item.Sub("Credits"),
+        Item.Sw("xRefCred", "Refined credits", "Quiet credits right below the last line: the songwriters, then the source, dim until the last line is sung, scrolled into view as the song ends. Turning it on moves the credits under the lyrics (below); off, they go back to the corner. From Spicy Lyrics 6.4.50."),
         Item.Ch("credPos", "Lyrics credits", listOf("corner" to "Bottom-left corner", "lyrics" to "Under the lyrics"), "The provider, maker and uploader are always shown while lyrics are on screen (required by Spicy Lyrics)."),
         Item.Sw("lcredLast", "Credits follow the last singer", "With credits under the lyrics: when a song ends on a line sung from the right, the credits move to the right too."),
         Item.Sub("Your lyrics files"),
         Item.Custom("Add lyrics files use a file for this song remove all") { MyFiles() },
-    ), sub = "Sources, size, font, style, scrolling, credits, your lyrics files", group = 1),
+    ), sub = "Sources, size, font, style, Focus mode, scrolling, credits, your lyrics files", group = 1),
     Page("timing", "Lyrics timing", Icons.Rounded.Timer, listOf(
         Item.Custom("Lyrics timing earlier later this song this output resync") { Buttons("Lyrics timing…" to { E.settingsPage = null; E.sheet = "timing" }) },
         Item.Sl("loff", "Timing offset (ms)", -3000, 3000, 50, "Lyrics behind the music? Raise it. Lyrics timing (above) also has this song’s and this output’s own.", fmt = { (if (it > 0) "+" else "") + it + " ms" }),
@@ -320,14 +339,9 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("fps", "Show FPS"),
     ), sub = "Low performance mode, Power saving, the heat warning, frame rate, animations", group = 3),
     Page("exp", "Experiments", Icons.Rounded.Science, listOf(
-        Item.Txt("Ideas being tried out. They may change, or go away, in a later version."),
-        Item.Sw("xRefCred", "Refined credits", "Quiet credits right below the last line: the songwriters, then the source, dim until the last line is sung, scrolled into view as the song ends. Turning it on moves the credits under the lyrics (Lyrics → Credits); off, they go back to the corner. From Spicy Lyrics 6.4.50."),
+        Item.Txt("Ideas being tried out. They may change, or go away, in a later version. The lyrics ones (Focus mode, Refined credits, Refreshed simple lyrics mode, Background vocal pop-out, Keep overlapping lines) are in Lyrics, beside what they go with."),
         Item.Sw("xScrub", "Scrub preview", "While you drag the seek bar, a bubble above your finger shows the time it would jump to (and the volume slider, the level). Off, the times show where the song is until you let go. From Spicy Lyrics 6.4.50."),
         Item.Sw("xSkeleton", "Lyrics loading skeleton", "While lyrics load, faint placeholder lines and a small “Loading lyrics” label instead of the big message. From Spicy Lyrics 6.4.0."),
-        Item.Sw("xKeep", "Keep overlapping lines", "In Minimal lyrics mode, a line that ends while one above it is still being sung stays on screen, dimmed. From Spicy Lyrics 6.4.50."),
-        Item.Sw("xBgPop", "Background vocal pop-out", "Background vocals stay tucked under their line until it’s sung, then slide out while the lines below make room. Only with Simple lyrics and Refreshed simple lyrics on. From Spicy Lyrics 6.4.70."),
-        Item.Sw("xRefSimple", "Refreshed simple lyrics mode", "In Simple lyrics mode, the sung part fades in behind one soft edge, words float up as they’re sung, and the letters of a short held word swell, spread, lift and glow. From Spicy Lyrics 6.4.50."),
-        Item.Sw("xFocus", "Focus mode", "The line being sung is sharp in the middle and stays until it’s sung to the end. The next line flies in from the bottom 200 ms before it’s sung; finished lines fly up and disappear."),
     ), sub = "Ideas being tried out", group = 3),
     Page("help", "Help & about", Icons.AutoMirrored.Rounded.Help, listOf(
         Item.Sub("App updates"),
@@ -480,16 +494,16 @@ private fun needs(k: String): String? = when (k) {
     "bgspeed" -> if (S.str("bgStyle") != "dynamic") "Only with the Dynamic background" else if (S.low) "Still in Low performance mode" else null
     "bgblur" -> if (S.str("bgStyle") in setOf("color", "none")) "Not with this background" else null
     "fpscap" -> if (S.low) "Low performance mode keeps it at 30 fps" else null
-    // Focus mode (Experiments) places, fades and blurs the lines its own way: what it does instead is greyed while
+    // Focus mode (Lyrics) places, fades and blurs the lines its own way: what it does instead is greyed while
     // it's on, and the cover in long breaks goes with it
-    "aRestCover" -> if (!S.xFocus) "Turn on Focus mode first (Experiments)" else null
+    "aRestCover" -> if (!S.xFocus) "Turn on Focus mode first (above)" else null
     "lblur" -> if (S.xFocus) "Focus mode blurs the lines its own way" else null
     "lminimal" -> if (S.xFocus) "Focus mode already hides the sung lines" else null
     "learly" -> if (S.xFocus) "Focus mode brings each line in its own way" else null
     "learlyMs" -> if (S.xFocus) "Focus mode brings each line in its own way" else if (!S.learly) "Turn on Early scroll first" else null
     "xKeep" -> if (S.xFocus) "Not in Focus mode" else if (!S.lminimal) "Turn on Minimal lyrics mode first" else null
     "xBgPop" -> if (!S.lsimple || !S.b("xRefSimple")) "Needs Simple lyrics and Refreshed simple lyrics mode" else null
-    "credPos" -> if (!S.b("xRefCred")) "Needs Refined credits (Experiments)" else null
+    "credPos" -> if (!S.b("xRefCred")) "Turn on Refined credits first (above)" else null
     "lcredLast" -> if (!S.b("xRefCred") || S.credPos != "lyrics") "Needs Refined credits under the lyrics" else null
     "xRefSimple" -> if (!S.lsimple) "Turn on Simple lyrics mode first" else null
     "aPipSize" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
