@@ -491,9 +491,14 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
 @Composable
 private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     val all = E.notices(home)
-    val ids = all.joinToString("|") { it.id }
+    val ids = all.map { it.id }
     var turn by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    LaunchedEffect(ids) { turn = 0; if (all.size > 1) while (true) { kotlinx.coroutines.delay(4500); turn++ } }
+    // on and on while there's more than one (a change in the list doesn't start them over)…
+    val many = all.size > 1
+    LaunchedEffect(many) { while (many) { kotlinx.coroutines.delay(4500); turn++ } }
+    // …and a new one shows first
+    val seen = remember { HashSet<String>() }
+    LaunchedEffect(ids) { if (ids.any { it !in seen }) turn = 0; seen.clear(); seen.addAll(ids) }
     val k = if (all.isEmpty()) 0 else turn % all.size
     val p = all.getOrNull(k)
     val last = remember { arrayOfNulls<E.Prob>(1) }   // still shown while it slides away
@@ -906,7 +911,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
                 if (dark) drawRect(shade)
             }
         }) {
-        Box(Modifier.fillMaxSize().graphicsLayer { if (frost) renderEffect = frostBands(size.height, r, topPx / maxOf(size.height, 1f), rampPx / maxOf(size.height, 1f), from, topK) }) { CanvasVideoView() }
+        Box(Modifier.fillMaxSize().graphicsLayer { if (frost) renderEffect = if (size.height < 1f) null else frostBands(size.height, r, topPx / size.height, rampPx / size.height, from, topK) }) { CanvasVideoView() }
     }
 }
 
@@ -914,8 +919,10 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
  *  opaque at the top (down to [top0], where the top's text ends; [topK] of it, fading while nothing's there), clear in the
  *  middle, and opaque again from a little below [from] (under the song, the seek bar and the controls), each edge a
  *  soft ramp. One blur pass on the GPU. */
-private fun frostBands(h: Float, r: Float, top0: Float, ramp: Float, from: Float, topK: Float): androidx.compose.ui.graphics.RenderEffect {
-    val top = top0.coerceIn(0f, from - ramp - .02f)
+private fun frostBands(h: Float, r: Float, top0: Float, ramp0: Float, from: Float, topK: Float): androidx.compose.ui.graphics.RenderEffect {
+    // never a range upside down (a crash in 0.29.0: a layer 0 px tall made the ramp 84 times the height)
+    val ramp = ramp0.coerceIn(.001f, .2f)
+    val top = top0.coerceIn(0f, maxOf(0f, from - ramp - .02f))
     val blur = android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
     val on = android.graphics.Color.BLACK; val off = android.graphics.Color.TRANSPARENT
     val up = android.graphics.Color.argb((topK.coerceIn(0f, 1f) * 255).toInt(), 0, 0, 0)   // the top band, only while something's there

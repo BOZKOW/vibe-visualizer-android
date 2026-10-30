@@ -73,7 +73,9 @@ object Updates {
                 val rel = AppRel(v, newest.tag, newest.apk, newest.note)
                 val newer = verCmp(v, mine) > 0
                 latest = if (newer && rel.apk.isNotEmpty()) rel else null
-                appStat = "Version ${BuildConfig.VERSION_NAME}" + if (newer) " · new version $v${if (rel.note.beta) " beta" else ""} is out" else " · the newest"
+                appStat = "Version ${BuildConfig.VERSION_NAME}" + if (newer) " · new version $v${if (rel.note.beta) " beta" else ""} is out" else " · you have the newest version"
+                // Check for updates pressed, and there's nothing newer: say so
+                if (manual && !newer) E.toast("You have the newest version (${BuildConfig.VERSION_NAME})", "ok")
                 if (newer && rel.apk.isNotEmpty() && (manual || prefs.getString("skip", "") != rel.tag) && E.settingsPage != "help")
                     E.snack(E.Snack("Version $v is available", "ok", E.Act("Update") { install(rel) }, long = true, onDismiss = { prefs.edit().putString("skip", rel.tag).apply() }))
             } catch (e: Exception) { appStat = "Couldn’t check for updates: " + e.message; if (manual) E.toast("Couldn’t check for updates", "warn") }
