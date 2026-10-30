@@ -166,7 +166,7 @@ fun PlayerScreen() {
         val wide = (maxWidth >= 600.dp && maxWidth >= maxHeight) || (maxWidth > maxHeight && maxHeight < 520.dp)
         if (E.wide != wide) E.wide = wide
         BackHandler(enabled = !wide && E.screen != "player" && E.settingsPage == null && !E.wizard) { E.show("player") }
-        if (CanvasVideo.active) CanvasBackdrop(wide, centred = wide && maxHeight >= 560.dp && soloWide())
+        if (CanvasVideo.active && !(wide && maxHeight < 560.dp)) CanvasBackdrop(wide, centred = wide && maxHeight >= 560.dp && soloWide())
         AmbientBlack()
         // clear of the bars and of the camera hole (where it really is: on its side some phones report less room)
         val pad = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.navigationBarsIgnoringVisibility).union(cutoutInsets()).only(WindowInsetsSides.Vertical + WindowInsetsSides.Horizontal))
@@ -302,48 +302,40 @@ private fun LandscapePhone() = LandscapeSplit()
 private val showCtl = expandVertically(expandFrom = Alignment.Top) + fadeIn()
 private val hideCtl = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
 
-/** The cover (a Canvas takes its place: the video fills that side; without lyrics it stays in front of the Canvas,
- *  unless Hide the cover while a Canvas plays is on), the song and the seek bar on the left; the lyrics on the right,
- *  or the bars when there are none. */
+/** A phone on its side: the cover as tall as the screen on the left (while a Canvas plays, the video itself there,
+ *  whole, 9:16); on the right where it plays (and what's wrong), the lyrics (or the bars: the Visualizer, or a song
+ *  without lyrics), the song, the seek bar and the controls in one row. */
 @Composable
 private fun LandscapeSplit() {
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Row(Modifier.weight(1f).fillMaxWidth()) {
-            Column(Modifier.fillMaxHeight().weight(.42f)) {
-                // where it plays and what's wrong: at the top of this side, clear of the lyrics
-                TopBar(side = true)
-                // the song beside the cover (there's no height for one under the other): the cover as tall as this side
-                // allows, the name and the artist next to it, at its foot
-                Row(Modifier.weight(1f).fillMaxWidth().padding(top = 6.dp, bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
-                    val keep = noLyrics() && !S.b("cvNoArt")
-                    val art = !CanvasVideo.cvmode || keep   // a Canvas without the cover: the name gets the whole width
-                    if (art) {
-                        Box(Modifier.fillMaxHeight().widthIn(max = 260.dp).fillMaxWidth(.56f), contentAlignment = Alignment.BottomStart) { ArtUnlessCanvas(withCanvas = keep) }
-                        Spacer(Modifier.width(14.dp))
-                    }
-                    Column(Modifier.weight(1f)) { TitleRow(big = !art) }
+    Row(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        // the picture: the cover, or the Canvas (its view is there while it loads: the first frame needs one to show in)
+        val video = CanvasVideo.active
+        val shown = CanvasVideo.cvmode
+        val k by animateFloatAsState(if (shown) 1f else 0f, tween(600), label = "landcv")
+        val ratio by animateFloatAsState(if (shown) 9f / 16f else 1f, if (S.low || E.reduceMotion()) tween(0) else spring(.9f, Spring.StiffnessLow), label = "landratio")
+        Box(Modifier.fillMaxHeight().aspectRatio(ratio, matchHeightConstraintsFirst = true).ambientOut(), contentAlignment = Alignment.Center) {
+            if (video) Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).graphicsLayer { alpha = maxOf(k, .01f) }) { CanvasVideoView() }
+            if (k < 1f) CoverArt(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - k }, corner = 16.dp)
+        }
+        Spacer(Modifier.width(20.dp))
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            TopBar(side = true)
+            val bars = E.screen == "viz" || noLyrics()
+            if (bars && E.screen != "viz") NoLyricsNote(Modifier.fillMaxWidth())
+            var areaH by remember { mutableFloatStateOf(0f) }
+            Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
+                if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 8.dp)); AwayNote(Modifier.align(Alignment.Center)) }
+                else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false)
+            }
+            SongInfo(big = false, toggles = !bars, lyrics = !bars)
+            AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1.2f)) { Transport(big = false) }
+                    Spacer(Modifier.width(12.dp))
+                    Box(Modifier.weight(1f)) { BottomBar(big = false) }
                 }
-                SeekRow()
-            }
-            Spacer(Modifier.width(20.dp))
-            RightPane(Modifier.fillMaxHeight().weight(.58f))
-        }
-        // the controls under each side: play / pause under the song, the round buttons under the lyrics
-        AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(.42f)) { Transport(big = false) }
-                Spacer(Modifier.width(20.dp))
-                Box(Modifier.weight(.58f), contentAlignment = Alignment.Center) { Box(Modifier.widthIn(max = 320.dp)) { BottomBar(big = false) } }
             }
         }
-    }
-}
-
-/** The cover, shrinking away while a Canvas plays (the video is the picture then), unless it stays [withCanvas]. */
-@Composable
-private fun ArtUnlessCanvas(withCanvas: Boolean = false) {
-    AnimatedVisibility(!CanvasVideo.cvmode || withCanvas, Modifier.ambientOut(), enter = fadeIn() + scaleIn(initialScale = .92f), exit = fadeOut() + scaleOut(targetScale = .92f)) {
-        CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true), corner = 16.dp)
     }
 }
 
