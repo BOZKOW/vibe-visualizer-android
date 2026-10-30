@@ -1,6 +1,12 @@
-Vibe Visualizer for Android 0.36.2 (beta). Android 12 or newer; it installs over 0.36.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.36.3 (beta). Android 12 or newer; it installs over 0.36.0–0.36.2 (Settings → Help & about → Update now).
 
-### Changed
+### Fixed
+
+- **Updates found the wrong newest version**: the app took the release published last for the newest, and 0.36.1's finished building after 0.36.2's, so 0.36.2 was never offered. The newest is now the highest version, whenever it was published.
+
+## From 0.36.2
+
+#### Changed
 
 - **No outline on the translate and romanize buttons**: off, they're just the frosted fill; on, filled white.
 - **No circle behind shuffle and repeat**: on, they're in the cover's colour with the dot under them.

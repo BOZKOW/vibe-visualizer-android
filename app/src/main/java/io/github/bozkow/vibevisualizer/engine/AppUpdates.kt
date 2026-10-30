@@ -67,7 +67,9 @@ object Updates {
         if (manual) appStat = "Checking…"
         Vibe.scope.launch {
             try {
-                val rels = fromApi() ?: ready(fromFeed())
+                // newest by version, not by when it was published: a release whose build finished later (0.36.1 after
+                // 0.36.2) was taken for the newest, and the real newest was never offered
+                val rels = (fromApi() ?: ready(fromFeed())).sortedWith { a, b -> verCmp(b.tag.removePrefix("android-v"), a.tag.removePrefix("android-v")) }
                 notes = rels.take(10).map { it.note }
                 val newest = rels.firstOrNull()
                 if (newest == null) { appStat = "Version ${BuildConfig.VERSION_NAME} · no app releases on GitHub yet."; return@launch }

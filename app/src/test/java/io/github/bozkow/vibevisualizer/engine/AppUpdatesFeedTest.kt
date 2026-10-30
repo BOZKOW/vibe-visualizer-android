@@ -44,4 +44,12 @@ animate&lt;/li&gt;
     }
 
     @Test fun nothing() = assertTrue(Updates.parseFeed("<html>not a feed</html>").isEmpty())
+
+    @Test
+    fun `the newest release is the highest version, whenever it was published`() {
+        // 0.36.1's build finished after 0.36.2's, so it was published later: it isn't the newer one
+        val tags = listOf("android-v0.36.1", "android-v0.36.2", "android-v0.36.0", "android-v0.35.10", "android-v0.35.9")
+        val sorted = tags.sortedWith { a, b -> Updates.verCmp(b.removePrefix("android-v"), a.removePrefix("android-v")) }
+        assertEquals(listOf("android-v0.36.2", "android-v0.36.1", "android-v0.36.0", "android-v0.35.10", "android-v0.35.9"), sorted)
+    }
 }
