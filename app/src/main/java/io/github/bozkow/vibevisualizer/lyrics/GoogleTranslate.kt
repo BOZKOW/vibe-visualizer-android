@@ -7,7 +7,7 @@ import java.net.URLEncoder
 
 /** Translation and romanization from Google Translate's free web endpoint (unofficial), as in the web app. */
 object Google {
-    private const val GT = "https://translate.googleapis.com/translate_a/single?client=dict-chrome-ex&sl=auto&dt=t&dt=rm&tl="
+    private const val GT = "https://translate.googleapis.com/translate_a/single?sl=auto&dt=t"
 
     class Res(val tr: List<String?>, val rom: List<String?>, val lang: String?)
     private class Chunk(val tr: List<String>?, val rom: List<String>?, val lang: String?)
@@ -15,7 +15,18 @@ object Google {
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
     private suspend fun chunk(lines: List<String>, tl: String): Chunk {
-        val r = Net.fetch(GT + enc(tl) + "&q=" + enc(lines.joinToString("\n|\n")), "google")
+        // Google's free endpoint answers 500 for some requests (romanization asked with a longer run of Latin-script
+        // lines, into some languages): the same once more under its other client name, then without its romanization
+        // (the app romanizes the main scripts itself), then in halves
+        var r = ask(lines, tl, "dict-chrome-ex", true)
+        if (r.code >= 500) r = ask(lines, tl, "gtx", true)
+        if (r.code >= 500) r = ask(lines, tl, "gtx", false)
+        if (r.code >= 500 && lines.size > 1) {
+            val h = lines.size / 2
+            val a = chunk(lines.subList(0, h), tl); val b = chunk(lines.subList(h, lines.size), tl)
+            fun <T> join(x: List<T>?, y: List<T>?) = if (x != null && y != null) x + y else null
+            return Chunk(join(a.tr, b.tr), join(a.rom, b.rom), a.lang ?: b.lang)
+        }
         if (!r.ok) throw NetError(if (r.code == 429) "Google is limiting requests right now, try again later" else "HTTP ${r.code}")
         val d = r.jsonArray() ?: throw NetError("unexpected answer")
         val segs = d.optJSONArray(0) ?: JSONArray()
@@ -30,6 +41,9 @@ object Google {
         val rom = if (rm.isNotEmpty()) split(rm.joinToString(" ")) else emptyList()
         return Chunk(tr.takeIf { it.size == lines.size }, rom.takeIf { it.size == lines.size }, d.optString(2).takeIf { it.isNotEmpty() && it != "null" })
     }
+
+    private suspend fun ask(lines: List<String>, tl: String, client: String, rom: Boolean) =
+        Net.fetch(GT + "&client=" + client + (if (rom) "&dt=rm" else "") + "&tl=" + enc(tl) + "&q=" + enc(lines.joinToString("\n|\n")), "google")
 
     suspend fun all(lines: List<String>, tl: String): Res {
         val tr = ArrayList<String?>(); val rom = ArrayList<String?>(); var lang: String? = null

@@ -1,4 +1,9 @@
-Vibe Visualizer for Android 0.33.1 (beta). Android 12 or newer; it installs over 0.33.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.33.2 (beta). Android 12 or newer; it installs over 0.33.1 (Settings → Help & about → Update now).
+
+### Fixed
+
+- **Translation failing with "HTTP 500"**: Google's free translation answers with a server error for some songs (a longer stretch of lyrics in Latin letters, translated into Czech and a few other languages, when its romanization is asked for too). The app now asks again in another way when that happens, and the translation comes through.
+
 
 ### Fixed
 
