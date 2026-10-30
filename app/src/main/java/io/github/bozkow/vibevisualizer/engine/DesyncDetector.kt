@@ -104,13 +104,13 @@ object Desync {
             Lyr.lAdj += lastFix; lastFix = 0.0; ign = true; reset(); Lyr.view.restAll()
             st("The last fix didn’t fit after all, so it was undone. This song is left as it is."); return
         }
-        val txt = "about " + String.format("%.1f", abs(e)) + " s " + (if (e > 0) "ahead of" else "behind") + " the singing"
-        val fix = { Lyr.lAdj -= e; lastFix = e; fixes++; reset(); Lyr.view.restAll(); st("Fixed: moved " + (if (e > 0) "back " else "ahead ") + String.format("%.1f", abs(e)) + " s.") }
+        val txt = "about " + String.format(java.util.Locale.getDefault(), "%.1f", abs(e)) + " s " + (if (e > 0) "ahead of" else "behind") + " the singing"
+        val fix = { Lyr.lAdj -= e; lastFix = e; fixes++; reset(); Lyr.view.restAll(); st("Fixed: moved " + (if (e > 0) "back " else "ahead ") + String.format(java.util.Locale.getDefault(), "%.1f", abs(e)) + " s.") }
         if (fixes >= 4) return   // something odd with this song: stop adjusting
-        if (S.str("lDesync") == "auto" || fixes > 0) { fix(); E.toast("Lyrics moved " + String.format("%.1f", abs(e)) + " s to match the singing", "ok"); return }   // once you've said yes, later fixes for the song just happen
+        if (S.str("lDesync") == "auto" || fixes > 0) { fix(); E.toast("Lyrics moved " + String.format(java.util.Locale.getDefault(), "%.1f", abs(e)) + " s to match the singing", "ok"); return }   // once you've said yes, later fixes for the song just happen
         if (asked) return
         asked = true; st("Lyrics look $txt.")
-        E.snack(E.Snack("Lyrics look " + String.format("%.1f", abs(e)) + " s " + (if (e > 0) "ahead" else "behind"), "warn", E.Act("Fix") { fix() }, long = true,
+        E.snack(E.Snack("Lyrics look " + String.format(java.util.Locale.getDefault(), "%.1f", abs(e)) + " s " + (if (e > 0) "ahead" else "behind"), "warn", E.Act("Fix") { fix() }, long = true,
             onDismiss = { dismissed++; if (dismissed >= 2) ign = true else { asked = false; next = now() + 60000 } }))
     }
 }

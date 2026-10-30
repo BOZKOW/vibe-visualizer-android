@@ -160,7 +160,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sl("bgblur", "Blur", 0, 100),
         Item.Sl("bri", "Brightness", 20, 140),
         Item.Sl("sat", "Saturation", 0, 300),
-        Item.Sl("bgspeed", "Motion speed (0 = still)", 0, 300, fmt = { if (it == 0) "Still" else String.format("%.2g×", it / 100.0) }),
+        Item.Sl("bgspeed", "Motion speed (0 = still)", 0, 300, fmt = { if (it == 0) "Still" else String.format(java.util.Locale.getDefault(), "%.2g×", it / 100.0) }),
     ), sub = "Design, colours, background", group = 0),
     Page("player", "Player screen", Icons.Rounded.PlayCircle, listOf(
         Item.Sub("Controls"),

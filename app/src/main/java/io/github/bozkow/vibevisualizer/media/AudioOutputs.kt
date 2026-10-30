@@ -23,6 +23,7 @@ import java.util.Locale
  *  speaker, so each keeps its own setting, used whenever it plays. A guess at the route, not a measurement of when
  *  the sound is heard. Ported from Spicy Lyrics Mobile by TheX24 (github.com/spicylyrics/mobile, AGPL-3.0:
  *  AudioOutputProfiles). */
+@android.annotation.SuppressLint("StaticFieldLeak")   // holds the application's context only, which lives as long as the app
 object Outputs {
     data class Route(val key: String, val label: String)
 

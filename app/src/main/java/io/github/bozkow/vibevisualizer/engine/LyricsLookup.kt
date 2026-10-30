@@ -745,7 +745,7 @@ object Lyr {
                 val moved = if (E.src == "spotify") Spotify.resync() else { if (E.src == "media") io.github.bozkow.vibevisualizer.media.MediaApps.resync(); null }
                 val undo = lAdj != 0.0; lAdj = 0.0; Desync.reset(true)
                 view.restAll()
-                E.toast(if (moved == null || abs(moved) < 40) "In sync" else "Moved " + String.format("%.2f", abs(moved) / 1000) + " s " + if (moved > 0) "ahead" else "back", "ok")
+                E.toast(if (moved == null || abs(moved) < 40) "In sync" else "Moved " + String.format(java.util.Locale.getDefault(), "%.2f", abs(moved) / 1000) + " s " + if (moved > 0) "ahead" else "back", "ok")
                 @Suppress("UNUSED_VARIABLE") val u = undo
             } catch (e: Exception) { E.toast("Couldn’t resync right now", "warn") }
             finally { resyncing = false }

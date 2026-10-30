@@ -87,7 +87,7 @@ fun fmtTime(s: Double): String =
 fun fmtWait(s: Double): String = when {
     s < 90 -> "${Math.round(s)} s"
     s < 5400 -> "${Math.round(s / 60)} min"
-    else -> String.format("%.1f h", s / 3600)
+    else -> String.format(java.util.Locale.getDefault(), "%.1f h", s / 3600)
 }
 
 fun ago(t: Long): String {

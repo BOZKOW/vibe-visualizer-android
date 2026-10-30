@@ -149,7 +149,7 @@ object Updates {
         if (downloading) return
         downloading = true; progress = 0f; stage = "Downloading the update…"
         Vibe.settings.flush()   // the installer ends the app: every setting is on disk first
-        prefs.edit().putString("whatsnew", rel.tag).commit()
+        @android.annotation.SuppressLint("ApplySharedPref") val ok = prefs.edit().putString("whatsnew", rel.tag).commit()   // on disk now: the installer ends the app
         Vibe.scope.launch {
             var sid = -1
             val pi = Vibe.app.packageManager.packageInstaller

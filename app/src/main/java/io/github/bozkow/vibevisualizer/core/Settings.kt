@@ -129,6 +129,7 @@ class Settings(ctx: Context) {
     private fun persist() { main.removeCallbacks(saveRun); main.postDelayed(saveRun, 300) }
     /** Writes the settings now and waits for it (leaving the app, before an update replaces it): nothing changed in the
      *  last moments is lost when the process ends. */
+    @android.annotation.SuppressLint("ApplySharedPref")   // on purpose: the process may end right after
     fun flush() { main.removeCallbacks(saveRun); sp.edit().putString("S", toJson().toString()).commit() }
 
     fun toJson(): JSONObject = JSONObject().also { o -> Defaults.S.keys.forEach { k -> o.put(k, get(k)) } }
