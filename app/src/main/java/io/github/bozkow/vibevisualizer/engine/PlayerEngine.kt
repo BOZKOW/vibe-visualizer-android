@@ -93,10 +93,11 @@ object E {
     val notes = mutableStateListOf<Snack>()        // the same for errors and warnings, at the top
     var ask by mutableStateOf<Ask?>(null)
 
+    /** Every message goes to the space at the top: hard errors with their one button, notices (good news, warnings,
+     *  waits) as words alone, with nothing to press. */
     fun snack(n: Snack) {
-        val q = if (n.kind == "ok") snacks else notes
-        if (q.any { it.msg == n.msg }) return
-        q.add(n); while (q.size > 3) q.removeAt(1)
+        if (notes.any { it.msg == n.msg }) return
+        notes.add(n); while (notes.size > 4) notes.removeAt(1)
     }
 
     /** A one-off error or warning is done: its button was pressed, or its time is up. */
@@ -110,12 +111,15 @@ object E {
      *  phone while it's warm, lyrics that couldn't load, and an update on its way. */
     fun notices(homeScreen: Boolean = false): List<Prob> {
         val out = ArrayList<Prob>()
-        notes.firstOrNull()?.let { n -> out.add(Prob(0, if (n.kind == "err") "err" else "wait", "note" + n.id, n.msg, "", Act(n.action?.label ?: "OK") { noteDone(n, n.action != null) })) }
+        notes.firstOrNull()?.let { n ->
+            val hard = n.kind == "err"   // a hard error keeps its button; a notice is words alone
+            out.add(Prob(0, if (hard) "err" else if (n.kind == "ok") "ok" else "wait", "note" + n.id, n.msg, "", if (hard) Act(n.action?.label ?: "OK") { noteDone(n, n.action != null) } else null))
+        }
         out.addAll(problems(homeScreen))
         val h = Perf.hot
         if (h > 0 && S.b("perfAsk")) out.add(Prob(0, if (h >= 2) "err" else "wait", "heat", if (h >= 2) "Your phone is hot" else "Your phone is getting warm",
             listOfNotNull(Perf.hotC?.let { "Battery at " + Math.round(it) + " °C" }, if (S.low) "Low performance mode is on" else null).joinToString(" · "),
-            if (S.low) null else Act("Low performance mode") { S.set("low", true) }))
+            if (S.low || h < 2) null else Act("Low performance mode") { S.set("low", true) }))   // warm is a notice (no button); hot is a hard one
         val m = Lyr.msg
         if (!homeScreen && m != null && m.err) out.add(Prob(0, "err", "lyrics", m.msg, m.sub, m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull()))
         if (Updates.downloading) out.add(Prob(0, "wait", "update", "Downloading the update", (Updates.progress * 100).toInt().toString() + "%"))

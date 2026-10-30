@@ -65,7 +65,7 @@ private class SnackLook(val s: E.Snack) : SnackbarVisuals {
 @Composable
 fun TopNotes(modifier: Modifier = Modifier) {
     val cur = E.notes.firstOrNull()
-    LaunchedEffect(cur?.id) { val n = cur ?: return@LaunchedEffect; delay(if (n.long || n.action != null) 10000L else 6000L); E.noteDone(n, false) }
+    LaunchedEffect(cur?.id) { val n = cur ?: return@LaunchedEffect; delay(if (n.kind == "err" && n.action != null) 10000L else if (n.long) 8000L else 5000L); E.noteDone(n, false) }
     val last = remember { arrayOfNulls<E.Snack>(1) }   // still shown while it slides away
     if (cur != null) last[0] = cur
     val over = E.settingsPage != null || E.wizard || E.sheet != null
@@ -75,7 +75,7 @@ fun TopNotes(modifier: Modifier = Modifier) {
         Surface(Modifier.padding(horizontal = 12.dp).widthIn(max = 560.dp), shape = RoundedCornerShape(16.dp), color = if (err) Color(0xFF3A1F22) else Color(0xFF3A321F), contentColor = Color.White, shadowElevation = 6.dp) {
             Row(Modifier.heightIn(min = 48.dp).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(n.msg, Modifier.weight(1f, fill = false).padding(vertical = 8.dp), fontSize = 14.sp)
-                TextButton(onClick = { E.haptic(); E.noteDone(n, n.action != null) }) {
+                if (err) TextButton(onClick = { E.haptic(); E.noteDone(n, n.action != null) }) {   // notices have nothing to press
                     Text(n.action?.label ?: "OK", fontWeight = FontWeight.Bold, color = if (err) Color(0xFFFFB4AB) else Color(0xFFFFD27A))
                 }
             }

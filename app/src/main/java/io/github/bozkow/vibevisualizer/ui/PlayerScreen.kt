@@ -166,7 +166,7 @@ fun PlayerScreen() {
         val wide = (maxWidth >= 600.dp && maxWidth >= maxHeight) || (maxWidth > maxHeight && maxHeight < 520.dp)
         if (E.wide != wide) E.wide = wide
         BackHandler(enabled = !wide && E.screen != "player" && E.settingsPage == null && !E.wizard) { E.show("player") }
-        if (CanvasVideo.active && !(wide && maxHeight < 560.dp)) CanvasBackdrop(wide, centred = wide && maxHeight >= 560.dp && soloWide())
+        if (CanvasVideo.active) CanvasBackdrop(wide, centred = wide && maxHeight >= 560.dp && soloWide())
         AmbientBlack()
         // clear of the bars and of the camera hole (where it really is: on its side some phones report less room)
         val pad = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.navigationBarsIgnoringVisibility).union(cutoutInsets()).only(WindowInsetsSides.Vertical + WindowInsetsSides.Horizontal))
@@ -302,38 +302,61 @@ private fun LandscapePhone() = LandscapeSplit()
 private val showCtl = expandVertically(expandFrom = Alignment.Top) + fadeIn()
 private val hideCtl = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
 
-/** A phone on its side: the cover as tall as the screen on the left (while a Canvas plays, the video itself there,
- *  whole, 9:16); on the right where it plays (and what's wrong), the lyrics (or the bars: the Visualizer, or a song
- *  without lyrics), the song, the seek bar and the controls in one row. */
+/** A phone on its side: while a Canvas plays, as on the desktop (the video over the left half, the cover smaller and
+ *  the song centred over it, the lyrics on the right); otherwise the cover as tall as the screen on the left. */
 @Composable
 private fun LandscapeSplit() {
+    Crossfade(CanvasVideo.cvmode, label = "landcv") { cv -> if (cv) LandscapeCanvas() else LandscapeCover() }
+}
+
+/** With a Canvas, the desktop's: the video fills the left half behind (the backdrop), and over it the cover, smaller,
+ *  with the song centred under it (without the cover, the song at the foot of the video); on the right where it plays,
+ *  the lyrics (or the bars), the seek bar and the controls. */
+@Composable
+private fun LandscapeCanvas() {
     Row(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
-        // the picture: the cover, or the Canvas (its view is there while it loads: the first frame needs one to show in)
-        val video = CanvasVideo.active
-        val shown = CanvasVideo.cvmode
-        val k by animateFloatAsState(if (shown) 1f else 0f, tween(600), label = "landcv")
-        val ratio by animateFloatAsState(if (shown) 9f / 16f else 1f, if (S.low || E.reduceMotion()) tween(0) else spring(.9f, Spring.StiffnessLow), label = "landratio")
-        Box(Modifier.fillMaxHeight().aspectRatio(ratio, matchHeightConstraintsFirst = true).ambientOut(), contentAlignment = Alignment.Center) {
-            if (video) Box(Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).graphicsLayer { alpha = maxOf(k, .01f) }) { CanvasVideoView() }
-            if (k < 1f) CoverArt(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - k }, corner = 16.dp)
+        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().ambientOut()) {
+            val noArt = S.b("cvNoArt")
+            val side = minOf(maxWidth * .5f, maxHeight - 96.dp, 220.dp).coerceAtLeast(96.dp)
+            Column(Modifier.fillMaxSize().padding(bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = if (noArt) Arrangement.Bottom else Arrangement.Center) {
+                if (!noArt) { CoverArt(Modifier.size(side), corner = 16.dp); Spacer(Modifier.height(12.dp)) }
+                TitleRow(big = false, center = true)
+            }
         }
         Spacer(Modifier.width(20.dp))
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            TopBar(side = true)
-            val bars = E.screen == "viz" || noLyrics()
-            if (bars && E.screen != "viz") NoLyricsNote(Modifier.fillMaxWidth())
-            var areaH by remember { mutableFloatStateOf(0f) }
-            Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
-                if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 8.dp)); AwayNote(Modifier.align(Alignment.Center)) }
-                else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false)
-            }
-            SongInfo(big = false, toggles = !bars, lyrics = !bars)
-            AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1.2f)) { Transport(big = false) }
-                    Spacer(Modifier.width(12.dp))
-                    Box(Modifier.weight(1f)) { BottomBar(big = false) }
-                }
+        SideColumn(Modifier.weight(1f), name = false)
+    }
+}
+
+/** Without a Canvas: the cover as tall as the screen on the left, everything else on the right. */
+@Composable
+private fun LandscapeCover() {
+    Row(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Box(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true).ambientOut()) { CoverArt(Modifier.fillMaxSize(), corner = 16.dp) }
+        Spacer(Modifier.width(20.dp))
+        SideColumn(Modifier.weight(1f), name = true)
+    }
+}
+
+/** The right side on its side: where it plays (and what's wrong), the lyrics (or the bars: the Visualizer, or a song
+ *  without lyrics), the song (unless its name is over the Canvas), the seek bar and the controls in one row. */
+@Composable
+private fun SideColumn(modifier: Modifier, name: Boolean) {
+    Column(modifier.fillMaxHeight()) {
+        TopBar(side = true)
+        val bars = E.screen == "viz" || noLyrics()
+        if (bars && E.screen != "viz") NoLyricsNote(Modifier.fillMaxWidth())
+        var areaH by remember { mutableFloatStateOf(0f) }
+        Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
+            if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 8.dp)); AwayNote(Modifier.align(Alignment.Center)) }
+            else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false)
+        }
+        SongInfo(big = false, toggles = !bars, lyrics = !bars, name = name)
+        AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1.2f)) { Transport(big = false) }
+                Spacer(Modifier.width(12.dp))
+                Box(Modifier.weight(1f)) { BottomBar(big = false) }
             }
         }
     }
@@ -497,7 +520,7 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
 }
 
 /** Under the top line: what's wrong (or that the phone is warm), while it lasts, even with the controls away. One at a
- *  time: several take turns (4.5 s each, a tap moves on to the next), a new one first, with a dot for each. */
+ *  time: several take turns (4.5 s each), a new one first, with a dot for each. Only a hard error has a button. */
 @Composable
 private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     val all = E.notices(home)
@@ -514,7 +537,7 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     val last = remember { arrayOfNulls<E.Prob>(1) }   // still shown while it slides away
     if (p != null) last[0] = p
     AnimatedVisibility(p != null, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
-        Column(Modifier.fillMaxWidth().clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null, enabled = all.size > 1) { turn++ },
+        Column(Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally) {
             // a different one cross-fades in; a countdown in the same one just counts
             AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
@@ -531,7 +554,7 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
  *  row on its side, where height is short. */
 @Composable
 private fun NoticeLines(p: E.Prob, row: Boolean = false) {
-    val tint = if (p.k == "err") Color(0xFFFFB4AB) else Color(0xFFFFD27A)
+    val tint = when (p.k) { "err" -> Color(0xFFFFB4AB); "ok" -> Color.White; else -> Color(0xFFFFD27A) }   // red broken, white good news, yellow waiting
     val act: @Composable () -> Unit = {
         p.act?.let { a -> TextButton(onClick = { E.haptic(); a.fn?.invoke() }, Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text(a.label, fontSize = 13.sp, color = tint) } }
     }
@@ -571,9 +594,13 @@ private fun AwayNote(modifier: Modifier) {
 /** The foot of every portrait screen: the song, the seek bar and where the lyrics are from. They stay when the
  *  controls slide away. */
 @Composable
-private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false) {
+private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false, name: Boolean = true) {
     Column(Modifier.fillMaxWidth()) {
-        TitleRow(big = big, toggles = toggles)
+        if (name) TitleRow(big = big, toggles = toggles)
+        else if (toggles && (Lyr.needTr || Lyr.needRom)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
+            if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
+        }
         if (note) NoLyricsNote(Modifier.fillMaxWidth())
         Spacer(Modifier.height(if (big) 10.dp else 6.dp))
         SeekRow()
@@ -892,7 +919,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
     val behind = S.str("cvBehind")
     val dark = behind == "dark" || behind == "both" || (behind == "blur" && S.low)   // Low performance: no blur, the gradient instead
     // only while the video shows (not while it loads, nor once it's gone): the whole Canvas blurred already, nothing to add
-    val frost = (behind == "blur" || behind == "both") && !S.low && !S.b("cvBlur") && CanvasVideo.cvmode
+    val frost = (behind == "blur" || behind == "both") && !S.low && !S.b("cvBlur") && CanvasVideo.cvmode && !wide   // side by side nothing sits on the video (the desktop's)
     // the blur reaches up to the song while the controls show, and sinks with them when they hide
     val sink by animateFloatAsState(if (E.uiHidden) 1f else 0f, tween(600, easing = FastOutSlowInEasing), label = "cvsink")
     val from = when { wide -> .52f; behindLyrics -> .6f; else -> .5f } + .12f * sink
@@ -903,8 +930,8 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
     // sizes: just behind the line, or down past what's wrong under it (it follows the error space as it opens and closes)
     val topK = 1f
 
-    Box((if (wide) Modifier.fillMaxHeight().fillMaxWidth(.68f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f))
-        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.16f / .68f) * c }.drawWithContent {
+    Box((if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f))
+        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.22f / .56f) * c }.drawWithContent {
             drawContent()
             // as dark at the top (behind the status bar and the top bar) as behind the controls at the bottom
             val tf = ((topPx + rampPx * 2) / size.height).coerceIn(.02f, .45f)
@@ -912,8 +939,9 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
             if (wide) {
                 // side by side: the shade fades out with the video (drawn after the fade it stopped in a hard line at the
                 // edge), over a long, eased fade into the blurred Canvas behind
-                if (dark) drawRect(shade)
-                val s = .3f + .4f * c   // where the fade starts: long beside the lyrics, short in the middle
+                // the desktop's: darker at the top and the foot, for the text over it
+                drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .4f), .22f to Color.Transparent, .52f to Color.Transparent, 1f to Color.Black.copy(alpha = .7f)))
+                val s = .4f + .3f * c   // where the fade starts (the desktop's 40 %): long beside the lyrics, short in the middle
                 drawRect(Brush.horizontalGradient(0f to Color.Black, *Array(6) { i -> (s + (1 - s) * EASE_AT[i]) to Color.Black.copy(alpha = EASE_A[i]) }), blendMode = BlendMode.DstIn)
                 // in the middle, the same fade on the left
                 if (c > 0f) drawRect(Brush.horizontalGradient(*Array(6) { k -> val j = 5 - k; .3f * (1 - EASE_AT[j]) to Color.Black.copy(alpha = 1 - c * (1 - EASE_A[j])) }, 1f to Color.Black), blendMode = BlendMode.DstIn)
