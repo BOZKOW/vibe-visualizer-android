@@ -1,6 +1,13 @@
-Vibe Visualizer for Android 0.36.1 (beta). Android 12 or newer; it installs over 0.36.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.36.2 (beta). Android 12 or newer; it installs over 0.36.1 (Settings → Help & about → Update now).
 
 ### Changed
+
+- **No outline on the translate and romanize buttons**: off, they're just the frosted fill; on, filled white.
+- **No circle behind shuffle and repeat**: on, they're in the cover's colour with the dot under them.
+
+## From 0.36.1
+
+#### Changed
 
 - **Lyrics timing is right in Settings** (Settings → Lyrics timing): all songs, this output, this music app and this song, and Resync, on the page itself instead of behind a button that opened a separate window. The timing button under the controls still opens it as a quick pop-up.
 - **More frosted glass in the Glass design**: the pop-up sheets (Lyrics timing, where it plays, what the bars hear…) and the questions the app asks, the sliders' tracks, and the options to pick from in the sheets and the setup guide (the picked one tinted with the cover's colour).

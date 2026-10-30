@@ -658,7 +658,7 @@ private fun SmallToggle(icon: ImageVector?, desc: String, on: Boolean, text: Str
     LaunchedEffect(on) { if (!S.low && !E.reduceMotion() && pop.value == 1f) { pop.snapTo(.82f); pop.animateTo(1f, spring(.45f, Spring.StiffnessMedium)) } }
     // like the seek bar: tapped while the controls are hidden, it only does its job (they stay away)
     IconButton(onClick = { E.haptic(); onClick() }, Modifier.quietTouch().graphicsLayer { scaleX = pop.value; scaleY = pop.value }
-        .border(1.dp, if (on) Color.Transparent else GlassEdge, CircleShape).semantics { contentDescription = desc; selected = on },
+        .semantics { contentDescription = desc; selected = on },
         colors = IconButtonDefaults.iconButtonColors(containerColor = bg, contentColor = fg)) {
         if (icon != null) Icon(icon, null, Modifier.size(20.dp)) else Text(text ?: "", fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
@@ -816,7 +816,6 @@ private fun CtlIcon(icon: ImageVector, desc: String, size: Dp = 24.dp, enabled: 
         E.haptic(); onClick()
         if (nudge != 0 && !Pop.calm) scope.launch { k.snapTo(0f); k.animateTo(1f, tween(130, easing = androidx.compose.animation.core.FastOutLinearInEasing)); k.snapTo(-1f); k.animateTo(0f, spring(.62f, 520f)) }
     }, enabled = enabled, interactionSource = src, modifier = Modifier.size(maxOf(48.dp, size + 12.dp)).pressScale(src, .86f)
-        .background(tint.copy(alpha = .2f * dk.coerceIn(0f, 1f)), CircleShape)   // a toggle that's on sits in a soft circle of its colour
         .semantics { contentDescription = desc; if (dot) selected = on },
         colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent, contentColor = tint, disabledContentColor = Color.White.copy(alpha = .3f))) {
         Icon(icon, null, Modifier.size(size).graphicsLayer { val x = k.value; translationX = x * nudge * size.toPx() * .38f; alpha = 1f - kotlin.math.abs(x) * .9f }
