@@ -23,12 +23,19 @@ Android 12 or newer. The app is a beta.
 1. Download `vibe-visualizer-android.apk` from the newest release on the [Releases page](../../releases) on the phone
    and open it (allow installing from your browser when Android asks). Google Play Protect may offer to check the app
    first, as it does with any app from outside the Play Store: that's fine to allow.
-2. The setup guide asks for your Vibe Visualizer server's address (`NAME.your-tailnet.ts.net`), set up as in the
-   [main repository](https://github.com/BOZKOW/vibe-visualizer#setup). Keep Tailscale connected on the phone; if the
-   server can't be found, turn off Android's Private DNS (it hides Tailscale names). Without a server the app still
-   plays your files and finds lyrics from the sources that don't need it.
-3. Spotify logs in with the same Client ID and Redirect URI as the web app: Spotify comes back to your server's page,
-   which hands the login to the app.
+2. The setup guide asks whether to use a server:
+   - **With your Vibe Visualizer server** (set up as in the [main repository](https://github.com/BOZKOW/vibe-visualizer#setup)):
+     enter its address (`NAME.your-tailnet.ts.net`) and keep Tailscale connected on the phone; if the server can't be
+     found, turn off Android's Private DNS (it hides Tailscale names). The server adds Spicy Lyrics, Spotify's own
+     lyrics and Canvas, Vibe Bridge, and keeps your settings and error log.
+   - **Without a server**: everything else runs on the phone (your files, Spotify, other music apps, lyrics from LRCLIB,
+     NetEase, AMLL, Unison, LRCMux, lrc.red and the Chinese catalogues, Canvas from Spicy Lyrics' Canvas service, the
+     bars, the widget…). Spicy Lyrics, Spotify's own lyrics and Vibe Bridge need a server and are left out.
+
+   You can switch later in *Settings → Server & connection*.
+3. Spotify logs in with your developer app's Client ID. With a server, Spotify comes back to your server's page (the
+   web app's Redirect URI), which hands the login to the app; without one, add `vibevisualizer://callback` to the app's
+   Redirect URIs.
 
 Updates install from inside the app: *Settings → Help & about → Update now*. Versions before 0.24 came from the
 main repository's Releases page; 0.24 and later come from here.

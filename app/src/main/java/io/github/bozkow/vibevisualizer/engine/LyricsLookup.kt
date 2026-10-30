@@ -215,14 +215,48 @@ object Lyr {
     }
 
     private suspend fun fromNetease(m: SongMeta): LyricsResult? {
-        val base = server("/api/netease")
         if (m.title.isEmpty()) return null
+        if (!Server.set) return fromNeteaseHere(m)   // without a server: asked from the phone, as the server asks it
+        val base = server("/api/netease")
         val q = "title=" + URLEncoder.encode(m.title, "UTF-8") + "&artist=" + URLEncoder.encode(m.artist.split(',')[0].trim(), "UTF-8") + "&duration=" + Math.round(m.duration)
         val r = try { Net.fetch("$base?$q", "netease") } catch (e: NetError) { Ping.kick(); throw Exception("your server could not be reached") }
         val j = r.json()
         if (r.code == 404) return null
         if (!r.ok) throw Exception(j?.optString("error")?.ifEmpty { null } ?: "HTTP ${r.code}")
         return SourceParse.netease(j)
+    }
+
+    /** NetEase Cloud Music asked from the phone (its unofficial API, as your server asks it): the best match by name, artist
+     *  and length (a title, or the artist and the length, must match: never "some song"), then its lyrics with their
+     *  translation and romanization. */
+    private suspend fun fromNeteaseHere(m: SongMeta): LyricsResult? {
+        val h = mapOf("User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36", "Referer" to "https://music.163.com/")
+        val artist = firstArtist(m.artist)
+        // names compared without brackets, case and punctuation (letters of every script kept)
+        fun norm(s: String) = s.lowercase().replace(Regex("\\s*[(\\[（【].*?[)\\]）】]"), "").replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
+        val r = try { Net.fetch("https://music.163.com/api/search/get?" + "s=" + URLEncoder.encode((m.title + " " + artist).trim(), "UTF-8") + "&type=1&limit=10", "netease", "GET", h) }
+            catch (e: NetError) { throw Exception("NetEase could not be reached") }
+        if (!r.ok) throw Exception("NetEase answered HTTP ${r.code}")
+        val songs = r.json()?.optJSONObject("result")?.optJSONArray("songs") ?: return null
+        val t = norm(m.title); val a = norm(artist)
+        var best: org.json.JSONObject? = null; var score = -1
+        for (k in 0 until songs.length()) {
+            val s = songs.optJSONObject(k) ?: continue
+            val n = norm(s.optString("name"))
+            var sc = if (n == t) 4 else if (t.isNotEmpty() && n.isNotEmpty() && (n.contains(t) || t.contains(n))) 2 else 0
+            val ar = s.optJSONArray("artists")
+            val arts = norm((0 until (ar?.length() ?: 0)).joinToString(" ") { ar!!.optJSONObject(it)?.optString("name").orEmpty() })
+            if (a.isNotEmpty() && arts.contains(a)) sc += 3
+            val dur = s.optDouble("duration", 0.0) / 1000
+            if (m.duration > 0 && dur > 0 && abs(dur - m.duration) <= 4) sc += 2
+            if (sc > score) { best = s; score = sc }
+        }
+        val b = best ?: return null
+        if (score < 4) return null
+        val ly = Net.fetch("https://music.163.com/api/song/lyric?id=" + b.optLong("id") + "&lv=1&kv=1&tv=-1&rv=-1", "netease", "GET", h).json() ?: return null
+        if (ly.optBoolean("nolyric") || ly.optBoolean("uncollected")) return null
+        return SourceParse.netease(org.json.JSONObject().put("lrc", ly.optJSONObject("lrc")?.optString("lyric").orEmpty())
+            .put("tlyric", ly.optJSONObject("tlyric")?.optString("lyric").orEmpty()).put("romalrc", ly.optJSONObject("romalrc")?.optString("lyric").orEmpty()))
     }
 
     // the same song by its names: equal once case, accents and punctuation are gone (Spicy Lyrics Mobile's matcher)

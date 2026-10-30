@@ -119,9 +119,9 @@ object Net {
     }
 }
 
-/** Your Vibe Visualizer server (its Tailscale HTTPS address), or null when none is set. */
+/** Your Vibe Visualizer server (its Tailscale HTTPS address), or null when none is set or the app runs without one. */
 object Server {
-    val base: String? get() = Vibe.cfg.server.takeIf { it.isNotEmpty() }
+    val base: String? get() = if (Vibe.cfg.local) null else Vibe.cfg.server.takeIf { it.isNotEmpty() }
     fun url(path: String): String? = base?.let { it + path }
     val set get() = base != null
 }

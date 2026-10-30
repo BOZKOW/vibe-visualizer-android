@@ -44,6 +44,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Surface
 import kotlinx.coroutines.delay
@@ -132,18 +134,20 @@ fun HeatWarning() {
     androidx.compose.animation.AnimatedVisibility(vis, enter = androidx.compose.animation.EnterTransition.None, exit = androidx.compose.animation.ExitTransition.None) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(Modifier.fillMaxSize().animateEnterExit(enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)), exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(220)))
-                .background(Color.Black.copy(alpha = .62f)).clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {})
+                .background(Color.Black.copy(alpha = if (E.wizard || E.settingsPage != null) .86f else .62f)).clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {})
+            // on its side there's little height: smaller, and it scrolls, so the buttons can always be reached
+            val short = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 520
             Column(Modifier.animateEnterExit(enter = popIn(androidx.compose.ui.graphics.TransformOrigin.Center, .6f), exit = popOut(androidx.compose.ui.graphics.TransformOrigin.Center, .8f))
-                .statusBarsSpace().navBarsSpace().padding(32.dp).widthIn(max = 420.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                .statusBarsSpace().navBarsSpace().verticalScroll(rememberScrollState()).padding(if (short) 16.dp else 32.dp).widthIn(max = if (short) 560.dp else 420.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 val tint = if (hot) Color(0xFFFF5449) else Color(0xFFFFD27A)
-                Box(Modifier.size(96.dp).clip(CircleShape).background(tint.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
-                    Icon(androidx.compose.material.icons.Icons.Rounded.DeviceThermostat, null, Modifier.size(52.dp), tint = tint)
+                Box(Modifier.size(if (short) 56.dp else 96.dp).clip(CircleShape).background(tint.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
+                    Icon(androidx.compose.material.icons.Icons.Rounded.DeviceThermostat, null, Modifier.size(if (short) 32.dp else 52.dp), tint = tint)
                 }
-                Text(if (hot) "Your phone is hot" else "Your phone is getting warm", Modifier.padding(top = 24.dp), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
+                Text(if (hot) "Your phone is hot" else "Your phone is getting warm", Modifier.padding(top = if (short) 10.dp else 24.dp), fontSize = if (short) 22.sp else 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
                 last.c?.let { Text("Battery at " + Math.round(it) + " °C", Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint) }
                 Text("Low performance mode keeps it cooler: the moving background and the live blurs rest, and the app draws fewer frames a second. You can turn it off again in Settings → Performance & battery.",
-                    Modifier.padding(top = 14.dp), fontSize = 15.sp, lineHeight = 21.sp, color = Color.White.copy(alpha = .75f), textAlign = TextAlign.Center)
-                Button(onClick = { E.haptic(); io.github.bozkow.vibevisualizer.engine.Perf.warnDone(true) }, Modifier.padding(top = 28.dp).fillMaxWidth().height(54.dp)) { Text("Turn on Low performance mode", fontSize = 16.sp) }
+                    Modifier.padding(top = if (short) 8.dp else 14.dp), fontSize = if (short) 13.sp else 15.sp, lineHeight = if (short) 18.sp else 21.sp, color = Color.White.copy(alpha = .75f), textAlign = TextAlign.Center)
+                Button(onClick = { E.haptic(); io.github.bozkow.vibevisualizer.engine.Perf.warnDone(true) }, Modifier.padding(top = if (short) 14.dp else 28.dp).fillMaxWidth().height(if (short) 46.dp else 54.dp)) { Text("Turn on Low performance mode", fontSize = 16.sp) }
                 TextButton(onClick = { io.github.bozkow.vibevisualizer.engine.Perf.warnDone(false) }, Modifier.padding(top = 6.dp)) { Text("Not now", fontSize = 15.sp, color = Color.White.copy(alpha = .8f)) }
             }
         }

@@ -165,6 +165,9 @@ class Config(ctx: Context) {
     fun saveTrKey(name: String, v: String) { tk.edit().putString(name, v.trim()).apply(); trVer++ }
 
     var server by mutableStateOf(sp.getString("server", "") ?: "")
+    /** Without a server (chosen in the setup guide or Settings → Server & connection): the address, if one was saved, is
+     *  left alone and not used; everything that can runs on the phone. */
+    var local by mutableStateOf(sp.getBoolean("local", false))
         private set
     var spotId by mutableStateOf(sp.getString("spotId", "") ?: "")
         private set
@@ -184,6 +187,7 @@ class Config(ctx: Context) {
         private set
 
     fun saveServer(u: String) { server = normServer(u); sp.edit().putString("server", server).apply() }
+    fun saveLocal(v: Boolean) { local = v; sp.edit().putBoolean("local", v).apply() }
     fun saveSpotId(id: String) { spotId = id.trim(); sp.edit().putString("spotId", spotId).apply() }
     fun saveCanvasUrl(u: String) { canvasUrl = u; sp.edit().putString("canvasUrl", u).apply() }
     fun saveSetup(done: Boolean) { setupDone = done; sp.edit().putBoolean("setup", done).apply() }
@@ -209,7 +213,7 @@ class Config(ctx: Context) {
 
     fun forgetAll() {
         sp.edit().clear().apply(); sec.edit().clear().apply(); tk.edit().clear().apply()
-        server = ""; spotId = ""; canvasUrl = "/api/canvas?id={id}"; setupDone = false; clearSpotify()
+        server = ""; local = false; spotId = ""; canvasUrl = "/api/canvas?id={id}"; setupDone = false; clearSpotify()
     }
 
     companion object {

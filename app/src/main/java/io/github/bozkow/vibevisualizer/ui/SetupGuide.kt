@@ -9,6 +9,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.RadioButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -202,11 +203,37 @@ fun Tag(t: String, ok: Boolean) {
 
 @Composable
 private fun ServerStep() {
-    H("Your Vibe Visualizer server")
-    P("Spicy Lyrics, Spotify’s own lyrics and Canvas videos, and NetEase lyrics come from your server, over Tailscale. Keep Tailscale connected on this phone. Your keys stay on the server; the app never sees them.")
-    ServerField(importPrefs = Vibe.settings.fresh)
-    Spacer(Modifier.height(10.dp))
-    Hint("Without a server, LRCLIB, AMLL and your own lyrics files still work, and so does everything else. Settings you kept on the server for this phone (from the old app) come along when it’s found.")
+    H("With a server, or without one?")
+    P("Vibe Visualizer works both ways. Pick one; you can change it later in Settings → Server & connection.")
+    ServerChoice()
+    Spacer(Modifier.height(12.dp))
+    if (!Vibe.cfg.local) {
+        P("Spicy Lyrics, Spotify’s own lyrics and Canvas videos come from your server, over Tailscale. Keep Tailscale connected on this phone. Your keys stay on the server; the app never sees them.")
+        ServerField(importPrefs = Vibe.settings.fresh)
+        Spacer(Modifier.height(10.dp))
+        Hint("Settings you kept on the server for this phone (from the old app) come along when it’s found.")
+    } else WithoutServer()
+}
+
+/** The two ways to run it, as two cards: with your Vibe Visualizer server, or everything on the phone. */
+@Composable
+fun ServerChoice() {
+    val local = Vibe.cfg.local
+    @Composable fun card(on: Boolean, t: String, d: String, pick: () -> Unit) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(20.dp)).background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.White.copy(alpha = .06f)).clickable { E.haptic(); pick() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { Text(t, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White); Text(d, fontSize = 13.sp, color = Color.White.copy(alpha = .7f)) }
+            RadioButton(on, null)
+        }
+    }
+    card(!local, "With my server", "Your Vibe Visualizer server (the web app's helper) adds Spicy Lyrics, Spotify's own lyrics and Canvas videos, Vibe Bridge for the bars, and keeps your settings and error log.") { Vibe.cfg.saveLocal(false); Ping.kick(); Lyr.refreshCounts() }
+    card(local, "Without a server", "Everything runs on this phone: no server, no Tailscale. A few things need a server and are left out (below).") { Vibe.cfg.saveLocal(true); Lyr.refreshCounts() }
+}
+
+/** What works without a server, and what doesn't. */
+@Composable
+fun WithoutServer() {
+    P("Works on the phone: your files and Spotify (with its Canvas from Spicy Lyrics' Canvas service), other music apps, lyrics from LRCLIB, NetEase, AMLL, Unison, LRCMux, lrc.red, KuGou, QQ Music and Kuwo and your own .lrc and .ttml files, translation and romanization, the bars from this phone's sound, the widget, picture-in-picture, Ambient mode and everything else.")
+    Hint("Needs a server, so it's left out: Spicy Lyrics (its key may only be kept on a server), Spotify's own lyrics (they need a Spotify cookie kept on the server), Vibe Bridge (it relays through the server), and settings and the error log kept on the server (Back up settings still copies them).")
 }
 
 @Composable
@@ -218,7 +245,7 @@ private fun SpotifyStep() {
     Step(1, "Create an app in the Spotify Developer Dashboard (any name; tick Web API), or open the one you have.") {
         TextButton(onClick = { openUrl("https://developer.spotify.com/dashboard") }) { Text("Developer Dashboard") }
     }
-    Step(2, "Make sure this Redirect URI is in the app’s settings (Settings → Edit → Redirect URIs). " + if (Server.set) "It’s your server’s address, the same the web app uses: Spotify comes back to your server’s page, which hands the login to this app." else "") {
+    Step(2, "Make sure this Redirect URI is in the app’s settings (Settings → Edit → Redirect URIs). " + if (Server.set) "It’s your server’s address, the same the web app uses: Spotify comes back to your server’s page, which hands the login to this app." else "It’s this app’s own address: Spotify comes straight back to the app (it can sit next to the web app’s address in the list).") {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(redirect, Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = .08f)).padding(10.dp), fontSize = 13.sp, color = Color.White)
             IconButton(onClick = { Lyr.copy(redirect); E.copied("Redirect URI") }) { Icon(Icons.Rounded.ContentCopy, "Copy") }
@@ -240,8 +267,11 @@ private fun LyricsStep() {
     H("Lyrics sources")
     P("Vibe Visualizer tries these in order and uses the first that has the song. Change the order or switch sources off in Settings → Lyrics.")
     val h = Ping.health
-    Step(1, "Spicy Lyrics: the best ones, word by word, with background vocals and duets. Needs your key in the server’s config folder (spicy_key).", ok = h?.optBoolean("spicy_key") == true)
-    Step(2, "Spotify’s own lyrics and Canvas videos (optional, unofficial): the server’s sp_dc cookie.", ok = h?.optBoolean("logged_in") == true)
+    if (Vibe.cfg.local) Step(1, "Without a server, Spicy Lyrics and Spotify’s own lyrics are left out; Canvas videos come from Spicy Lyrics’ Canvas service.", ok = true)
+    else {
+        Step(1, "Spicy Lyrics: the best ones, word by word, with background vocals and duets. Needs your key in the server’s config folder (spicy_key).", ok = h?.optBoolean("spicy_key") == true)
+        Step(2, "Spotify’s own lyrics and Canvas videos (optional, unofficial): the server’s sp_dc cookie.", ok = h?.optBoolean("logged_in") == true)
+    }
     Step(3, "LRCLIB and NetEase Cloud Music: no setup. AMLL TTML DB too. You can also add your own .lrc or .ttml files.", ok = true)
     Step(4, "Translation and romanization: the あa and translate buttons at the top of the lyrics (they appear when a song needs them). Pick the language in Settings → Translation.", ok = true)
     Step(5, "Timing: the lyrics follow Spotify closely (exactly, with the Spotify app on this phone). ⋮ → Lyrics timing moves them earlier or later.", ok = true)
@@ -259,7 +289,7 @@ private fun SoundStep() {
     Step(2, "Exact timing and controls from the Spotify app on this phone (no Premium needed for play, pause, skip and seek): allow notification access. No notification is read; it only lets the app see the Spotify app’s player.", ok = acc) {
         if (!acc) FilledTonalButton(onClick = { Perms.notificationAccess() }, Modifier.padding(top = 6.dp)) { Text("Open notification access") }
     }
-    Step(3, "Music on another device: run Vibe Bridge there with your server’s address, and the bars here follow it too.", ok = Audio.bridgeOn)
+    if (!Vibe.cfg.local) Step(3, "Music on another device: run Vibe Bridge there with your server’s address, and the bars here follow it too.", ok = Audio.bridgeOn)
     LaunchedEffect(Unit) { SpotifyApp.refresh(Vibe.app) }
 }
 
