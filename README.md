@@ -47,6 +47,8 @@ main repository's Releases page; 0.24 and later come from here.
 - **The bars** hear everything the phone plays (Android's Visualizer; it needs the microphone permission, and nothing
   is recorded or sent), the microphone, or [Vibe Bridge](https://github.com/BOZKOW/vibe-visualizer#vibe-bridge-bars-from-the-spotify-app)
   through your server.
+- The next song in the queue (Spotify's, the music app's or your files') gets its lyrics, Canvas and cover ready while
+  the song before it plays; Canvas videos are kept on the phone.
 - Lyrics timing per audio output, a heat warning and Low performance mode with Power saving, keyboard shortcuts, and
   settings that can be copied to the web app and back (*Settings → Help & about → Back up settings*).
 
@@ -76,7 +78,8 @@ by Spikerko and the Spicy Lyrics contributors (GNU AGPL-3.0). Its spring model i
 From [Spicy Lyrics Mobile](https://github.com/spicylyrics/mobile) by TheX24 (GNU AGPL-3.0): background vocals in
 brackets and a song's own lyrics delay, the lyric clock that reads music apps' position reports, the timing kept per
 audio output, the lookup order (the first source alone, then the rest at once, better timing winning), the back-off for
-failing sources, the cleaning of file names, the Unison, LRCMux, lrc.red, KuGou, QQ Music and Kuwo sources, the
+failing sources, the 20-second limit per source, the cleaning of file names, word timing in LRC lyrics and the
+translations under their lines, the Unison, LRCMux, lrc.red, KuGou, QQ Music and Kuwo sources, the
 translation services, session stickiness, Spicy Lyrics' Canvas service, Ambient mode, the widget and the Now Playing
 layout. Its LRCMux source is itself adapted from Lyrica's lrcmux adapter (MIT).
 

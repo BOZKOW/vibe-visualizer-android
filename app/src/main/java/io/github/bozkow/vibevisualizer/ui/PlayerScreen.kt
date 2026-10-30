@@ -224,7 +224,7 @@ private fun LyricsWithLyrics() {
             }
         }
         if (S.view == "both") BarsView(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
-        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true) }
+        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
         }
@@ -418,23 +418,22 @@ private fun EmptyState() {
 /* ================= parts ================= */
 
 /** The top of every screen: where the music plays from at the left and on what device at the right, and under them the
- *  space for what's wrong. The line goes with the controls; what's wrong stays until it's solved. */
+ *  space for what's wrong. Always there, also with the controls away. */
 @Composable
 private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false) {
     E.sec.intValue
     val top = when (E.src) { "spotify" -> "PLAYING FROM SPOTIFY"; "file" -> "PLAYING ON THIS PHONE"; "media" -> "PLAYING FROM " + io.github.bozkow.vibevisualizer.media.MediaApps.appName().uppercase(); else -> "VIBE VISUALIZER" }
     val dev = when (E.src) { "spotify" -> Spotify.device?.name?.let { "on $it" } ?: if (Spotify.meta == null) "Nothing playing" else ""; "file" -> Local.position(); else -> "" }
-    Column(modifier.fillMaxWidth()) {
-        if (S.b("aHideStatus")) {
-            // the status bar is hidden: the line goes up where it was, either side of the camera, and takes no room here
-            val k by animateFloatAsState(if (E.uiHidden) 0f else 1f, tween(300), label = "topline")
-            TopLine(top, dev, Modifier.graphicsLayer { alpha = k }, beside = true)
-        } else AnimatedVisibility(!E.uiHidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
-            TopLine(top, dev, Modifier)
-        }
+    Column(modifier.fillMaxWidth().reportTop()) {
+        // the status bar hidden: the line goes up where it was, either side of the camera, and takes no room here
+        TopLine(top, dev, Modifier, beside = S.b("aHideStatus"))
         NoticeSpace(home)
     }
 }
+
+/** Where the top's text (and what's wrong under it) ends on screen, in px: the Canvas is blurred down to there. */
+private object TopArea { var bottom by mutableFloatStateOf(0f) }
+private fun Modifier.reportTop() = onGloballyPositioned { TopArea.bottom = it.positionInWindow().y + it.size.height }
 
 /** "PLAYING FROM …" at the left, the device at the right. Beside the camera: drawn up in the hidden status bar's place,
  *  level with the camera and clear of it at both sides. */
@@ -450,8 +449,8 @@ private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolea
     val x0 = (at?.x ?: 0f) - (if (beside) e else 0f)
     val ww = w + (if (beside) 2 * e else 0f)
     val c = cut?.takeIf { beside && it.right > x0 && it.left < x0 + ww }
-    val lw = with(dens) { ((if (c != null) c.left - x0 else ww / 2) - gap).coerceAtLeast(0f).toDp() }
-    val rw = with(dens) { ((if (c != null) x0 + ww - c.right else ww / 2) - gap).coerceAtLeast(0f).toDp() }
+    val lw = with(dens) { ((if (c != null) c.left - x0 else ww / 2) - gap).coerceAtLeast(1f).toDp() }
+    val rw = with(dens) { ((if (c != null) x0 + ww - c.right else ww / 2) - gap).coerceAtLeast(1f).toDp() }
     Box(modifier.fillMaxWidth()
         .onGloballyPositioned { lc ->
             val p = lc.positionInWindow(); at = p; w = lc.size.width.toFloat()
@@ -465,12 +464,27 @@ private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolea
             layout(cs.maxWidth, 0) { pl.place(-ex, (cy - y0 - pl.height / 2f).roundToInt()) }
         } else Modifier.height(32.dp))
         .graphicsLayer { alpha = if (at == null) 0f else 1f }) {
-        AnimatedContent(top, Modifier.align(Alignment.CenterStart).widthIn(max = lw), transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
-            Text(t, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // each in the middle of its side
+        AnimatedContent(top, Modifier.align(Alignment.CenterStart).width(lw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
+            TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
         }
-        AnimatedContent(dev, Modifier.align(Alignment.CenterEnd).widthIn(max = rw), contentAlignment = Alignment.CenterEnd, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { t ->
-            Text(t, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        AnimatedContent(dev, Modifier.align(Alignment.CenterEnd).width(rw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { t ->
+            TopText(t, 12.sp, FontWeight.SemiBold, Color.White)
         }
+    }
+}
+
+/** A text of the top line, in the middle of its side; too long for it, it slides as a long song name does, fading out at
+ *  both ends (or ends in "…" with Scroll long names off). */
+@Composable
+private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp) {
+    var boxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var textW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val over = boxW > 0 && textW > boxW
+    Box(Modifier.fillMaxWidth().onSizeChanged { boxW = it.width }, contentAlignment = Alignment.Center) {
+        if (!S.b("aMarquee")) Text(text, fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        else Text(text, (if (over) Modifier.fadeSides(10.dp, 14.dp) else Modifier).basicMarquee(iterations = if (E.settingsPage == null) 3 else 0, initialDelayMillis = 2500),
+            fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
     }
 }
 
@@ -514,7 +528,7 @@ private fun LandscapeNotice() {
     val p = E.notice()
     val last = remember { arrayOfNulls<E.Prob>(1) }   // still shown while it slides away
     if (p != null) last[0] = p
-    AnimatedVisibility(p != null, enter = showCtl, exit = hideCtl) {
+    AnimatedVisibility(p != null, Modifier.reportTop(), enter = showCtl, exit = hideCtl) {
         last[0]?.let { Box(Modifier.fillMaxWidth().padding(top = 6.dp)) { NoticeLines(it, row = true) } }
     }
 }
@@ -522,14 +536,17 @@ private fun LandscapeNotice() {
 /** The foot of every portrait screen: the song, the seek bar and where the lyrics are from. They stay when the
  *  controls slide away. */
 @Composable
-private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false) {
+private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false) {
     Column(Modifier.fillMaxWidth()) {
         TitleRow(big = big, toggles = toggles)
         if (note) NoLyricsNote(Modifier.fillMaxWidth())
         Spacer(Modifier.height(if (big) 10.dp else 6.dp))
         SeekRow()
         val c = Lyr.credit
-        AnimatedVisibility(c != null && Lyr.lines > 0, enter = fadeIn(tween(600)) + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+        // on the Lyrics screen, Refined credits under the last line say it already while they're on screen
+        val v = Lyr.view
+        val refined = lyrics && S.credPos == "lyrics" && S.b("xRefCred") && (v.allsung || v.isStatic) && !(v.rest && !v.lyFree)
+        AnimatedVisibility(c != null && Lyr.lines > 0 && !refined, enter = fadeIn(tween(600)) + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             if (c != null) CreditsLine(c, Modifier.fillMaxWidth().padding(bottom = 4.dp))
         }
     }
@@ -791,7 +808,8 @@ private fun Modifier.canvasShrink(): Modifier {
 @Composable
 fun CoverArt(modifier: Modifier, corner: Dp, small: Boolean = false) {
     val shape = RoundedCornerShape(corner * (S.i("aCoverR").coerceIn(0, 40) / 22f))   // Settings → Player screen → Cover corners (22: as designed)
-    Box(modifier.then(if (small) Modifier else Modifier.shadow(24.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)).clip(shape).background(Color.White.copy(alpha = .08f))) {
+    Box(modifier.then(if (small) Modifier else Modifier.shadow(24.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)).clip(shape).background(Color.White.copy(alpha = .08f))
+        .then(if (S.b("aCoverLine")) Modifier.border(1.dp, Color.White.copy(alpha = .22f), shape) else Modifier)) {   // Settings → Player screen → Cover outline
         Cover(Modifier.fillMaxSize())
     }
 }
@@ -835,26 +853,27 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
     // behind the top bar, the song and the controls: the dark gradient, the Canvas blurred there, both or nothing
     val behind = S.str("cvBehind")
     val dark = behind == "dark" || behind == "both" || (behind == "blur" && S.low)   // Low performance: no blur, the gradient instead
-    val frost = (behind == "blur" || behind == "both") && !S.low && !S.b("cvBlur")      // the whole Canvas blurred already: nothing to add
+    // only while the video shows (not while it loads, nor once it's gone): the whole Canvas blurred already, nothing to add
+    val frost = (behind == "blur" || behind == "both") && !S.low && !S.b("cvBlur") && CanvasVideo.cvmode
     // the blur reaches up to the song while the controls show, and sinks with them when they hide
     val sink by animateFloatAsState(if (E.uiHidden) 1f else 0f, tween(600, easing = FastOutSlowInEasing), label = "cvsink")
     val from = when { wide -> .52f; behindLyrics -> .6f; else -> .5f } + .12f * sink
     val d = androidx.compose.ui.platform.LocalDensity.current
+    val topPx = TopArea.bottom; val rampPx = with(d) { 28.dp.toPx() }
     val r = with(d) { (S.i("cvBlurAmt").coerceIn(5, 100) / 100f * 48f).dp.toPx() }
-    // the top's blur, shade and softening only while something's up there: the status bar, or a top bar (Now Playing's
-    // hides with the controls; the Lyrics screen's goes in Ambient mode; side by side there's none)
-    val topOn = !S.b("aHideStatus") || when {
-        wide -> false
-        E.screen == "viz" -> true
-        behindLyrics -> !E.ambient
-        else -> !E.uiHidden
-    }
+    // the top's blur, shade and softening while something's up there: the status bar, or the top line (always there
+    // upright; side by side only while something's wrong). Two sizes: just behind the top line, or down past what's
+    // wrong under it (it follows the error space as it opens and closes)
+    val noted by remember { androidx.compose.runtime.derivedStateOf { E.notice() != null } }
+    val topOn = !S.b("aHideStatus") || !wide || noted
     val topK by animateFloatAsState(if (topOn) 1f else 0f, tween(500, easing = FastOutSlowInEasing), label = "cvtop")
+
     Box((if (wide) Modifier.fillMaxHeight().fillMaxWidth(.68f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f))
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.16f / .68f) * c }.drawWithContent {
             drawContent()
             // as dark at the top (behind the status bar and the top bar) as behind the controls at the bottom
-            val shade = Brush.verticalGradient(0f to Color.Black.copy(alpha = .45f * topK), .22f to Color.Transparent, .55f to Color.Transparent, 1f to Color.Black.copy(alpha = .45f))
+            val tf = ((topPx + rampPx * 2) / size.height).coerceIn(.02f, .45f)
+            val shade = Brush.verticalGradient(0f to Color.Black.copy(alpha = .45f * topK), tf to Color.Transparent, .55f to Color.Transparent, 1f to Color.Black.copy(alpha = .45f))
             if (wide) {
                 // side by side: the shade fades out with the video (drawn after the fade it stopped in a hard line at the
                 // edge), over a long, eased fade into the blurred Canvas behind
@@ -870,20 +889,21 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
                 if (dark) drawRect(shade)
             }
         }) {
-        Box(Modifier.fillMaxSize().graphicsLayer { if (frost) renderEffect = frostBands(size.height, r, if (wide) .05f else .09f, from, topK) }) { CanvasVideoView() }
+        Box(Modifier.fillMaxSize().graphicsLayer { if (frost) renderEffect = frostBands(size.height, r, topPx / maxOf(size.height, 1f), rampPx / maxOf(size.height, 1f), from, topK) }) { CanvasVideoView() }
     }
 }
 
 /** The Canvas frosted where the controls are: a blurred copy of it over the sharp one, shown through a mask that's
- *  opaque at the top (down to [top], under the top bar; [topK] of it, fading while nothing's there), clear in the
+ *  opaque at the top (down to [top0], where the top's text ends; [topK] of it, fading while nothing's there), clear in the
  *  middle, and opaque again from a little below [from] (under the song, the seek bar and the controls), each edge a
  *  soft ramp. One blur pass on the GPU. */
-private fun frostBands(h: Float, r: Float, top: Float, from: Float, topK: Float): androidx.compose.ui.graphics.RenderEffect {
+private fun frostBands(h: Float, r: Float, top0: Float, ramp: Float, from: Float, topK: Float): androidx.compose.ui.graphics.RenderEffect {
+    val top = top0.coerceIn(0f, from - ramp - .02f)
     val blur = android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
     val on = android.graphics.Color.BLACK; val off = android.graphics.Color.TRANSPARENT
     val up = android.graphics.Color.argb((topK.coerceIn(0f, 1f) * 255).toInt(), 0, 0, 0)   // the top band, only while something's there
     val mask = android.graphics.RenderEffect.createShaderEffect(android.graphics.LinearGradient(0f, 0f, 0f, maxOf(h, 1f),
-        intArrayOf(up, up, off, off, on, on), floatArrayOf(0f, top, top + .09f, from, minOf(from + .14f, .99f), 1f), android.graphics.Shader.TileMode.CLAMP))
+        intArrayOf(up, up, off, off, on, on), floatArrayOf(0f, top, top + ramp, from, minOf(from + .14f, .99f), 1f), android.graphics.Shader.TileMode.CLAMP))
     val frosted = android.graphics.RenderEffect.createBlendModeEffect(blur, mask, android.graphics.BlendMode.DST_IN)
     return android.graphics.RenderEffect.createBlendModeEffect(android.graphics.RenderEffect.createOffsetEffect(0f, 0f), frosted, android.graphics.BlendMode.SRC_OVER).asComposeRenderEffect()
 }

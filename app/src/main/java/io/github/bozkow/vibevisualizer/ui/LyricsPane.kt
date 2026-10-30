@@ -138,8 +138,9 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                     drawRect(Brush.verticalGradient(0f to Color.Transparent, t to Color.Black, b to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
                 }
             }
-            // Refined credits (Spicy Lyrics 6.4.50): right under the last line
-            if (n > 0 && S.credPos == "lyrics" && S.b("xRefCred")) {
+            // Refined credits (Spicy Lyrics 6.4.50): right under the last line (not in picture-in-picture: its own small
+            // line says where the lyrics are from)
+            if (n > 0 && !compact && S.credPos == "lyrics" && S.b("xRefCred")) {
                 val c = Lyr.credit
                 if (c != null) {
                     // Focus mode: the lines fly in from the bottom and away at the top, so the credits wait for the end (the

@@ -1,21 +1,27 @@
-Vibe Visualizer for Android 0.26.0 (beta). Android 12 or newer; it installs over 0.25.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.27.0 (beta). Android 12 or newer; it installs over 0.26.0 (Settings → Help & about → Update now).
 
-### Every error at the top
+### The next song is ready before it starts
 
-- **All errors and warnings now show at the top**, under "Playing from …": no internet, the server or Spotify not answering, lyrics that couldn't load, a song that can't be played, a failed update, the "lyrics look ahead / behind" suggestion and every other short message that used to pop up at the bottom. Red is something broken, yellow something waiting; each has its one button (or OK), and short ones go by themselves after a few seconds. They stay visible while the controls are hidden.
-- **A warm or hot phone shows there too**, for as long as it stays warm ("Your phone is getting warm · Battery at 41 °C", with a Low performance mode button), also after you answer the big warning with "Not now".
-- Over Settings, a sheet or the setup guide, a new error comes down from the top of the screen instead.
-- With the phone on its side, errors slide in along the top as one line.
-- Good news (an update is ready, "Updated to …") still comes up at the bottom.
+- **Lyrics, Canvas and cover are looked up ahead.** A few seconds into a song, the app finds the next one in the queue (your Spotify queue, the music app's queue when the app shares it, or your own files' list) and looks up its lyrics, Canvas and cover, so they show the moment it starts. With the Spotify app on this phone they even start before Spotify's Web API names the new song. It costs one more request to Spotify a song; turn it off in *Settings → Lyrics → Get the next song ready*.
+- **Canvas videos are kept on the phone** (200 MB at most, the longest unplayed go first), so a song you play again starts its Canvas at once, without downloading it again.
+- **Lyrics come in sooner**: the first source gets 0.7 s alone (was 1 s) before the rest are asked, an answer that's already in shows after 1.5 s (was 2 s), and a source that hasn't answered in 20 seconds is given up on, so a slow one never holds a lookup up (from Spicy Lyrics Mobile 0.16.1).
+- **Skipping through songs asks for nothing until you stop**: the lyrics, the Canvas, the "liked" check and the Spotify catch-up after a skip in the Spotify app wait until a song stays on, so quick skipping doesn't run into Spotify's or the lyrics sources' limits.
 
 ### The top line
 
-- **"Playing from …" sits at the left and the device at the right.** With the status bar hidden (*Settings → Player screen → Hide the status bar*) they go up level with the camera, one on each side of it, and take no room from the cover or the lyrics. With the status bar shown they sit right under it.
-- **The arrow is gone.** The Lyrics button (or Back) still takes you back to Now Playing.
-- On the Lyrics screen, the translate and romanize buttons are now next to the song's name at the bottom.
+- **Always on screen**, also when the controls slide away, each text in the middle of its side; a name too long for its side slides along like a long song name.
+- **The blur behind it fits it**: just behind the top line, or down past an error while there's one under it. It's only there while a Canvas video plays (no blur work otherwise).
 
-### The cover in long breaks
+### More
 
-- **When nothing is sung for 10 seconds or more** (a long intro, a break, the end), the cover fades in where the lyrics are and fades away again 2 seconds before the next line. Scrolling the lyrics shows them at once. It's on by default: *Settings → Lyrics → Cover in long breaks*.
+- **A thin outline around the cover**, so it stands out from the background (*Settings → Player screen → Cover outline*).
+- **"Provided by" no longer shows twice**: on the Lyrics screen the line at the bottom steps aside while the Refined credits under the last line are on screen, and picture-in-picture keeps just its own small line.
+
+### From Spicy Lyrics Mobile 0.16
+
+- **Word timing in LRC lyrics** (LRCLIB and others sometimes have it as `<00:12.34>` stamps): they now play word by word instead of line by line.
+- **An LRC line with its translation under it** on the same time shows the translation as a translation, not as a second line.
+- **TTML files** starting with a byte-order mark or spaces, or using `&nbsp;`, now load, and a word with no end time (or one before its start) keeps a length.
+- **A player that reports playing at speed 0** no longer freezes the lyrics.
 
 From 0.24.0: the app has its own repository.

@@ -31,6 +31,32 @@ class ParseTest {
         assertEquals(5.25, l[2].t!!, 1e-9)
     }
 
+    @Test fun lrcWordTiming() {
+        val l = parseLRC("[00:12.00]<00:12.00>Hello <00:12.50>wor<00:12.80>ld<00:13.20>\n[00:14.00]<00:14.00>Next<00:14.40> one")
+        assertEquals(2, l.size)
+        assertEquals("Hello world", l[0].text)
+        val w = l[0].words!!
+        assertEquals(listOf("Hello", "wor", "ld"), w.map { it.text })
+        assertTrue("a space after Hello", w[0].sp)
+        assertTrue("a syllable runs into the next", !w[1].sp)
+        assertEquals(12.8, w[1].end!!, 1e-9)
+        assertEquals(13.2, l[0].end!!, 1e-9)
+        assertTrue("a space before the next word counts for the one before", l[1].words!![0].sp)
+    }
+
+    @Test fun lrcTranslationUnder() {
+        val l = parseLRC("[00:01.00]Ich liebe dich\n[00:01.00]I love you\n[00:03.00]Next")
+        assertEquals(2, l.size)
+        assertEquals("Ich liebe dich", l[0].text)
+        assertEquals("I love you", l[0].apiTr)
+    }
+
+    @Test fun ttmlForgiving() {
+        val p = parseTTML("\uFEFF  <tt xmlns=\"http://www.w3.org/ns/ttml\"><body><div><p begin=\"1.0\" end=\"2.0\"><span begin=\"1.0\" end=\"0.5\">A</span>&nbsp;<span begin=\"1.5\" end=\"2.0\">B</span></p></div></body></tt>")
+        assertEquals(1, p.lines.size)
+        assertEquals(null, p.lines[0].words!![0].end)
+    }
+
     @Test fun interludesAndKeys() {
         val p = fromText(res("test.ttml"))
         val i = interludes(p.lines)

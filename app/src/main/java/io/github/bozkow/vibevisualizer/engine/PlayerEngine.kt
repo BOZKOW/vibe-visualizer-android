@@ -209,6 +209,7 @@ object E {
         title = nt; artist = na; year = ""; status = ""; trackVer++
         val meta = SongMeta(title = nt, artist = na, album = MediaApps.album, duration = MediaApps.durMs / 1000.0)
         Lyr.load(meta, tok)
+        Preload.songStarted()
         mediaArt = setCoverBitmap(MediaApps.cover(), "From " + MediaApps.appName(), tok)
         if (!mediaArt) {
             resetCover()
@@ -244,10 +245,13 @@ object E {
         val tok = ++coverTok
         Audio.dropBars(); CanvasVideo.clear(true); Lyr.loading()
         title = t; artist = a; year = ""; status = "Spotify"; trackVer++
-        appShown = t
+        appShown = t; earlyId = ""
         appArt = art != null && setCoverBitmap(art, "From the Spotify app", tok)
         if (!appArt) resetCover()
+        // the song found ahead in your queue: its lyrics and Canvas start now, before Spotify's Web API names it
+        Preload.nextFor(t, SpotifyApp.durMs.toDouble())?.let { m -> earlyId = m.id; Lyr.load(m, tok); CanvasVideo.lookup(m, tok) }
     }
+    private var earlyId = ""   // the song the Spotify app started with what was found ahead
 
     fun onSpTrack(m: SongMeta) {
         curArtistId = m.artistId
@@ -256,10 +260,11 @@ object E {
         // only gets sharper
         val same = appShown.isNotEmpty() && appShown == SpotifyApp.title && SpotifyApp.matches(m.title, m.duration * 1000)
         val quiet = same && appArt
-        appShown = ""; appArt = false
+        val early = same && earlyId == m.id   // its lyrics and Canvas are already on their way: they carry on
+        appShown = ""; appArt = false; earlyId = ""
         if (!same) Audio.dropBars()   // the bars drop and grow back with the new song
-        val tok = ++coverTok
-        CanvasVideo.clear(true)
+        val tok = if (early) coverTok else ++coverTok
+        if (!early) CanvasVideo.clear(true)
         title = m.title; artist = m.artist; year = m.year; status = "Spotify"; if (!same) trackVer++
         Vibe.scope.launch {
             // Spotify's cover; once more past the cache if it doesn't load, then its smaller size
@@ -275,8 +280,8 @@ object E {
                 if (tok == coverTok) coverNote += if (ok) " · found online" else " · none online"
             }
         }
-        Lyr.load(m, tok)
-        CanvasVideo.lookup(m, tok)
+        if (!early) { Lyr.load(m, tok); CanvasVideo.lookup(m, tok) }
+        Preload.songStarted()
         updPlay()
     }
 
@@ -298,20 +303,16 @@ object E {
         curArtistId = ""
         val tok = ++coverTok
         CanvasVideo.clear(false); Audio.dropBars(); resetCover()
-        // "03 - Artist - Song (Official Video).mp3" → Song by Artist (Spicy Lyrics Mobile's name cleaner)
-        val fn = TrackNameCleaner.clean(name, "")
-        title = fn.title.ifEmpty { Files.clean(name) }; artist = fn.artist; year = ""; status = ""; trackVer++
+        val fn = fileSong(name, null)
+        title = fn.title; artist = fn.artist; year = ""; status = ""; trackVer++
         Lyr.loading()
         Vibe.scope.launch {
             val tags = Files.tags(uri)
             if (tok != coverTok) return@launch
-            if (tags.title != null || tags.artist != null) {   // tags can be a file name too, or name no artist
-                val tn = TrackNameCleaner.clean(tags.title ?: name, tags.artist ?: "")
-                title = tn.title.ifEmpty { title }; artist = tn.artist.ifEmpty { artist }
-            }
-            year = tags.year ?: ""
-            val meta = SongMeta(title = title, artist = artist, album = tags.album ?: "", duration = tags.durationMs / 1000.0, file = name, year = year)
+            val meta = fileSong(name, tags)
+            title = meta.title; artist = meta.artist; year = meta.year
             Lyr.load(meta, tok)
+            Preload.songStarted()
             Local.setMeta(title, artist, tags.picture)
             if (tags.picture != null && setCoverBitmap(Images.decode(tags.picture), "Embedded cover", tok)) return@launch
             // Android's own album art for the file: its picture, or a cover.jpg / folder.jpg next to it
@@ -322,6 +323,18 @@ object E {
             if (!findCover(meta.copy(title = meta.title.ifEmpty { Files.clean(name) }), tok) && tok == coverTok) status = "No cover found · using default"
         }
         updPlay()
+    }
+
+    /** A file's song as the lookups name it: its tags' title and artist (cleaned), else what its name says
+     *  ("03 - Artist - Song (Official Video).mp3" → Song by Artist, Spicy Lyrics Mobile's name cleaner). */
+    fun fileSong(name: String, tags: Files.Tags?): SongMeta {
+        val fn = TrackNameCleaner.clean(name, "")
+        var t = fn.title.ifEmpty { Files.clean(name) }; var a = fn.artist
+        if (tags != null && (tags.title != null || tags.artist != null)) {   // tags can be a file name too, or name no artist
+            val tn = TrackNameCleaner.clean(tags.title ?: name, tags.artist ?: "")
+            t = tn.title.ifEmpty { t }; a = tn.artist.ifEmpty { a }
+        }
+        return SongMeta(title = t, artist = a, album = tags?.album ?: "", duration = (tags?.durationMs ?: 0L) / 1000.0, file = name, year = tags?.year ?: "")
     }
 
     fun onFileState() { updPlay(); CanvasVideo.syncPlay(); poke() }

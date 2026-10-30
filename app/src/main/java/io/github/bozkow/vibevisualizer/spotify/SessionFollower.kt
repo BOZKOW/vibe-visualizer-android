@@ -144,11 +144,13 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         // clock there would freeze a line that runs to the end, so it carries on until the next song's report
         if (!trackChanged && s.state == PlaybackState.STATE_BUFFERING && clock.isPlaying && durMs > 0 && s.position >= durMs - 2000) return
         val relayed = ctrl?.playbackInfo?.playbackType == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE
-        val r = LyricClock.Report(s.state, playing, s.position, s.lastPositionUpdateTime, s.playbackSpeed, relayed)
+        // a player that says it plays at speed 0 still plays (Spicy Lyrics Mobile 0.16.0: it froze the lyrics)
+        val speed = if (playing && s.playbackSpeed <= 0f) 1f else s.playbackSpeed
+        val r = LyricClock.Report(s.state, playing, s.position, s.lastPositionUpdateTime, speed, relayed)
         val fresh = clock.isFresh(r); val now = SystemClock.elapsedRealtime()
         if (trackChanged && !fresh && now - lastReportAt > 1000) {
             // the report we have is the previous song's position: the new song starts from 0 until the app reports
-            clock.startTrack(now, s.playbackSpeed, playing); awaitingReport = true; return
+            clock.startTrack(now, speed, playing); awaitingReport = true; return
         }
         if (!force && !fresh) return
         val resync = resyncNext && fresh && playing; if (resync) resyncNext = false
@@ -187,6 +189,17 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         if (!connected.value || title.isEmpty()) return false
         val a = name.lowercase().trim(); val b = title.lowercase().trim()
         return (a == b || a.startsWith(b) || b.startsWith(a)) && (durMs <= 0 || kotlin.math.abs(durMs - durationMs) < 2500)
+    }
+
+    /** The next song in the app's queue, when the app shares it: (title, artist, length in ms or 0). */
+    fun nextInQueue(): Triple<String, String, Long>? {
+        val c = ctrl ?: return null
+        val q = runCatching { c.queue }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return null
+        val at = c.playbackState?.activeQueueItemId ?: return null
+        val i = q.indexOfFirst { it.queueId == at }; if (i < 0) return null
+        val d = q.getOrNull(i + 1)?.description ?: return null
+        val t = d.title?.toString().orEmpty(); if (t.isEmpty()) return null
+        return Triple(t, d.subtitle?.toString().orEmpty(), d.extras?.getLong(MediaMetadata.METADATA_KEY_DURATION, 0L) ?: 0L)
     }
 
     fun play() = ctrl?.transportControls?.play()

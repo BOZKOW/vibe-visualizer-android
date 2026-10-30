@@ -256,6 +256,25 @@ object Spotify {
         return if (sw > 0) so / sw else med
     }
 
+    /** A track (or an episode) as the Web API describes it. */
+    private fun metaOf(it: JSONObject): SongMeta {
+        val ep = it.optString("type") == "episode"
+        val imgs = (if (ep) it.optJSONArray("images") else it.optJSONObject("album")?.optJSONArray("images")) ?: JSONArray()
+        val artists = it.optJSONArray("artists") ?: JSONArray()
+        return SongMeta(id = it.optString("id"), uri = it.optString("uri"), title = it.optString("name"),
+            artist = if (ep) it.optJSONObject("show")?.optString("name") ?: "" else (0 until artists.length()).joinToString(", ") { k -> artists.getJSONObject(k).optString("name") },
+            album = if (ep) "" else it.optJSONObject("album")?.optString("name") ?: "", duration = it.optDouble("duration_ms") / 1000,
+            cover = imgs.optJSONObject(0)?.optString("url") ?: "", coverSmall = imgs.optJSONObject(1)?.optString("url") ?: "", isrc = it.optJSONObject("external_ids")?.optString("isrc") ?: "",
+            year = ((if (ep) it.optString("release_date") else it.optJSONObject("album")?.optString("release_date")) ?: "").take(4).takeIf { y -> y.length == 4 && y.all(Char::isDigit) } ?: "", artistId = if (ep) "" else artists.optJSONObject(0)?.optString("id") ?: "", ep = ep)
+    }
+
+    /** The next song in your Spotify queue (one request), or null (none, or Spotify asked to wait). */
+    suspend fun queueNext(): SongMeta? {
+        if (!connected || wall() < backoff) return null
+        val q = (runCatching { api("/me/player/queue") }.getOrNull() as? JSONObject)?.optJSONArray("queue") ?: return null
+        return q.optJSONObject(0)?.takeIf { it.optString("id").isNotEmpty() }?.let { metaOf(it) }
+    }
+
     private fun apply(d: JSONObject?, mid: Double) {
         val nowT = now(); val before = if (spState?.playing == true) curMs() else null; val oldId = spId
         spFetched = mid
@@ -266,14 +285,7 @@ object Spotify {
             if (spId != null || E.title.isEmpty()) { spId = null; meta = null; E.spIdle() }
             return
         }
-        val ep = it.optString("type") == "episode"
-        val imgs = (if (ep) it.optJSONArray("images") else it.optJSONObject("album")?.optJSONArray("images")) ?: JSONArray()
-        val artists = it.optJSONArray("artists") ?: JSONArray()
-        val m = SongMeta(id = it.optString("id"), uri = it.optString("uri"), title = it.optString("name"),
-            artist = if (ep) it.optJSONObject("show")?.optString("name") ?: "" else (0 until artists.length()).joinToString(", ") { k -> artists.getJSONObject(k).optString("name") },
-            album = if (ep) "" else it.optJSONObject("album")?.optString("name") ?: "", duration = it.optDouble("duration_ms") / 1000,
-            cover = imgs.optJSONObject(0)?.optString("url") ?: "", coverSmall = imgs.optJSONObject(1)?.optString("url") ?: "", isrc = it.optJSONObject("external_ids")?.optString("isrc") ?: "",
-            year = ((if (ep) it.optString("release_date") else it.optJSONObject("album")?.optString("release_date")) ?: "").take(4).takeIf { y -> y.length == 4 && y.all(Char::isDigit) } ?: "", artistId = if (ep) "" else artists.optJSONObject(0)?.optString("id") ?: "", ep = ep)
+        val m = metaOf(it)
         val st = PState(d.optBoolean("is_playing"), d.optDouble("progress_ms", 0.0), it.optDouble("duration_ms"))
         spState = st
         // small differences glide in over ~0.6 s instead of jumping the lyrics; big ones (seek, skip, pause) snap
@@ -339,11 +351,12 @@ object Spotify {
     private var lastCatch = 0L
     /** Ask the Web API for the new song's details (its id), a few times until it names the song the Spotify app plays. */
     private fun catchUp() {
+        val quick = wall() - lastCatch < 1500   // skipping through songs: asks once you stop on one
         lastCatch = wall()
         catchJob?.cancel()
         catchJob = Vibe.scope.launch {
             for (k in 0 until 4) {
-                delay(if (k == 0) 120 else 700)
+                delay(if (k == 0) (if (quick) 1200 else 120) else 700)
                 if (E.src != "spotify" || wall() < backoff) return@launch
                 poll(); delay(700)
                 if (appTiming()) return@launch   // caught up
@@ -451,10 +464,12 @@ object Spotify {
         return if (method == "GET") r.jsonArray() else null
     }
 
+    private var likeAt = 0L
     fun likeCheck(m: SongMeta?) {
         val tok = ++likeTok; liked = null; version++
         if (m == null || m.ep || m.uri.isEmpty() || !hasScope("user-library-read")) return
-        Vibe.scope.launch { runCatching { val j = lib(m, "GET") as? JSONArray; if (tok == likeTok && j != null) { liked = j.optBoolean(0); version++ } } }
+        val quick = wall() - likeAt < 1500; likeAt = wall()   // skipping through songs: only the one you stop on is asked
+        Vibe.scope.launch { if (quick) { delay(1200); if (tok != likeTok) return@launch }; runCatching { val j = lib(m, "GET") as? JSONArray; if (tok == likeTok && j != null) { liked = j.optBoolean(0); version++ } } }
     }
 
     fun toggleLike() {

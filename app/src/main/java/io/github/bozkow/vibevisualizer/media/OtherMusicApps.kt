@@ -24,6 +24,13 @@ object MediaApps : SessionFollower({ p -> p != Vibe.app.packageName && (p != Spo
     private val names = HashMap<String, String>()
 
     /** The followed app's name as the phone shows it ("YouTube Music"). */
+    /** The next song in the app's queue, named as the lookups name the app's songs. */
+    fun nextSong(): io.github.bozkow.vibevisualizer.lyrics.SongMeta? {
+        val (t, a, d) = nextInQueue() ?: return null
+        val tn = io.github.bozkow.vibevisualizer.lyrics.TrackNameCleaner.clean(t, a)
+        return io.github.bozkow.vibevisualizer.lyrics.SongMeta(title = tn.title.ifEmpty { t }, artist = tn.artist.ifEmpty { a }, duration = d / 1000.0)
+    }
+
     fun appName(): String {
         val p = pkg; if (p.isEmpty()) return ""
         return names.getOrPut(p) {

@@ -99,6 +99,13 @@ object Local {
     }
     fun durationMs(): Double = player?.duration?.takeIf { it > 0 }?.toDouble() ?: 0.0
     fun hasNext() = player?.hasNextMediaItem() == true
+    /** The file that plays next (in shuffle and repeat too), and its name. */
+    fun nextItem(): Pair<Uri, String>? {
+        val p = player ?: return null
+        val i = p.nextMediaItemIndex; if (i == androidx.media3.common.C.INDEX_UNSET) return null
+        val u = p.getMediaItemAt(i).localConfiguration?.uri ?: return null
+        return u to (names[u.toString()] ?: Files.name(u))
+    }
 
     fun toggle() {
         val p = player ?: return

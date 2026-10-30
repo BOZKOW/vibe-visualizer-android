@@ -373,7 +373,7 @@ object Lyr {
         fun note(p: String, st: String, ms: Long? = null) { log.add(Look(p, st, ms)); if (tok == E.coverTok) { lookupLog.clear(); lookupLog.addAll(log) } }
         lookupLog.clear(); lookupSong = (if (m.artist.isNotEmpty()) m.artist + " – " else "") + m.title
         if (order.isEmpty()) { if (skipS.isNotEmpty()) return otherDone(m, tok); clear("All lyrics sources are off", "", "none", listOf(E.Act("Settings", pri = true) { E.openSettings("lyrics") })); return }
-        val key = listOf(m.id, m.artist, m.title, Math.round(m.duration).toString(), provList().filter { it.on }.joinToString(",") { it.k }).joinToString("|").lowercase()
+        val key = keyOf(m)
         cur = Cur(m, key, skip)
         if (!fresh) {
             if (order[0] == "local") { val r = runCatching { fromLocal(m) }.getOrNull(); if (tok != E.coverTok) return; if (r != null) { r.prov = "local"; note("local", "found"); apply(r); return } }   // your own file wins, also over saved lyrics
@@ -397,6 +397,8 @@ object Lyr {
         val done = HashMap<String, Got>()        // answers in so far, in any order
         var best: LyricsResult? = null
         var shown: LyricsResult? = null          // on screen now (an early answer, or the best so far)
+        // looked up ahead without the song's length: shown at once, and the usual lookup checks it
+        if (!fresh && skipS.isEmpty()) soft.remove(softKey(m))?.let { r -> shown = r; note(r.prov ?: "?", "looked up ahead"); apply(r) }
         val place = order.withIndex().associate { it.value to it.index }
         fun usable(r: LyricsResult?) = r != null && r.lines.any { !it.dots } && !SourceParse.placeholder(r.lines)
         fun canBeat(p: String) = best.let { b -> b == null || rank(b) == 0 || (rank(b) == 1 && p in WORDY) }
@@ -404,15 +406,15 @@ object Lyr {
         coroutineScope {
             fun ask(p: String): Deferred<Got> = asks.getOrPut(p) { async {
                 val a = now()
-                val g = try { Got(fetchFrom(p, m), null, (now() - a).toLong()) }
+                val g = try { Got(timed(p, m), null, (now() - a).toLong()) }
                 catch (e: kotlinx.coroutines.CancellationException) { throw e }
                 catch (e: Exception) { Got(null, e, (now() - a).toLong()) }
                 done[p] = g; g
             } }
-            // a slow source above shouldn't hold back lyrics that are already here: after 2 s the best answer in so far
+            // a slow source above shouldn't hold back lyrics that are already here: after 1.5 s the best answer in so far
             // shows (better timed first, then your order); a source above it that answers as well within 8 s takes over
             launch {
-                delay(2000)
+                delay(1500)
                 while (shown == null && tok == E.coverTok) {
                     val pick = done.entries.filter { usable(it.value.r) }.maxWithOrNull(compareBy<Map.Entry<String, Got>> { rank(it.value.r!!) }.thenByDescending { place[it.key] ?: 99 })
                     if (pick != null) { val r = pick.value.r!!; r.prov = pick.key; shown = r; note(pick.key, "shown early, while a source above it answers"); apply(r); break }
@@ -428,7 +430,7 @@ object Lyr {
                 if (resting[p] != null) continue
                 val d = ask(p)
                 val lead = !fanned && p != "local"
-                var g: Got? = if (lead) withTimeoutOrNull(1000) { d.await() } else null
+                var g: Got? = if (lead) withTimeoutOrNull(700) { d.await() } else null
                 if (lead && g == null) { fanned = true; fanOut() }
                 if (g == null) g = d.await()
                 if (tok != E.coverTok) break
@@ -471,6 +473,45 @@ object Lyr {
             E.Act("Try again", pri = true) { ladders.clear(); lcache.remove(key); Vibe.scope.launch { LyricsCache.del(key) }; load(m, E.coverTok) },
             E.Act("Copy details") { copy(m.artist + " – " + m.title + "\n" + errs.joinToString("\n")); E.copied("Details") }), err = true)
         else clear("No lyrics for this song", "It may be instrumental. You can add your own .lrc or .ttml file.", "none", listOf(E.Act("Add a file") { FilePicker.lyrics?.invoke(true) }))
+    }
+
+    /** One source's answer, given up on after 20 s (as Spicy Lyrics Mobile 0.16.1 does): a slow source doesn't hold a
+     *  lookup up. */
+    private suspend fun timed(p: String, m: SongMeta): LyricsResult? {
+        var r: LyricsResult? = null
+        withTimeoutOrNull(20_000) { r = fetchFrom(p, m); true } ?: throw Exception("no answer in 20 s")
+        return r
+    }
+
+    private fun keyOf(m: SongMeta) = listOf(m.id, m.artist, m.title, Math.round(m.duration).toString(), provList().filter { it.on }.joinToString(",") { it.k }).joinToString("|").lowercase()
+    private fun softKey(m: SongMeta) = (m.artist + "|" + m.title).lowercase()
+    private val soft = HashMap<String, LyricsResult>()   // looked up ahead for a song whose length wasn't known yet
+
+    /** The next song's lyrics, looked up ahead while this one plays and kept (in memory and on this phone), so they show
+     *  the moment it starts. Quietly: nothing on screen changes, no source is rested for failing here, and a failure
+     *  isn't remembered. The first source asks alone; unless it has word timing, the rest that could do better together. */
+    suspend fun preload(m: SongMeta) {
+        val key = keyOf(m)
+        if (lcache.containsKey(key) || soft.containsKey(softKey(m))) return
+        if (LyricsCache.get(key) !is LyricsCache.Got.Absent) return
+        val order = provList().filter { it.on && it.k != "local" }.map { it.k }.filter { ladder(it).openUntil(wall()) == null }
+        if (order.isEmpty()) return
+        var best: LyricsResult? = null; var bestAt = 99; var errs = false
+        fun take(p: String, r: LyricsResult?) {
+            if (r == null || r.lines.none { !it.dots } || SourceParse.placeholder(r.lines)) return
+            val i = order.indexOf(p); val b = best
+            if (b == null || rank(r) > rank(b) || (rank(r) == rank(b) && i < bestAt)) { r.prov = p; best = r; bestAt = i }
+        }
+        suspend fun ask(p: String): LyricsResult? = try { timed(p, m) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { errs = true; null }
+        take(order[0], ask(order[0]))
+        if (best.let { it == null || rank(it) < 2 }) coroutineScope {
+            order.drop(1).filter { p -> best.let { b -> b == null || rank(b) == 0 || (rank(b) == 1 && p in WORDY) } }
+                .map { p -> async { p to ask(p) } }.map { it.await() }.forEach { (p, r) -> take(p, r) }
+        }
+        val r = best
+        if (m.duration <= 0) { if (r != null) { soft[softKey(m)] = r; while (soft.size > 10) soft.remove(soft.keys.first()) }; return }
+        if (r != null) { lcache[key] = r; LyricsCache.put(key, r) }
+        else if (!errs) LyricsCache.put(key, null)   // "none" for a day, as a lookup would
     }
 
     private suspend fun fetchFrom(p: String, m: SongMeta): LyricsResult? = when (p) {

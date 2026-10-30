@@ -23,6 +23,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 import java.net.URLEncoder
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheWriter
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import io.github.bozkow.vibevisualizer.core.wall
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Spotify Canvas videos (from your server, or the endpoint set in Settings) and your own canvas video. While one
  *  plays, the layout makes room for it and the background is the video itself, blurred. */
@@ -51,7 +63,14 @@ object CanvasVideo {
         } }
     }
 
-    private fun ensure(): ExoPlayer = player ?: ExoPlayer.Builder(Vibe.app).build().apply {
+    // Canvas videos are kept on the phone (200 MB at most, the longest unplayed go first): a song played again, or the
+    // next one found ahead, starts at once instead of downloading its video again
+    private val cache by lazy { SimpleCache(java.io.File(Vibe.app.cacheDir, "canvas"), LeastRecentlyUsedCacheEvictor(200L shl 20), StandaloneDatabaseProvider(Vibe.app)) }
+    private val cached by lazy { CacheDataSource.Factory().setCache(cache).setUpstreamDataSourceFactory(DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)) }
+    private val ahead = LinkedHashMap<String, Pair<String, Boolean>>()   // the next songs' Canvas, found ahead: song → (video, from Spicy's service)
+    private var askAt = 0L
+
+    private fun ensure(): ExoPlayer = player ?: ExoPlayer.Builder(Vibe.app).setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(Vibe.app, cached))).build().apply {
         volume = 0f; repeatMode = Player.REPEAT_MODE_ONE; addListener(listener)
         view?.get()?.let { setVideoTextureView(it) }
         player = this
@@ -92,36 +111,57 @@ object CanvasVideo {
         }
     }
 
-    /** Your server first (when set), then Spicy Lyrics' Canvas service for Spotify songs. */
+    private fun aheadKey(m: SongMeta) = m.id.ifEmpty { (m.artist + "|" + m.title).lowercase() }
+
+    /** Your server first (when set), then Spicy Lyrics' Canvas service for Spotify songs. Found ahead: at once. Song
+     *  changes in quick succession only look up the one you stop on. */
     private suspend fun look(m: SongMeta, tok: Int) {
         if (!S.canvasOn) return
+        ahead.remove(aheadKey(m))?.let { (v, spicy) -> set(v); if (spicy) spicyId = m.id; return }
+        val quick = wall() - askAt < 1200; askAt = wall()
+        if (quick) { delay(650); if (tok != E.coverTok) return }
+        val f = find(m) { tok != E.coverTok } ?: return
+        if (tok == E.coverTok && f.first.isNotEmpty()) { set(f.first); if (f.second) spicyId = m.id }
+    }
+
+    /** The next song's Canvas, found ahead and its video downloaded, so it plays the moment the song starts. */
+    suspend fun preload(m: SongMeta) {
+        if (!S.canvasOn) return
+        val k = aheadKey(m); if (ahead.containsKey(k)) return
+        val f = find(m)?.takeIf { it.first.isNotEmpty() } ?: return   // none, or couldn't tell: looked up as usual then
+        ahead[k] = f; while (ahead.size > 12) ahead.remove(ahead.keys.first())
+        if (f.first.startsWith("http")) withContext(Dispatchers.IO) { runCatching { CacheWriter(cached.createDataSource(), DataSpec(Uri.parse(f.first)), null, null).cache() } }
+    }
+
+    /** The song's Canvas: (video, from Spicy Lyrics' service), ("", false) when there's none, null when it couldn't be
+     *  told (or [gone]: another song plays). Your server's lookup is tried once more after 1.5 s when it fails (as
+     *  Spicy Lyrics Mobile 0.14.4 does). */
+    private suspend fun find(m: SongMeta, gone: () -> Boolean = { false }): Pair<String, Boolean>? {
         val tpl = Vibe.cfg.canvasUrl.trim()
-        if (tpl.isNotEmpty() && fromServer(m, tok, tpl)) return
-        if (tok != E.coverTok || !S.b("cvSpicy") || m.id.isEmpty() || m.ep) return
-        val v = SpicyCanvas.find(m.id) ?: return
-        if (tok == E.coverTok) { set(v); spicyId = m.id }
-    }
-
-    /** Your server's Canvas for the song: true once it's set (or another song plays). A failed lookup is tried once
-     *  more after 1.5 s (as Spicy Lyrics Mobile 0.14.4 does). */
-    private suspend fun fromServer(m: SongMeta, tok: Int, tpl: String): Boolean {
-        for (attempt in 0..1) {
-            if (attempt > 0) { delay(1500); if (tok != E.coverTok) return true }
-            when (val r = askServer(m, tok, tpl)) { null -> continue; else -> return r }
+        var failed = false
+        if (tpl.isNotEmpty()) {
+            var r = askServer(m, tpl)
+            if (r == null) { delay(1500); if (gone()) return null; r = askServer(m, tpl) }
+            if (gone()) return null
+            if (!r.isNullOrEmpty()) return r to false
+            failed = r == null
         }
-        return false
+        if (!S.b("cvSpicy") || m.id.isEmpty() || m.ep) return if (failed) null else "" to false
+        val v = SpicyCanvas.find(m.id)
+        if (gone()) return null
+        return if (v != null) v to true else if (failed) null else "" to false
     }
 
-    /** true: set (or another song plays), false: the server has none, null: the lookup failed. */
-    private suspend fun askServer(m: SongMeta, tok: Int, tpl: String): Boolean? {
+    /** Your server's Canvas for the song: the video, "" when it has none, null when the lookup failed. */
+    private suspend fun askServer(m: SongMeta, tpl: String): String? {
         var u = Regex("\\{(\\w+)\\}").replace(tpl) { r ->
             URLEncoder.encode(when (r.groupValues[1]) { "id" -> m.id; "uri" -> m.uri; "title" -> m.title; "artist" -> m.artist; else -> "" }, "UTF-8")
         }
-        if (u.startsWith("/")) u = Server.url(u) ?: return false
-        if (m.id.isEmpty() && tpl.contains("{id}")) return false
+        if (u.startsWith("/")) u = Server.url(u) ?: return ""
+        if (m.id.isEmpty() && tpl.contains("{id}")) return ""
         try {
             val r = Net.fetch(u, "canvas")
-            if (r.code == 404) return false
+            if (r.code == 404) return ""
             if (!r.ok) throw IllegalStateException(r.json()?.optString("error")?.ifEmpty { null } ?: "HTTP ${r.code}")
             val ct = r.header("content-type") ?: ""
             val v = when {
@@ -129,9 +169,7 @@ object CanvasVideo {
                 ct.contains("json") -> r.json()?.let { j -> listOf("url", "canvasUrl", "video", "canvas").firstNotNullOfOrNull { k -> j.optString(k).ifEmpty { null } } }
                 else -> r.text.trim()
             }
-            if (tok != E.coverTok) return true
-            if (v.isNullOrEmpty()) return false
-            set(v); return true
+            return v ?: ""
         } catch (e: kotlinx.coroutines.CancellationException) { throw e
         } catch (e: Exception) { android.util.Log.w("VV-canvas", "lookup: ${e.message}"); return null }   // no Canvas, quietly
     }

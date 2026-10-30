@@ -11,20 +11,50 @@ class Parsed(val lines: List<Line>, val sync: Boolean, val writers: List<String>
 
 private val LRC_LINE = Regex("""^((?:\[\d+:\d+(?:[.:]\d+)?]\s*)+)(.*)$""")
 private val LRC_TIME = Regex("""\[(\d+):(\d+(?:[.:]\d+)?)]""")
-private val LRC_WORD_TIME = Regex("""<\d+:\d+(?:[.:]\d+)?>""")
+private val LRC_WORD_TIME = Regex("""<(\d+):(\d+(?:[.:]\d+)?)>""")
+private fun lrcSec(m: String, s: String) = m.toDouble() * 60 + s.replace(':', '.').toDouble()
+
+/** Enhanced LRC's word timing ("<00:12.34>Hello <00:12.80>world<00:13.20>", as LRCLIB and Unison sometimes have it):
+ *  each word (or syllable) runs to the next stamp. Null without word stamps, or with text before the first one. */
+private fun lrcWords(s: String): List<Word>? {
+    val st = LRC_WORD_TIME.findAll(s).toList()
+    if (st.isEmpty() || s.substring(0, st[0].range.first).isNotBlank()) return null
+    val out = ArrayList<Word>()
+    for ((i, m) in st.withIndex()) {
+        val nx = st.getOrNull(i + 1)
+        val seg = s.substring(m.range.last + 1, nx?.range?.first ?: s.length)
+        if (seg.firstOrNull()?.isWhitespace() == true) out.lastOrNull()?.sp = true   // " world": a space after the word before
+        val txt = seg.trim(); if (txt.isEmpty()) continue
+        val t = lrcSec(m.groupValues[1], m.groupValues[2])
+        out.add(Word(t, nx?.let { lrcSec(it.groupValues[1], it.groupValues[2]) }?.takeIf { it > t }, txt, seg.lastOrNull()?.isWhitespace() == true))
+    }
+    return out.takeIf { it.isNotEmpty() }
+}
 
 fun parseLRC(t: String): List<Line> {
     val out = ArrayList<Line>()
     for (ln in t.split(Regex("\r?\n"))) {
         val m = LRC_LINE.find(ln) ?: continue
-        val txt = m.groupValues[2].replace(LRC_WORD_TIME, "").trim()   // empty timed lines mark instrumental breaks
-        for (tm in LRC_TIME.findAll(m.groupValues[1])) {
-            val s = tm.groupValues[1].toDouble() * 60 + tm.groupValues[2].replace(':', '.').toDouble()
-            out.add(if (txt.isNotEmpty()) Line(s, null, txt) else Line(s, null, "", dots = true))
+        val txt = m.groupValues[2].replace(LRC_WORD_TIME, "").replace(Regex("\\s+"), " ").trim()   // empty timed lines mark instrumental breaks
+        val times = LRC_TIME.findAll(m.groupValues[1]).toList()
+        // word stamps only make sense for a line sung once (a line on several stamps would get the first one's times)
+        val ws = if (txt.isNotEmpty() && times.size == 1) lrcWords(m.groupValues[2]) else null
+        for (tm in times) {
+            val s = lrcSec(tm.groupValues[1], tm.groupValues[2])
+            out.add(if (txt.isEmpty()) Line(s, null, "", dots = true) else if (ws != null) Line(s, ws.last().end, txt, words = ws) else Line(s, null, txt))
         }
     }
     out.sortBy { it.t }
-    return out
+    // a line with its translation right under it on the same stamp (two lines, one time; Spicy Lyrics Mobile 0.16.0):
+    // the second is the translation, not a line of its own
+    val merged = ArrayList<Line>(out.size)
+    var i = 0
+    while (i < out.size) {
+        val a = out[i]; val b = out.getOrNull(i + 1)
+        if (b != null && !a.dots && !b.dots && a.t == b.t && out.getOrNull(i + 2)?.t != a.t) { a.apiTr = b.text; merged.add(a); i += 2 }
+        else { merged.add(a); i++ }
+    }
+    return merged
 }
 
 fun ttSec(x: String): Double {
@@ -46,8 +76,10 @@ private fun allByLocal(root: Node, name: String, out: MutableList<Element> = Arr
     return out
 }
 
-fun parseTTML(x: String): Parsed {
+fun parseTTML(x0: String): Parsed {
     val f = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = false; isValidating = false }
+    // a file starting with a byte-order mark or spaces, or using &nbsp; (HTML's, not XML's), reads too (Spicy Lyrics Mobile 0.16.1)
+    val x = x0.trimStart('\uFEFF', ' ', '\t', '\r', '\n').replace("&nbsp;", "&#160;")
     val d = try { f.newDocumentBuilder().parse(ByteArrayInputStream(x.toByteArray(Charsets.UTF_8))) }
     catch (e: Exception) { throw IllegalArgumentException("The TTML file is not valid XML.") }
     val out = ArrayList<Line>()
@@ -64,7 +96,9 @@ fun parseTTML(x: String): Parsed {
             val n = ch.item(i)
             if (isBg(n) || isSide(n)) continue
             if (n is Element && n.hasAttribute("begin")) {
-                words.add(Word(ttSec(n.getAttribute("begin")), n.attr("end")?.let { ttSec(it) }, n.textContent, false))
+                // a word with no end, or one before its start, runs to the next word (it keeps a length)
+                val b = ttSec(n.getAttribute("begin"))
+                words.add(Word(b, n.attr("end")?.let { ttSec(it) }?.takeIf { it > b }, n.textContent, false))
             } else if (n.nodeType == Node.TEXT_NODE && n.nodeValue.any { it.isWhitespace() } && words.isNotEmpty()) words.last().sp = true
         }
     }
