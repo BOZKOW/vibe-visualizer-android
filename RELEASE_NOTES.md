@@ -1,4 +1,9 @@
-Vibe Visualizer for Android 0.33.2 (beta). Android 12 or newer; it installs over 0.33.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.33.3 (beta). Android 12 or newer; it installs over 0.33.2 (Settings → Help & about → Update now).
+
+### Fixed
+
+- **Update downloads timing out**: the update used the same 35-second limit as the quick lyrics and Spotify lookups, so on a slower connection the 19 MB download was cut off part way. It now has no limit on how long it takes; it only gives up when nothing arrives for a whole minute.
+
 
 ### Fixed
 
