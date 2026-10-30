@@ -400,12 +400,12 @@ private fun EmptyState() {
 private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false) {
     E.sec.intValue
     val top = when (E.src) { "spotify" -> "PLAYING FROM SPOTIFY"; "file" -> "PLAYING ON THIS PHONE"; "media" -> "PLAYING FROM " + io.github.bozkow.vibevisualizer.media.MediaApps.appName().uppercase(); else -> "VIBE VISUALIZER" }
-    // the device in the same style: "PLAYING ON PETR'S S25"
+    // the device in the same style: "PLAYING ON <DEVICE>"
     val dev = when (E.src) { "spotify" -> Spotify.device?.name?.let { "PLAYING ON $it" } ?: if (Spotify.meta == null) "NOTHING PLAYING" else ""; "file" -> Local.position(); else -> "" }.uppercase()
     Column(modifier.fillMaxWidth().reportTop()) {
         // the status bar hidden: the line goes up where it was, either side of the camera, and takes no room here
         if (side) {
-            // on its side, one line: "PLAYING FROM SPOTIFY ON PETR'S S25"
+            // on its side, one line: "PLAYING FROM SPOTIFY ON <DEVICE>"
             val one = if (dev.startsWith("PLAYING ON ")) top + " " + dev.removePrefix("PLAYING ") else if (dev.isNotEmpty()) "$top · $dev" else top
             Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.Center) {
                 AnimatedContent(one, Modifier.fillMaxWidth(), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdone") { t ->
