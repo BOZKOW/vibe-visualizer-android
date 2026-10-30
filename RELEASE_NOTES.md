@@ -1,11 +1,18 @@
-Vibe Visualizer for Android 0.35.1 (beta). Android 12 or newer; it installs over 0.35.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.35.2 (beta). Android 12 or newer; it installs over 0.35.1 (Settings → Help & about → Update now).
 
-### Fixed
+### The line at the top, tidied
+
+- **Where it plays from and where it plays now fit either side of the camera**: "PLAYING FROM SPOTIFY" and "PLAYING ON …" were too long for the room beside the camera, so both crawled along and mostly showed their first words ("PLAYING FROM SPO", "PLAYING ON LIVING"). Now it's an icon and the name: Spotify's logo and SPOTIFY (or the music app, or THIS PHONE) at the left, and the device's icon (a speaker, a phone, a computer, a TV) with its name at the right. Only a very long device name still scrolls.
+- **They sit at the edges**, as a status bar's clock and icons do, in line with the rest of the screen (each floated in the middle of its side). On its side the app keeps the one line in words: "PLAYING FROM SPOTIFY ON …".
+
+## From 0.35.1
+
+#### Fixed
 
 - **Haptic feedback works**: the tick it asked Android for plays nothing on some phones (Samsung's), so the setting seemed to do nothing. It's now a click played on the vibrator itself, as strong as your phone's touch vibration (and still there when that's off, since you asked for it here). Turning the setting on ticks at once, and each tap ticks once (the play button and the screen buttons ticked twice).
 - **Buttons that are on are easy to tell**: a button under the controls that's on (the screen you're on, Translate, Romanize, Canvas, Like) is filled white with a dark icon, as the translate and romanize buttons by the song; shuffle and repeat sit in a soft circle of their colour, besides the dot.
 
-### Next shows the next song at once
+#### Next shows the next song at once
 
 - **Pressing Next in the app shows the next song straight away**: its name, cover, lyrics and Canvas, got ready while the song before played, without waiting for Spotify to say a new song started (its time counts from the press until Spotify does). Pressing Next again before Spotify answers goes on to the one after. If Spotify still plays the old song 8 seconds later, the app goes back to it.
 

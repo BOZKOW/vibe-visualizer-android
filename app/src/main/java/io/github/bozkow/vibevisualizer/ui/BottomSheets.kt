@@ -229,7 +229,7 @@ private fun DevicesSheet(close: () -> Unit) {
         list == null -> Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) { LoadingIndicator() }
         list!!.isEmpty() -> Hint("No devices found. Open Spotify on one of your devices.")
         else -> list!!.forEach { d ->
-            val icon = when (d.type) { "Computer" -> Icons.Rounded.Computer; "Smartphone" -> Icons.Rounded.PhoneAndroid; "TV" -> Icons.Rounded.Tv; else -> Icons.Rounded.Speaker }
+            val icon = deviceIcon(d.type)
             val col = if (d.active) Color(0xFF1ED760) else Color.White
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = if (d.active) .08f else .04f))
                 .clickable(enabled = !d.restricted) {
@@ -293,3 +293,6 @@ private fun TimingSheet() {
 }
 
 @Suppress("unused") private val keepBorder = Modifier.border(0.dp, Color.Transparent)
+
+/** A Spotify device's kind as an icon (Spotify's own types). */
+fun deviceIcon(type: String) = when (type) { "Computer" -> Icons.Rounded.Computer; "Smartphone" -> Icons.Rounded.PhoneAndroid; "TV" -> Icons.Rounded.Tv; else -> Icons.Rounded.Speaker }

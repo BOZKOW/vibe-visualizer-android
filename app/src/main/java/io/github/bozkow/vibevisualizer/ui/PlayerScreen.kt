@@ -62,6 +62,9 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Cast
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -434,20 +437,30 @@ private fun EmptyState() {
 @Composable
 private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false) {
     E.sec.intValue
-    val top = when (E.src) { "spotify" -> "PLAYING FROM SPOTIFY"; "file" -> "PLAYING ON THIS PHONE"; "media" -> "PLAYING FROM " + io.github.bozkow.vibevisualizer.media.MediaApps.appName().uppercase(); else -> "VIBE VISUALIZER" }
-    // the device in the same style: "PLAYING ON <DEVICE>"
-    val dev = when (E.src) { "spotify" -> Spotify.device?.name?.let { "PLAYING ON $it" } ?: if (Spotify.meta == null) "NOTHING PLAYING" else ""; "file" -> Local.position(); else -> "" }.uppercase()
+    // where it plays from and on, short enough to stand either side of the camera whole (with "PLAYING FROM …" and
+    // "PLAYING ON …" both only ever showed their first words, crawling); an icon says which is which
+    val app = io.github.bozkow.vibevisualizer.media.MediaApps.appName().uppercase()
+    val top = when (E.src) { "spotify" -> "SPOTIFY"; "file" -> "THIS PHONE"; "media" -> app; else -> "VIBE VISUALIZER" }
+    val topIcon = when (E.src) { "spotify" -> VIcons.spotify; "file" -> Icons.Rounded.PhoneAndroid; "media" -> Icons.Rounded.MusicNote; else -> null }
+    val sd = Spotify.device
+    val dev = when (E.src) { "spotify" -> sd?.name ?: if (Spotify.meta == null) "NOTHING PLAYING" else ""; "file" -> Local.position(); else -> "" }.uppercase()
+    val devIcon = when (E.src) { "spotify" -> sd?.let { deviceIcon(it.type) }; "file" -> Icons.AutoMirrored.Rounded.QueueMusic; else -> null }
     Column(modifier.fillMaxWidth().reportTop()) {
         // the status bar hidden: the line goes up where it was, either side of the camera, and takes no room here
         if (side) {
-            // on its side, one line: "PLAYING FROM SPOTIFY ON <DEVICE>"
-            val one = if (dev.startsWith("PLAYING ON ")) top + " " + dev.removePrefix("PLAYING ") else if (dev.isNotEmpty()) "$top · $dev" else top
+            // on its side, one line with room for the words: "PLAYING FROM SPOTIFY ON <DEVICE>"
+            val one = when (E.src) {
+                "spotify" -> "PLAYING FROM SPOTIFY" + (if (sd != null) " ON $dev" else if (dev.isNotEmpty()) " · $dev" else "")
+                "file" -> "PLAYING ON THIS PHONE" + (if (dev.isNotEmpty()) " · $dev" else "")
+                "media" -> "PLAYING FROM $app"
+                else -> top
+            }
             Box(Modifier.fillMaxWidth().height(26.dp), contentAlignment = Alignment.Center) {
                 AnimatedContent(one, Modifier.fillMaxWidth(), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdone") { t ->
                     TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
                 }
             }
-        } else TopLine(top, dev, Modifier, beside = S.b("aHideStatus"))
+        } else TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"))
         NoticeSpace(home, row = side)
     }
 }
@@ -456,17 +469,17 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
 private object TopArea { var bottom by mutableFloatStateOf(0f) }
 private fun Modifier.reportTop() = onGloballyPositioned { TopArea.bottom = it.positionInWindow().y + it.size.height }
 
-/** "PLAYING FROM …" at the left, the device at the right. Beside the camera: drawn up in the hidden status bar's place,
- *  level with the camera and clear of it at both sides. */
+/** Where it plays from at the left edge, the device at the right edge, as a status bar has them. Beside the camera:
+ *  drawn up in the hidden status bar's place, level with the camera and clear of it at both sides. */
 @Composable
-private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolean = false) {
+private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: ImageVector?, modifier: Modifier, beside: Boolean = false) {
     val view = androidx.compose.ui.platform.LocalView.current
     val dens = androidx.compose.ui.platform.LocalDensity.current
     var at by remember { mutableStateOf<Offset?>(null) }            // where this row starts in the window
     var w by remember { mutableFloatStateOf(0f) }
     var cut by remember { mutableStateOf<android.graphics.Rect?>(null) }   // the camera hole above the row
     val e = with(dens) { 8.dp.toPx() }      // up there it reaches a little further out (the corners are clear at that height)
-    val gap = with(dens) { 22.dp.toPx() }   // room to the camera
+    val gap = with(dens) { 16.dp.toPx() }   // room to the camera
     val x0 = (at?.x ?: 0f) - (if (beside) e else 0f)
     val ww = w + (if (beside) 2 * e else 0f)
     val c = cut?.takeIf { beside && it.right > x0 && it.left < x0 + ww }
@@ -499,12 +512,12 @@ private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolea
             layout(cs.maxWidth, 0) { pl.place(-ex, (cy - y0 - pl.height / 2f).roundToInt()) }
         } else Modifier.height(32.dp))
         .graphicsLayer { alpha = if (at == null) 0f else 1f }) {
-        // each in the middle of its side
-        AnimatedContent(top, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
-            TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
+        // one at the outer edge of each side (centred in a side, they floated at odd places)
+        AnimatedContent(top to topIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw), contentAlignment = Alignment.CenterStart, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { (t, ic) ->
+            TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic, align = Alignment.CenterStart)
         }
-        AnimatedContent(dev, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(rx.roundToInt(), 0) }.width(rw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { t ->
-            TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
+        AnimatedContent(dev to devIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(rx.roundToInt(), 0) }.width(rw), contentAlignment = Alignment.CenterEnd, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { (t, ic) ->
+            if (t.isNotEmpty()) TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic, align = Alignment.CenterEnd)
         }
     }
 }
@@ -513,15 +526,20 @@ private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolea
  *  fading out at both ends of its side. At rest its first letter is whole, just after the fade (or it ends in "…" with
  *  Scroll long names off). */
 @Composable
-private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp) {
+private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp,
+                    icon: ImageVector? = null, align: Alignment = Alignment.Center) {
     var boxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var textW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
-    val over = boxW > 0 && textW > boxW
-    Box(Modifier.fillMaxWidth().onSizeChanged { boxW = it.width }, contentAlignment = Alignment.Center) {
-        if (!S.b("aMarquee")) Text(text, fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        else Text(text, (if (over) Modifier.fadeSides(10.dp, 14.dp) else Modifier).basicMarquee(iterations = if (E.settingsPage == null) Int.MAX_VALUE else 0, initialDelayMillis = 2500)
-            .then(if (over) Modifier.padding(start = 10.dp) else Modifier),
-            fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
+    val iconW = with(androidx.compose.ui.platform.LocalDensity.current) { if (icon != null) 17.dp.roundToPx() else 0 }
+    val over = boxW > 0 && textW > boxW - iconW
+    Box(Modifier.fillMaxWidth().onSizeChanged { boxW = it.width }, contentAlignment = align) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) { Icon(icon, null, Modifier.size(12.dp), tint = color); Spacer(Modifier.width(5.dp)) }
+            if (!S.b("aMarquee")) Text(text, Modifier.weight(1f, fill = false), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            else Text(text, Modifier.weight(1f, fill = false).then(if (over) Modifier.fadeSides(10.dp, 14.dp) else Modifier).basicMarquee(iterations = if (E.settingsPage == null) Int.MAX_VALUE else 0, initialDelayMillis = 2500)
+                .then(if (over) Modifier.padding(start = 10.dp) else Modifier),
+                fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
+        }
     }
 }
 
