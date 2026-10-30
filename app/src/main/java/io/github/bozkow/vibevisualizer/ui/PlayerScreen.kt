@@ -494,16 +494,28 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
     }
 }
 
-/** Under the top line: what's wrong (or that the phone is warm), while it lasts, even with the controls away. */
+/** Under the top line: what's wrong (or that the phone is warm), while it lasts, even with the controls away. One at a
+ *  time: several take turns (4.5 s each, a tap moves on to the next), a new one first, with a dot for each. */
 @Composable
 private fun NoticeSpace(home: Boolean) {
-    val p = E.notice(home)
+    val all = E.notices(home)
+    val ids = all.joinToString("|") { it.id }
+    var turn by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(ids) { turn = 0; if (all.size > 1) while (true) { kotlinx.coroutines.delay(4500); turn++ } }
+    val k = if (all.isEmpty()) 0 else turn % all.size
+    val p = all.getOrNull(k)
     val last = remember { arrayOfNulls<E.Prob>(1) }   // still shown while it slides away
     if (p != null) last[0] = p
     AnimatedVisibility(p != null, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
-        // a different problem cross-fades in; a countdown in the same one just counts
-        AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
-            Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q) }
+        Column(Modifier.fillMaxWidth().clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null, enabled = all.size > 1) { turn++ },
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            // a different one cross-fades in; a countdown in the same one just counts
+            AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q) }
+            }
+            if (all.size > 1) Row(Modifier.padding(bottom = 4.dp)) {
+                all.indices.forEach { i -> Box(Modifier.padding(horizontal = 3.dp).size(5.dp).clip(CircleShape).background(Color.White.copy(alpha = if (i == k) .9f else .3f))) }
+            }
         }
     }
 }

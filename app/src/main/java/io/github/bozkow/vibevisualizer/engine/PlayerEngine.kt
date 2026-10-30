@@ -105,19 +105,21 @@ object E {
         if (acted) n.action?.fn?.invoke() else n.onDismiss?.invoke()
     }
 
-    /** What the top of the screen says is wrong: a one-off error first (it's gone in a few seconds), then what's wrong
-     *  until it's solved, a warm phone while it's warm, lyrics that couldn't load, and an update on its way. */
-    fun notice(homeScreen: Boolean = false): Prob? {
-        notes.firstOrNull()?.let { n -> return Prob(0, if (n.kind == "err") "err" else "wait", "note" + n.id, n.msg, "", Act(n.action?.label ?: "OK") { noteDone(n, n.action != null) }) }
-        problems(homeScreen).firstOrNull()?.let { return it }
+    /** Everything the top of the screen says, most important first (the space under the top line shows them in turn):
+     *  a one-off error (it's gone in a few seconds; the next one waits its turn), what's wrong until it's solved, a warm
+     *  phone while it's warm, lyrics that couldn't load, and an update on its way. */
+    fun notices(homeScreen: Boolean = false): List<Prob> {
+        val out = ArrayList<Prob>()
+        notes.firstOrNull()?.let { n -> out.add(Prob(0, if (n.kind == "err") "err" else "wait", "note" + n.id, n.msg, "", Act(n.action?.label ?: "OK") { noteDone(n, n.action != null) })) }
+        out.addAll(problems(homeScreen))
         val h = Perf.hot
-        if (h > 0 && S.b("perfAsk")) return Prob(0, if (h >= 2) "err" else "wait", "heat", if (h >= 2) "Your phone is hot" else "Your phone is getting warm",
+        if (h > 0 && S.b("perfAsk")) out.add(Prob(0, if (h >= 2) "err" else "wait", "heat", if (h >= 2) "Your phone is hot" else "Your phone is getting warm",
             listOfNotNull(Perf.hotC?.let { "Battery at " + Math.round(it) + " °C" }, if (S.low) "Low performance mode is on" else null).joinToString(" · "),
-            if (S.low) null else Act("Low performance mode") { S.set("low", true) })
+            if (S.low) null else Act("Low performance mode") { S.set("low", true) }))
         val m = Lyr.msg
-        if (!homeScreen && m != null && m.err) return Prob(0, "err", "lyrics", m.msg, m.sub, m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull())
-        if (Updates.downloading) return Prob(0, "wait", "update", "Downloading the update", (Updates.progress * 100).toInt().toString() + "%")
-        return null
+        if (!homeScreen && m != null && m.err) out.add(Prob(0, "err", "lyrics", m.msg, m.sub, m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull()))
+        if (Updates.downloading) out.add(Prob(0, "wait", "update", "Downloading the update", (Updates.progress * 100).toInt().toString() + "%"))
+        return out
     }
 
     /** A short message: errors and warnings at the top, the rest at the bottom. Errors are saved in the error log on
