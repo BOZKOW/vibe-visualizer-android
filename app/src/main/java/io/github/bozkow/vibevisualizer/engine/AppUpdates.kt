@@ -167,7 +167,8 @@ object Updates {
                     pi.openSession(sid).use { s ->
                         // no limit on the whole download (the app's lookups give up after 35 s, and the update is tens of
                         // megabytes): only a connection that sends nothing for a minute counts as gone
-                        val dl = Net.http.newBuilder().callTimeout(0, java.util.concurrent.TimeUnit.SECONDS).readTimeout(60, java.util.concurrent.TimeUnit.SECONDS).build()
+                        // and past the web cache: the APK would fill most of it, pushing out the answers it's for
+                        val dl = Net.http.newBuilder().cache(null).callTimeout(0, java.util.concurrent.TimeUnit.SECONDS).readTimeout(60, java.util.concurrent.TimeUnit.SECONDS).build()
                         dl.newCall(Request.Builder().url(rel.apk).build()).execute().use { r ->
                             if (r.code == 404) throw Exception("this version isn’t on GitHub yet: try again in a few minutes")
                             if (!r.isSuccessful) throw Exception("HTTP ${r.code}")

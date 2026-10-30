@@ -3,6 +3,7 @@ package io.github.bozkow.vibevisualizer.ui
 import android.os.BatteryManager
 import androidx.compose.animation.core.animateOffsetAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -67,7 +68,12 @@ fun AmbientScreen(modifier: Modifier = Modifier) {
             val loc = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]   // follows a language change while it's open
             Column(horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
                 if (S.b("aAmbClock")) {
-                    Text(java.text.SimpleDateFormat(pat, loc).format(now), fontSize = 72.sp, fontWeight = FontWeight.Light, color = Color.White, letterSpacing = (-1).sp)
+                    // a new minute rolls in from below
+                    androidx.compose.animation.AnimatedContent(java.text.SimpleDateFormat(pat, loc).format(now),
+                        transitionSpec = { (androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(500)) { it / 3 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(500))) togetherWith
+                            (androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(400)) { -it / 3 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(300))) }, label = "ambclock") { t ->
+                        Text(t, fontSize = 72.sp, fontWeight = FontWeight.Light, color = Color.White, letterSpacing = (-1).sp)
+                    }
                     val day = android.text.format.DateFormat.format(android.text.format.DateFormat.getBestDateTimePattern(loc, "EEEMMMMd"), now).toString()
                     Text(day, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = .7f))
                 }

@@ -65,7 +65,7 @@ private class SnackLook(val s: E.Snack) : SnackbarVisuals {
 @Composable
 fun TopNotes(modifier: Modifier = Modifier) {
     val cur = E.notes.firstOrNull()
-    LaunchedEffect(cur?.id) { val n = cur ?: return@LaunchedEffect; delay(if (n.kind == "err" && n.action != null) 10000L else if (n.long) 8000L else 5000L); E.noteDone(n, false) }
+    LaunchedEffect(cur?.id) { val n = cur ?: return@LaunchedEffect; delay(if (n.kind == "err" && n.action != null) 20000L else if (n.long) 20000L else 15000L); E.noteDone(n, false) }   // long enough to read, also while they take turns
     val last = remember { arrayOfNulls<E.Snack>(1) }   // still shown while it slides away
     if (cur != null) last[0] = cur
     val over = E.settingsPage != null || E.wizard || E.sheet != null

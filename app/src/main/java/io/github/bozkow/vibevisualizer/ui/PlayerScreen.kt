@@ -544,7 +544,10 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
                 Column(Modifier.fillMaxWidth().padding(vertical = if (row) 0.dp else 6.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
             }
             if (all.size > 1) Row(Modifier.padding(bottom = if (row) 2.dp else 4.dp)) {
-                all.indices.forEach { i -> Box(Modifier.padding(horizontal = 3.dp).size(5.dp).clip(CircleShape).background(Color.White.copy(alpha = if (i == k) .9f else .3f))) }
+                all.indices.forEach { i ->
+                    val on by animateFloatAsState(if (i == k) 1f else 0f, tween(300), label = "dot")
+                    Box(Modifier.padding(horizontal = 3.dp).size(width = 5.dp + 7.dp * on, height = 5.dp).clip(CircleShape).background(Color.White.copy(alpha = .3f + .6f * on)))
+                }
             }
         }
     }
@@ -616,8 +619,12 @@ private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = fal
 
 @Composable
 private fun SmallToggle(icon: ImageVector?, desc: String, on: Boolean, text: String? = null, onClick: () -> Unit) {
-    IconButton(onClick = { E.haptic(); onClick() }, Modifier.semantics { contentDescription = desc },
-        colors = IconButtonDefaults.iconButtonColors(containerColor = if (on) Color.White else Color.Transparent, contentColor = if (on) Color(0xFF111116) else Color.White)) {
+    val bg by androidx.compose.animation.animateColorAsState(if (on) Color.White else Color.White.copy(alpha = 0f), tween(220), label = "tglbg")
+    val fg by androidx.compose.animation.animateColorAsState(if (on) Color(0xFF111116) else Color.White, tween(220), label = "tglfg")
+    val pop = remember { Animatable(1f) }
+    LaunchedEffect(on) { if (!S.low && !E.reduceMotion() && pop.value == 1f) { pop.snapTo(.82f); pop.animateTo(1f, spring(.45f, Spring.StiffnessMedium)) } }
+    IconButton(onClick = { E.haptic(); onClick() }, Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }.semantics { contentDescription = desc },
+        colors = IconButtonDefaults.iconButtonColors(containerColor = bg, contentColor = fg)) {
         if (icon != null) Icon(icon, null, Modifier.size(20.dp)) else Text(text ?: "", fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }

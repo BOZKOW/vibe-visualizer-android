@@ -11,6 +11,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -461,6 +467,42 @@ private fun ResetBtn(k: String) {
     if (Vibe.settings.changed(k)) IconButton(onClick = { E.haptic(); Vibe.settings.reset(k) }, Modifier.size(32.dp)) { Icon(Icons.Rounded.Restore, "Reset to default", Modifier.size(18.dp), tint = Color.White.copy(alpha = .6f)) }
 }
 
+/** A setting that only works with another one (or not alongside it): why it can't be changed now, or null. */
+private fun needs(k: String): String? = when (k) {
+    "aHideSec" -> if (S.str("uiHide") == "never") "Only when the controls hide (above)" else null
+    "aAmbientSec", "aAmbClock", "aAmbBattery", "aAmbCover", "aAmbSong", "aAmbLyrics", "aAmbBars", "aAmbBg", "aAmbBright", "aAmbShift" ->
+        if (!S.b("aAmbient")) "Turn on Ambient mode first" else null
+    "cvNoArt", "cvBlur", "cvBehind", "cvSpicy" -> if (!S.canvasOn) "Turn on Canvas first" else null
+    "cvShrink" -> if (!S.canvasOn) "Turn on Canvas first" else if (S.b("cvNoArt")) "Not while the cover is hidden" else null
+    "cvBlurAmt" -> if (!S.canvasOn) "Turn on Canvas first" else if (!S.b("cvBlur") && S.str("cvBehind") !in setOf("blur", "both")) "Needs Blur the Canvas, or a blur behind the controls" else null
+    "bridge" -> if (!Server.set) "Needs your server" else null
+    "glow", "blur" -> if (S.low) "Off in Low performance mode" else null
+    "bgspeed" -> if (S.str("bgStyle") != "dynamic") "Only with the Dynamic background" else if (S.low) "Still in Low performance mode" else null
+    "bgblur" -> if (S.str("bgStyle") in setOf("color", "none")) "Not with this background" else null
+    "fpscap" -> if (S.low) "Low performance mode keeps it at 30 fps" else null
+    "learlyMs" -> if (!S.learly) "Turn on Early scroll first" else null
+    "credPos" -> if (!S.b("xRefCred")) "Needs Refined credits (Experiments)" else null
+    "lcredLast" -> if (!S.b("xRefCred") || S.credPos != "lyrics") "Needs Refined credits under the lyrics" else null
+    "xRefSimple" -> if (!S.lsimple) "Turn on Simple lyrics mode first" else null
+    "aPipSize" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
+    "aLike" -> if (!Spotify.connected) "Needs Spotify connected" else null
+    else -> null
+}
+
+/** Greyed (fading) while it can't be changed, with why under it. */
+@Composable
+private fun Needs(k: String, content: @Composable (Boolean) -> Unit) {
+    val why = needs(k)
+    val last = remember { arrayOfNulls<String>(1) }; if (why != null) last[0] = why
+    val a by animateFloatAsState(if (why != null) .38f else 1f, tween(220), label = "needs")
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.graphicsLayer { alpha = a }) { content(why == null) }
+        AnimatedVisibility(why != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            Text(last[0] ?: "", fontSize = 12.5.sp, color = Color(0xFFFFD27A).copy(alpha = .9f), modifier = Modifier.padding(bottom = 6.dp))
+        }
+    }
+}
+
 @Composable
 fun ItemView(it: Item) {
     when (it) {
@@ -470,36 +512,39 @@ fun ItemView(it: Item) {
         // a Column, not a Box: rows that put several things one under another (the server field, its Test and save
         // button and its answer) were drawn over each other
         is Item.Custom -> Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) { it.c() }
-        is Item.Sw -> Row(Modifier.fillMaxWidth().squishClick { E.haptic(); S.set(it.k, !S.b(it.k)) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        is Item.Sw -> Needs(it.k) { on -> Row(Modifier.fillMaxWidth().then(if (on) Modifier.squishClick { E.haptic(); S.set(it.k, !S.b(it.k)) } else Modifier).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
                 if (it.d.isNotEmpty()) Text(it.d, fontSize = 13.5.sp, lineHeight = 19.sp, color = Color.White.copy(alpha = .62f), modifier = Modifier.padding(top = 2.dp))
             }
-            ResetBtn(it.k)
+            if (on) ResetBtn(it.k)
             Spacer(Modifier.width(8.dp))
-            Switch(S.b(it.k), { v -> E.haptic(); S.set(it.k, v) })
-        }
-        is Item.Sl -> Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+            Switch(S.b(it.k), { v -> E.haptic(); S.set(it.k, v) }, enabled = on)
+        } }
+        is Item.Sl -> Needs(it.k) { on -> Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White, modifier = Modifier.weight(1f))
-                ResetBtn(it.k)
+                if (on) ResetBtn(it.k)
                 Text(it.fmt(S.i(it.k)), fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
             val range = (it.max - it.min).toFloat()
-            Slider((S.i(it.k) - it.min) / range, { f -> S.set(it.k, it.min + (Math.round(f * range / it.step) * it.step)) }, steps = 0)
+            Slider((S.i(it.k) - it.min) / range, { f -> S.set(it.k, it.min + (Math.round(f * range / it.step) * it.step)) }, enabled = on, steps = 0)
             if (it.d.isNotEmpty()) Hint(it.d)
-        }
-        is Item.Ch -> {
+        } }
+        is Item.Ch -> Needs(it.k) { on ->
             var open by remember { mutableStateOf(false) }
             val cur = it.opts.find { o -> o.first == S.str(it.k) }?.second ?: S.str(it.k)
             Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Box {
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { open = true }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(enabled = on) { open = true }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
-                            Text(cur, fontSize = 13.5.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 2.dp))
+                            // a new choice slides in
+                            AnimatedContent(cur, transitionSpec = { (fadeIn(tween(220)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(120)) }, label = "chval") { c ->
+                                Text(c, fontSize = 13.5.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 2.dp))
+                            }
                         }
-                        ResetBtn(it.k)
+                        if (on) ResetBtn(it.k)
                         Icon(Icons.Rounded.KeyboardArrowDown, null, tint = Color.White.copy(alpha = .6f))
                     }
                     DropdownMenu(open, { open = false }, glassMenu(), shape = RoundedCornerShape(18.dp), containerColor = glassMenuColor(), shadowElevation = 16.dp, border = menuEdge) {
@@ -772,12 +817,29 @@ private fun AppUpdates() {
     }
 }
 
+/** A release note's line with its Markdown drawn: **bold**, *italic* and `code` (the marks themselves left out). */
+private fun md(s: String): androidx.compose.ui.text.AnnotatedString = androidx.compose.ui.text.buildAnnotatedString {
+    val re = Regex("""\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`""")
+    var at = 0
+    for (m in re.findAll(s)) {
+        append(s.substring(at, m.range.first))
+        val g = m.groups
+        when {
+            g[1] != null -> withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) { append(g[1]!!.value) }
+            g[2] != null -> withStyle(androidx.compose.ui.text.SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)) { append(g[2]!!.value) }
+            else -> withStyle(androidx.compose.ui.text.SpanStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)) { append(g[3]!!.value) }
+        }
+        at = m.range.last + 1
+    }
+    append(s.substring(at))
+}
+
 @Composable
 private fun NoteView(n: Updates.Note, open: Boolean) {
     var o by remember { mutableStateOf(open) }
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = .05f)).clickable { o = !o }.padding(12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = .05f)).clickable { o = !o }.animateContentSize().padding(12.dp)) {
         Row { Text(n.title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White, modifier = Modifier.weight(1f)); Text(n.date.take(10), fontSize = 12.sp, color = Color.White.copy(alpha = .5f)) }
-        if (o) n.points.forEach { Text("•  $it", fontSize = 13.sp, color = Color.White.copy(alpha = .8f), modifier = Modifier.padding(top = 3.dp)) }
+        if (o) n.points.forEach { Text(md("•  $it"), fontSize = 13.sp, color = Color.White.copy(alpha = .8f), modifier = Modifier.padding(top = 3.dp)) }
         else if (n.points.isNotEmpty()) Text("${n.points.size} change" + (if (n.points.size > 1) "s" else "") + " ›", fontSize = 12.sp, color = Color.White.copy(alpha = .5f))
     }
 }
