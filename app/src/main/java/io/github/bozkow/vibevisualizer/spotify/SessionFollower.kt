@@ -46,6 +46,12 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
     private var awaitingReport = false   // a new song whose first report hasn't come yet
     private var resyncNext = false       // "Resync": the next playing report is taken outright
     private var lastReportAt = 0L
+    // Spotify's buffering report at the end of a song, skipped: the last song's, not news for the next one (Spicy
+    // Lyrics Mobile 0.16: taken as the next song's first report, its lyrics started at the old song's end)
+    private var endBuffering: LyricClock.Report? = null
+    // when a report last took the clock back to a song's start with no new song named: with crossfade, gapless
+    // playback, Automix and the DJ, Spotify can report the next song's start a few seconds before it names it
+    private var backAt = 0L
 
     var onTrack: (() -> Unit)? = null       // a new song started in the app
     var onState: (() -> Unit)? = null       // played, paused or seeked
@@ -113,7 +119,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
     private fun attach(c: MediaController?) {
         ctrl?.let { runCatching { it.unregisterCallback(cb) } }
         ctrl = c; stoppedAt = 0; main.removeCallbacks(recheck); pkg = c?.packageName ?: ""
-        clock.reset(SystemClock.elapsedRealtime()); awaitingReport = false; resyncNext = false
+        clock.reset(SystemClock.elapsedRealtime()); awaitingReport = false; resyncNext = false; endBuffering = null; backAt = 0
         if (c == null) { connected.value = false; state = null; title = ""; artist = ""; album = ""; durMs = 0; art = null; onState?.invoke(); return }
         c.registerCallback(cb, main)
         connected.value = true
@@ -140,15 +146,17 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
     private fun report(s: PlaybackState?, force: Boolean = false, trackChanged: Boolean = false, snap: Boolean = trackChanged) {
         if (s == null || s.position < 0) return
         val playing = s.state == PlaybackState.STATE_PLAYING
-        // Spotify reports buffering at its end position about a second before the next song starts: stopping the
-        // clock there would freeze a line that runs to the end, so it carries on until the next song's report
-        if (!trackChanged && s.state == PlaybackState.STATE_BUFFERING && clock.isPlaying && durMs > 0 && s.position >= durMs - 2000) return
         val relayed = ctrl?.playbackInfo?.playbackType == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE
         // a player that says it plays at speed 0 still plays (Spicy Lyrics Mobile 0.16.0: it froze the lyrics)
         val speed = if (playing && s.playbackSpeed <= 0f) 1f else s.playbackSpeed
         val r = LyricClock.Report(s.state, playing, s.position, s.lastPositionUpdateTime, speed, relayed)
-        val fresh = clock.isFresh(r); val now = SystemClock.elapsedRealtime()
-        if (trackChanged && !fresh && now - lastReportAt > 1000) {
+        // Spotify reports buffering at its end position about a second before the next song starts: stopping the
+        // clock there would freeze a line that runs to the end, so it carries on until the next song's report
+        if (!trackChanged && s.state == PlaybackState.STATE_BUFFERING && clock.isPlaying && durMs > 0 && s.position >= durMs - 2000) { endBuffering = r; return }
+        val fresh = clock.isFresh(r) && r != endBuffering; val now = SystemClock.elapsedRealtime()
+        if (trackChanged && (r == endBuffering || (!fresh && now - lastReportAt > 1000))) {
+            // the next song's start, reported before its name came: that report is the new song's (brought to now)
+            if (r != endBuffering && backAt > 0 && now - backAt < 15000) { backAt = 0; awaitingReport = false; clock.onReport(r, now, snap = true); return }
             // the report we have is the previous song's position: the new song starts from 0 until the app reports
             clock.startTrack(now, speed, playing); awaitingReport = true; return
         }
@@ -156,7 +164,19 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         val resync = resyncNext && fresh && playing; if (resync) resyncNext = false
         val first = awaitingReport && fresh; if (first) awaitingReport = false
         if (fresh) lastReportAt = now
+        val was = clock.positionAt(now)
         clock.onReport(r, now, snap = snap || resync || first)
+        if (trackChanged) backAt = 0
+        else if (fresh && playing && s.position < 30000 && was - clock.positionAt(now) > 3000) backAt = now   // back to a start
+    }
+
+    /** No report from the app since its song changed: where Spotify's Web API says the song is ([ms] now) moves the
+     *  clock, when it's well off (crossfade, Automix, the DJ starting a song past its start). The app's own first
+     *  report still wins. */
+    fun webPosition(ms: Double) {
+        if (!awaitingReport) return
+        val now = SystemClock.elapsedRealtime()
+        if (kotlin.math.abs(clock.positionAt(now) - ms) > 1500) clock.seekTo(ms.toLong().coerceAtLeast(0L), now)
     }
 
     /** "Resync": the last report is taken outright now, and so is the next one. */

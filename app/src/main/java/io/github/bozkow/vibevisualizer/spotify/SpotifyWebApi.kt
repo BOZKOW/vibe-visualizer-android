@@ -282,6 +282,9 @@ object Spotify {
         val it = d?.optJSONObject("item")
         spxFrom(d)
         if (it == null) {
+            // playing, but nothing Spotify names: an ad, or the DJ talking between songs. What's on screen stays (the
+            // Spotify app's own song, when it's on this phone) instead of "Nothing playing" in between
+            if (d?.optBoolean("is_playing") == true && E.title.isNotEmpty()) { isPlaying = true; E.onSpUpdate(); return }
             spState = null; isPlaying = false
             if (spId != null || E.title.isEmpty()) { spId = null; meta = null; E.spIdle() }
             return
@@ -305,6 +308,8 @@ object Spotify {
         isPlaying = st.playing
         meta = m
         if (m.id != spId) { spId = m.id; E.onSpTrack(m) }
+        // the Spotify app on this phone changed song without saying where it is yet: Spotify's word for it
+        if (appTiming()) SpotifyApp.webPosition(st.progress + if (st.playing) nowT - spFetched else 0.0)
         E.onSpUpdate()
     }
 
