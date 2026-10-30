@@ -72,7 +72,7 @@ object Lyr {
     var credit by mutableStateOf<Credit?>(null); private set
     var label by mutableStateOf(""); private set
     var lines by mutableIntStateOf(0); private set                // how many lines (the UI only needs to know when it changes)
-    class Msg(val msg: String, val sub: String = "", val kind: String = "", val actions: List<E.Act> = emptyList())
+    class Msg(val msg: String, val sub: String = "", val kind: String = "", val actions: List<E.Act> = emptyList(), val err: Boolean = false)
     var msg by mutableStateOf<Msg?>(null); private set
     var empty by mutableStateOf(false); private set           // the lookup is done and there are no lyrics: the cover takes their place
     var needRom by mutableStateOf(false); private set
@@ -469,7 +469,7 @@ object Lyr {
         if (errs.isEmpty()) LyricsCache.put(key, null)   // remember "none" for a day; failures aren't remembered
         if (errs.isNotEmpty()) clear("Couldn’t load lyrics", errs.first(), "none", listOf(
             E.Act("Try again", pri = true) { ladders.clear(); lcache.remove(key); Vibe.scope.launch { LyricsCache.del(key) }; load(m, E.coverTok) },
-            E.Act("Copy details") { copy(m.artist + " – " + m.title + "\n" + errs.joinToString("\n")); E.copied("Details") }))
+            E.Act("Copy details") { copy(m.artist + " – " + m.title + "\n" + errs.joinToString("\n")); E.copied("Details") }), err = true)
         else clear("No lyrics for this song", "It may be instrumental. You can add your own .lrc or .ttml file.", "none", listOf(E.Act("Add a file") { FilePicker.lyrics?.invoke(true) }))
     }
 
@@ -512,12 +512,12 @@ object Lyr {
         loadT = Vibe.scope.launch { delay(500); clear("Looking for lyrics…", "", "load"); empty = was }
     }
 
-    fun clear(m: String, sub: String = "", kind: String = "", actions: List<E.Act> = emptyList()) {
+    fun clear(m: String, sub: String = "", kind: String = "", actions: List<E.Act> = emptyList(), err: Boolean = false) {
         loadT?.cancel(); view.freeEnd()
         L = emptyList(); lsync = false; credit = null; label = ""; shownProv = null
         render(null, false)
         empty = kind == "none"
-        msg = if (m.isEmpty() || (kind == "none" && !S.b("lnotice"))) null else Msg(m, sub, kind, actions)
+        msg = if (m.isEmpty() || (kind == "none" && !err && !S.b("lnotice"))) null else Msg(m, sub, kind, actions, err)
     }
 
     private fun apply(r: LyricsResult) {

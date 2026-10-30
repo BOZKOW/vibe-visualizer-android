@@ -38,6 +38,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.Surface
+import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.sp
 import io.github.bozkow.vibevisualizer.engine.E
 
@@ -48,7 +57,31 @@ private class SnackLook(val s: E.Snack) : SnackbarVisuals {
     override val duration = if (s.long || s.action != null) SnackbarDuration.Long else SnackbarDuration.Short
 }
 
-/** Short messages, one at a time, at the bottom: Android's snackbar. Swipe one away to dismiss it. */
+/** One-off errors and warnings, one at a time: each stays a few seconds (ten with a button) unless its button is
+ *  pressed. On the player they're in the top bar, where "Playing from …" goes; over Settings, a sheet or the setup
+ *  guide they come down from the top here. */
+@Composable
+fun TopNotes(modifier: Modifier = Modifier) {
+    val cur = E.notes.firstOrNull()
+    LaunchedEffect(cur?.id) { val n = cur ?: return@LaunchedEffect; delay(if (n.long || n.action != null) 10000L else 6000L); E.noteDone(n, false) }
+    val last = remember { arrayOfNulls<E.Snack>(1) }   // still shown while it slides away
+    if (cur != null) last[0] = cur
+    val over = E.settingsPage != null || E.wizard || E.sheet != null
+    AnimatedVisibility(cur != null && over && !E.inPip, modifier, enter = slideInVertically { -it } + fadeIn(), exit = slideOutVertically { -it } + fadeOut()) {
+        val n = last[0] ?: return@AnimatedVisibility
+        val err = n.kind == "err"
+        Surface(Modifier.padding(horizontal = 12.dp).widthIn(max = 560.dp), shape = RoundedCornerShape(16.dp), color = if (err) Color(0xFF3A1F22) else Color(0xFF3A321F), contentColor = Color.White, shadowElevation = 6.dp) {
+            Row(Modifier.heightIn(min = 48.dp).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(n.msg, Modifier.weight(1f, fill = false).padding(vertical = 8.dp), fontSize = 14.sp)
+                TextButton(onClick = { E.haptic(); E.noteDone(n, n.action != null) }) {
+                    Text(n.action?.label ?: "OK", fontWeight = FontWeight.Bold, color = if (err) Color(0xFFFFB4AB) else Color(0xFFFFD27A))
+                }
+            }
+        }
+    }
+}
+
+/** Good news (an update, "Copied"), one at a time, at the bottom: Android's snackbar. Swipe one away to dismiss it. */
 @Composable
 fun Snacks(modifier: Modifier = Modifier) {
     val host = remember { SnackbarHostState() }
@@ -62,12 +95,11 @@ fun Snacks(modifier: Modifier = Modifier) {
     SnackbarHost(host, modifier) { data ->
         val st = rememberSwipeToDismissBoxState()
         SwipeToDismissBox(st, backgroundContent = {}, onDismiss = { data.dismiss() }) {
-            val err = (data.visuals as? SnackLook)?.s?.kind == "err"
             Snackbar(
                 Modifier.padding(horizontal = 12.dp).widthIn(max = 560.dp),
                 action = data.visuals.actionLabel?.let { l -> { TextButton(onClick = { E.haptic(); data.performAction() }) { Text(l, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) } } },
                 shape = RoundedCornerShape(16.dp),
-                containerColor = if (err) Color(0xFF3A1F22) else MaterialTheme.colorScheme.surfaceContainerHighest,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = Color.White,
             ) { Text(data.visuals.message, fontSize = 14.sp) }
         }

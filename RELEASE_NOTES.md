@@ -1,21 +1,21 @@
-Vibe Visualizer for Android 0.25.0 (beta). Android 12 or newer; it installs over 0.24.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.26.0 (beta). Android 12 or newer; it installs over 0.25.0 (Settings → Help & about → Update now).
 
-### One layout for every screen
+### Every error at the top
 
-Now Playing, Lyrics and the Visualizer are laid out the same way when the phone is upright:
+- **All errors and warnings now show at the top**, under "Playing from …": no internet, the server or Spotify not answering, lyrics that couldn't load, a song that can't be played, a failed update, the "lyrics look ahead / behind" suggestion and every other short message that used to pop up at the bottom. Red is something broken, yellow something waiting; each has its one button (or OK), and short ones go by themselves after a few seconds. They stay visible while the controls are hidden.
+- **A warm or hot phone shows there too**, for as long as it stays warm ("Your phone is getting warm · Battery at 41 °C", with a Low performance mode button), also after you answer the big warning with "Not now".
+- Over Settings, a sheet or the setup guide, a new error comes down from the top of the screen instead.
+- With the phone on its side, errors slide in along the top as one line.
+- Good news (an update is ready, "Updated to …") still comes up at the bottom.
 
-- **At the top**: only where the music plays from and on what device ("PLAYING FROM SPOTIFY · on Galaxy S25"). When something is wrong (no internet, the server can't be reached, Spotify isn't answering or has paused requests), that space shows it instead, in red or yellow, with the one button that fixes it. It stays there even while the controls are hidden, and goes back to the device once it's solved.
-- **At the bottom**: the song's name, the seek bar and where the lyrics are from ("Provided by …", with who made and uploaded community lyrics, and the songwriters when the source names them). These stay on screen when the controls slide away.
-- The translate and romanize buttons of the Lyrics screen sit at the right of the top bar.
+### The top line
 
-The phone on its side keeps its own layout.
+- **"Playing from …" sits at the left and the device at the right.** With the status bar hidden (*Settings → Player screen → Hide the status bar*) they go up level with the camera, one on each side of it, and take no room from the cover or the lyrics. With the status bar shown they sit right under it.
+- **The arrow is gone.** The Lyrics button (or Back) still takes you back to Now Playing.
+- On the Lyrics screen, the translate and romanize buttons are now next to the song's name at the bottom.
 
-### Your own files run smoothly
+### The cover in long breaks
 
-- **The lyrics and the visualizer ran at about 4 frames a second** while your own files played: the player reports where it is only a few times a second, and the lyrics followed those jumps. Now the time between them is filled in, so they move every frame again.
-
-### More colour
-
-- **The background is far more vivid**: the colours from the cover (and the blurred Canvas) are turned up a lot, and a little brighter. *Settings → Look → Saturation* and *Brightness* still tune them from there.
+- **When nothing is sung for 10 seconds or more** (a long intro, a break, the end), the cover fades in where the lyrics are and fades away again 2 seconds before the next line. Scrolling the lyrics shows them at once. It's on by default: *Settings → Lyrics → Cover in long breaks*.
 
 From 0.24.0: the app has its own repository.

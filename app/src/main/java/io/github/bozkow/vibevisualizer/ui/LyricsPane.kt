@@ -97,7 +97,7 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
     val conf = LocalConfiguration.current
     remember(gc) { view.releaser = { gc.releaseGraphicsLayer(it) }; 0 }
     val n = Lyr.lines
-    // problems never sit on the lyrics: without lyrics they're the empty state here, unless the top bar shows them
+    // problems never sit on the lyrics: they're at the top of the screen; in picture-in-picture, without lyrics, here
     val prob = if (n == 0 && problems) E.problems(false).firstOrNull() else null
     BoxWithConstraints(modifier) {
         val wDp = maxWidth.value
@@ -157,7 +157,7 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
         // where the lyrics go: messages and problems
         val m = Lyr.msg
         if (prob != null) ProblemState(prob, Modifier.align(Alignment.CenterStart).padding(start = padStart.dp, end = padEnd.dp))
-        else if (n == 0 && m != null) LyricsMessage(m, Modifier.fillMaxSize().padding(start = padStart.dp, end = padEnd.dp), compact)
+        else if (n == 0 && m != null && (problems || !m.err)) LyricsMessage(m, Modifier.fillMaxSize().padding(start = padStart.dp, end = padEnd.dp), compact)
         AnimatedVisibility(view.lyFree, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp), enter = fadeIn() + slideInVertically { it }, exit = fadeOut() + slideOutVertically { it }) {
             FilledTonalButton(onClick = { view.freeEnd() }, shape = pillShape) {
                 Icon(Icons.Rounded.ArrowDownward, null, Modifier.size(18.dp)); HSpace(6.dp); Text("Back to the lyrics being sung")

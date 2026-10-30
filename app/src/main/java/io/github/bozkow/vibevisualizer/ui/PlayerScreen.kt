@@ -21,6 +21,10 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.SizeTransform
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -168,7 +172,7 @@ fun PlayerScreen() {
             E.src == "none" -> Box(pad) { EmptyState() }
             wide -> Box(pad) { WideLayout() }
             // Lyrics and the Visualizer grow out of the button that opened them
-            else -> AnimatedContent(E.screen, pad, transitionSpec = { (fadeIn(tween(320)) + scaleIn(spring(.86f, 400f), initialScale = if (Pop.calm) 1f else .9f, transformOrigin = Pop.origin())) togetherWith fadeOut(tween(220)) }, label = "screen") { s ->
+            else -> AnimatedContent(E.screen, pad, transitionSpec = { (fadeIn(tween(320)) + scaleIn(spring(.86f, 400f), initialScale = if (Pop.calm) 1f else .9f, transformOrigin = Pop.origin())) togetherWith fadeOut(tween(220)) using SizeTransform(clip = false) }, label = "screen") { s ->
                 when (s) { "lyrics" -> LyricsScreen(); "viz" -> VizScreen(); else -> NowPlaying() }
             }
         }
@@ -200,20 +204,27 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
 private fun LyricsScreen() {
     // a song without lyrics: the Lyrics screen looks like Now Playing (big cover, the song, the seek bar, controls that
     // slide away), with a short note under the song; the arrow at the top goes back to Now Playing
-    Crossfade(Lyr.empty && Lyr.lines == 0, label = "nolyrics") { big -> if (big) NowPlaying(noLyricsNote = true) else LyricsWithLyrics() }
+    Crossfade(noLyrics(), label = "nolyrics") { big -> if (big) NowPlaying(noLyricsNote = true) else LyricsWithLyrics() }
 }
 
 @Composable
 private fun LyricsWithLyrics() {
     val hidden = E.uiHidden
     Column(Modifier.fillMaxSize()) {
-        TopBar(Modifier.padding(horizontal = 24.dp), lyricsToggles = true)
+        TopBar(Modifier.padding(horizontal = 24.dp))
         var areaH by remember { mutableFloatStateOf(0f) }
+        // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
+        val rest = Lyr.view.rest && !Lyr.view.lyFree && !(CanvasVideo.cvmode && S.b("cvNoArt"))
+        val rk by animateFloatAsState(if (rest) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, if (rest) Spring.StiffnessVeryLow else Spring.StiffnessLow), label = "rest")
         Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
-            LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false)
+            LyricsPane(Modifier.fillMaxSize().graphicsLayer { alpha = (1f - rk).coerceIn(0f, 1f) }, areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false)
+            if (rk > .01f) Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp).ambientOut()
+                .graphicsLayer { alpha = rk.coerceIn(0f, 1f); val s = .9f + .1f * rk; scaleX = s; scaleY = s }, contentAlignment = Alignment.Center) {
+                CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
+            }
         }
         if (S.view == "both") BarsView(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
-        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false) }
+        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
         }
@@ -251,7 +262,7 @@ private fun Tablet() {
     val solo = soloWide()   // no lyrics: Now Playing alone, the cover big
     Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.Center) {
         Column(Modifier.fillMaxHeight().then(if (solo) Modifier.widthIn(max = 560.dp) else Modifier.weight(.42f).widthIn(max = 480.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
-            Header(Modifier.ambientOut())
+            TopBar(Modifier.ambientOut())
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
                 if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
@@ -287,6 +298,7 @@ private val hideCtl = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(
 @Composable
 private fun LandscapeSplit() {
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        LandscapeNotice()
         Row(Modifier.weight(1f).fillMaxWidth()) {
             Column(Modifier.fillMaxHeight().weight(.42f).padding(top = 8.dp)) {
                 Box(Modifier.weight(1f).fillMaxWidth().padding(bottom = 10.dp), contentAlignment = Alignment.BottomStart) {
@@ -341,6 +353,7 @@ private fun AmbientBlack() {
 private fun LandscapeSolo() {
     val art = !CanvasVideo.cvmode
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        LandscapeNotice()
         Box(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp, bottom = 10.dp), contentAlignment = Alignment.Center) {
             ArtUnlessCanvas()
         }
@@ -369,7 +382,7 @@ private fun RightPane(modifier: Modifier) {
         var areaH by remember { mutableFloatStateOf(0f) }
         Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
             if (E.screen == "viz") BarsView(Modifier.fillMaxSize().padding(vertical = 16.dp))
-            else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 8f, padEnd = 16f)
+            else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 8f, padEnd = 16f, problems = false)
         }
         if (E.screen != "viz" && S.view == "both") BarsView(Modifier.fillMaxWidth().height(64.dp))
         LyricsCredits()
@@ -380,7 +393,7 @@ private fun RightPane(modifier: Modifier) {
 @Composable
 private fun EmptyState() {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Header(problem = false)
+        TopBar(home = true)
         Spacer(Modifier.weight(1f))
         AppLogo(96.dp)
         Spacer(Modifier.height(20.dp))
@@ -393,7 +406,6 @@ private fun EmptyState() {
         FilledTonalButton(onClick = { E.haptic(); if (Spotify.connected) E.setSource("spotify") else E.spLogin() }, Modifier.fillMaxWidth().widthIn(max = 360.dp).height(52.dp)) {
             Icon(VIcons.spotify, null, Modifier.size(20.dp)); HSpace(8.dp); Text(if (Spotify.connected) "Use Spotify" else "Connect Spotify", fontSize = 15.sp)
         }
-        E.problems(true).firstOrNull()?.let { p -> Spacer(Modifier.height(24.dp)); ProblemState(p, Modifier.widthIn(max = 360.dp), compact = true) }
         Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { E.wizard = true }) { Text("Setup guide") }
@@ -405,67 +417,114 @@ private fun EmptyState() {
 
 /* ================= parts ================= */
 
-/** The top of every portrait screen: where the music plays from and on what device, or what's wrong when something is.
- *  It slides away with the controls, and stays (or comes back) while something's wrong. */
+/** The top of every screen: where the music plays from at the left and on what device at the right, and under them the
+ *  space for what's wrong. The line goes with the controls; what's wrong stays until it's solved. */
 @Composable
-private fun TopBar(modifier: Modifier = Modifier, lyricsToggles: Boolean = false) {
-    val show = !E.uiHidden || E.problems(false).isNotEmpty() || Updates.downloading
-    AnimatedVisibility(show, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
-        Header(modifier, lyricsToggles = lyricsToggles)
+private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false) {
+    E.sec.intValue
+    val top = when (E.src) { "spotify" -> "PLAYING FROM SPOTIFY"; "file" -> "PLAYING ON THIS PHONE"; "media" -> "PLAYING FROM " + io.github.bozkow.vibevisualizer.media.MediaApps.appName().uppercase(); else -> "VIBE VISUALIZER" }
+    val dev = when (E.src) { "spotify" -> Spotify.device?.name?.let { "on $it" } ?: if (Spotify.meta == null) "Nothing playing" else ""; "file" -> Local.position(); else -> "" }
+    Column(modifier.fillMaxWidth()) {
+        if (S.b("aHideStatus")) {
+            // the status bar is hidden: the line goes up where it was, either side of the camera, and takes no room here
+            val k by animateFloatAsState(if (E.uiHidden) 0f else 1f, tween(300), label = "topline")
+            TopLine(top, dev, Modifier.graphicsLayer { alpha = k }, beside = true)
+        } else AnimatedVisibility(!E.uiHidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
+            TopLine(top, dev, Modifier)
+        }
+        NoticeSpace(home)
     }
-    if (!show) Spacer(Modifier.height(8.dp))
 }
 
-/** Where the music comes from and on what device; in its place, what's wrong and the one thing to do about it. */
+/** "PLAYING FROM …" at the left, the device at the right. Beside the camera: drawn up in the hidden status bar's place,
+ *  level with the camera and clear of it at both sides. */
 @Composable
-private fun Header(modifier: Modifier = Modifier, problem: Boolean = true, lyricsToggles: Boolean = false) {
+private fun TopLine(top: String, dev: String, modifier: Modifier, beside: Boolean = false) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    val dens = androidx.compose.ui.platform.LocalDensity.current
+    var at by remember { mutableStateOf<Offset?>(null) }            // where this row starts in the window
+    var w by remember { mutableFloatStateOf(0f) }
+    var cut by remember { mutableStateOf<android.graphics.Rect?>(null) }   // the camera hole above the row
+    val e = with(dens) { 8.dp.toPx() }      // up there it reaches a little further out (the corners are clear at that height)
+    val gap = with(dens) { 12.dp.toPx() }   // room to the camera
+    val x0 = (at?.x ?: 0f) - (if (beside) e else 0f)
+    val ww = w + (if (beside) 2 * e else 0f)
+    val c = cut?.takeIf { beside && it.right > x0 && it.left < x0 + ww }
+    val lw = with(dens) { ((if (c != null) c.left - x0 else ww / 2) - gap).coerceAtLeast(0f).toDp() }
+    val rw = with(dens) { ((if (c != null) x0 + ww - c.right else ww / 2) - gap).coerceAtLeast(0f).toDp() }
+    Box(modifier.fillMaxWidth()
+        .onGloballyPositioned { lc ->
+            val p = lc.positionInWindow(); at = p; w = lc.size.width.toFloat()
+            if (beside) cut = view.rootWindowInsets?.displayCutout?.boundingRects?.firstOrNull { it.top <= 0 && it.bottom <= p.y + 1 && it.width() < lc.size.width }
+        }
+        .then(if (beside) Modifier.layout { m, cs ->
+            val ex = e.roundToInt()
+            val pl = m.measure(cs.copy(minWidth = cs.maxWidth + 2 * ex, maxWidth = cs.maxWidth + 2 * ex, minHeight = 0))
+            val y0 = at?.y ?: 0f
+            val cy = cut?.exactCenterY() ?: (y0 / 2)   // level with the camera; without one, the middle of the bar's place
+            layout(cs.maxWidth, 0) { pl.place(-ex, (cy - y0 - pl.height / 2f).roundToInt()) }
+        } else Modifier.height(32.dp))
+        .graphicsLayer { alpha = if (at == null) 0f else 1f }) {
+        AnimatedContent(top, Modifier.align(Alignment.CenterStart).widthIn(max = lw), transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
+            Text(t, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        AnimatedContent(dev, Modifier.align(Alignment.CenterEnd).widthIn(max = rw), contentAlignment = Alignment.CenterEnd, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { t ->
+            Text(t, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Under the top line: what's wrong (or that the phone is warm), while it lasts, even with the controls away. */
+@Composable
+private fun NoticeSpace(home: Boolean) {
+    val p = E.notice(home)
+    val last = remember { arrayOfNulls<E.Prob>(1) }   // still shown while it slides away
+    if (p != null) last[0] = p
+    AnimatedVisibility(p != null, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
+        // a different problem cross-fades in; a countdown in the same one just counts
+        AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
+            Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q) }
+        }
+    }
+}
+
+/** What's wrong, in red (broken) or yellow (waiting), and the one button that fixes it (or OK for a one-off). In a
+ *  row on its side, where height is short. */
+@Composable
+private fun NoticeLines(p: E.Prob, row: Boolean = false) {
+    val tint = if (p.k == "err") Color(0xFFFFB4AB) else Color(0xFFFFD27A)
+    val act: @Composable () -> Unit = {
+        p.act?.let { a -> TextButton(onClick = { E.haptic(); a.fn?.invoke() }, Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text(a.label, fontSize = 13.sp, color = tint) } }
+    }
+    if (row) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        Text(p.t, Modifier.weight(1f, fill = false), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (p.s.isNotEmpty()) Text("  ·  " + p.s, Modifier.weight(1f, fill = false), fontSize = 12.sp, color = dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        act()
+    } else {
+        Text(p.t, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = if (p.s.isEmpty()) 2 else 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        if (p.s.isNotEmpty()) Text(p.s, fontSize = 12.sp, color = dim, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        act()
+    }
+}
+
+/** On its side there's no "Playing from" line: what's wrong comes in at the top while it lasts. */
+@Composable
+private fun LandscapeNotice() {
     E.sec.intValue
-    val prob = if (problem) E.problems(false).firstOrNull() else null
-    val top = when (E.src) { "spotify" -> "PLAYING FROM SPOTIFY"; "file" -> "PLAYING ON THIS PHONE"; "media" -> "PLAYING FROM " + io.github.bozkow.vibevisualizer.media.MediaApps.appName().uppercase(); else -> "VIBE VISUALIZER" }
-    val sub = if (Updates.downloading) "Downloading the update · " + (Updates.progress * 100).toInt() + "%"
-        else when (E.src) { "spotify" -> Spotify.device?.name?.let { "on $it" } ?: if (Spotify.meta == null) "Nothing playing" else ""; "file" -> Local.position(); else -> "" }
-    val toggles = lyricsToggles && (Lyr.needTr || Lyr.needRom)
-    val side = if (toggles) 96.dp else 48.dp   // the same on both sides, so the lines sit in the middle
-    Row(modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(side), contentAlignment = Alignment.CenterStart) { if (E.screen != "player" && !E.wide && E.src != "none") ScreenBack() }
-        // the lines cross-fade when they change: where it plays, the device, or a problem (a countdown in it just counts)
-        AnimatedContent(prob, Modifier.weight(1f), contentKey = { it?.let { p -> p.id + p.t } }, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hd") { p ->
-            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (p == null) {
-                    AnimatedContent(top, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { t ->
-                        Text(t, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, color = dim, maxLines = 1)
-                    }
-                    AnimatedContent(sub, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { t ->
-                        if (t.isNotEmpty()) Text(t, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (Updates.downloading) Color(0xFFFFD27A) else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                } else {
-                    // red for what's broken, yellow for what's waiting
-                    val tint = if (p.k == "err") Color(0xFFFFB4AB) else Color(0xFFFFD27A)
-                    Text(p.t, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (p.s.isNotEmpty()) Text(p.s, fontSize = 12.sp, color = dim, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                    p.act?.let { a ->
-                        TextButton(onClick = { E.haptic(); a.fn?.invoke() }, Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text(a.label, fontSize = 13.sp, color = tint) }
-                    }
-                }
-            }
-        }
-        Row(Modifier.width(side), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-            if (toggles) {
-                if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
-                if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
-            }
-            // the round Settings button is at the foot while something plays; before that, this is the way in
-            if (E.src == "none") MoreButton()
-        }
+    val p = E.notice()
+    val last = remember { arrayOfNulls<E.Prob>(1) }   // still shown while it slides away
+    if (p != null) last[0] = p
+    AnimatedVisibility(p != null, enter = showCtl, exit = hideCtl) {
+        last[0]?.let { Box(Modifier.fillMaxWidth().padding(top = 6.dp)) { NoticeLines(it, row = true) } }
     }
 }
 
 /** The foot of every portrait screen: the song, the seek bar and where the lyrics are from. They stay when the
  *  controls slide away. */
 @Composable
-private fun SongInfo(big: Boolean, note: Boolean = false) {
+private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false) {
     Column(Modifier.fillMaxWidth()) {
-        TitleRow(big = big)
+        TitleRow(big = big, toggles = toggles)
         if (note) NoLyricsNote(Modifier.fillMaxWidth())
         Spacer(Modifier.height(if (big) 10.dp else 6.dp))
         SeekRow()
@@ -473,13 +532,6 @@ private fun SongInfo(big: Boolean, note: Boolean = false) {
         AnimatedVisibility(c != null && Lyr.lines > 0, enter = fadeIn(tween(600)) + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             if (c != null) CreditsLine(c, Modifier.fillMaxWidth().padding(bottom = 4.dp))
         }
-    }
-}
-
-@Composable
-private fun ScreenBack() {
-    IconButton(onClick = { E.show("player") }, Modifier.semantics { contentDescription = "Back to Now Playing" }) {
-        Icon(Icons.Rounded.KeyboardArrowDown, null, Modifier.size(30.dp), tint = Color.White)
     }
 }
 
@@ -497,7 +549,7 @@ private fun MoreButton() {
 }
 
 @Composable
-private fun TitleRow(big: Boolean, center: Boolean = false, year: Boolean = false) {
+private fun TitleRow(big: Boolean, center: Boolean = false, year: Boolean = false, toggles: Boolean = false) {
     val ver = E.trackVer
     val a = remember { Animatable(1f) }
     LaunchedEffect(ver) { if (!S.low && !E.reduceMotion()) { a.snapTo(0f); a.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
@@ -507,6 +559,10 @@ private fun TitleRow(big: Boolean, center: Boolean = false, year: Boolean = fals
             Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp)
             val by = if (year && E.year.isNotEmpty()) listOf(E.artist, E.year).filter { it.isNotEmpty() }.joinToString(" · ") else E.artist
             if (by.isNotEmpty()) Scrolling(by, (if (big) 19f else 15f).times(k).sp, FontWeight.Medium, dim)
+        }
+        if (toggles) {   // the Lyrics screen: translate and romanize, when the lyrics need them
+            if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
+            if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
         }
         if (E.src == "spotify" && !center && S.b("aLike")) LikeButton()
     }
@@ -863,8 +919,8 @@ private fun CanvasView() {
     AndroidView({ ctx -> TextureView(ctx).also { CanvasVideo.bindView(it) } }, Modifier.fillMaxSize(), update = { tv -> tv.post { coverFit(tv) } }, onRelease = { CanvasVideo.unbind(it) })
 }
 
-/** The lookup is done and found no lyrics (and nothing's wrong with the connection): the cover takes their place. */
-private fun noLyrics() = Lyr.empty && Lyr.lines == 0 && E.problems(false).isEmpty()
+/** The lookup is done and found no lyrics: the cover takes their place (what's wrong, if anything, is at the top). */
+private fun noLyrics() = Lyr.empty && Lyr.lines == 0
 
 /** Side by side with no lyrics (and not the Visualizer): the song alone, in the middle. */
 private fun soloWide() = noLyrics() && E.screen != "viz"
@@ -872,7 +928,7 @@ private fun soloWide() = noLyrics() && E.screen != "viz"
 /** Under the big cover: why there are no lyrics, and the one thing to do about it. */
 @Composable
 private fun NoLyricsNote(modifier: Modifier = Modifier) {
-    val m = Lyr.msg ?: return
+    val m = Lyr.msg?.takeIf { !it.err } ?: return   // lyrics that couldn't load are an error: at the top
     val act = m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull()
     Row(modifier.padding(top = 2.dp).heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(VIcons.lyrics, null, Modifier.size(16.dp), tint = dim)

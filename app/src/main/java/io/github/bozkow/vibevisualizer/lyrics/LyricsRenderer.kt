@@ -115,6 +115,8 @@ class LyricsRenderer {
     // scrolling
     private val lyY = Tween(0f)
     var lyFree by mutableStateOf(false); private set
+    /** A long break: nothing sung for 10 s or more around now, and the next line over 2 s away (the cover shows). */
+    var rest by mutableStateOf(false); private set
     private var lyFreeY = 0f; private var lyFreeAt = 0.0
     var dragged = false
     private var lyTall = false; private var lyTallAt = 0.0
@@ -338,15 +340,29 @@ class LyricsRenderer {
 
     /* ================= every frame ================= */
 
+    /** Nothing is sung for 10 s or more around now (the intro, a break between lines, the end) and the next line is
+     *  more than 2 s away. A line without its end known counts as sung until the next one, unless a break follows it. */
+    private fun restAt(pos: Double): Boolean {
+        val a = findIdx(lines, pos)
+        var p = a; while (p >= 0 && lines[p].dots) p--
+        var n = a + 1; while (n < lines.size && (lines[n].dots || lines[n].t == null)) n++
+        val next = lines.getOrNull(n)?.t ?: durFn?.invoke()?.takeIf { it > 0 } ?: return false
+        if (pos >= next - 2) return false
+        var end = if (p < 0) 0.0 else lineEnd(lines[p]) ?: lines.getOrNull(p + 1)?.takeIf { it.dots }?.t ?: return false
+        for (k in max(0, p - 6) until max(p, 0)) if (!lines[k].dots) lineEnd(lines[k])?.let { if (it > end) end = it }   // a duet's line still going
+        return pos >= end && next - end >= 10
+    }
+
     fun frame(t: Double, pos: Double, viewOn: Boolean) {
         posNow = pos
-        if (lines.isEmpty() || W <= 0) return
+        if (lines.isEmpty() || W <= 0) { rest = false; return }
         if (!laidOut) layoutAll()
         val wasPlace = placeUntil > 0 && t < placeUntil
         if (wasPlace) place(t, pos)
         else if (lyTall && !lyFree && t - lyTallAt > 250) { lyTallAt = t; place(t, pos) }
         if (!viewOn) return
-        if (!sync) { staticScroll(t, pos); tops(t); bump(); return }
+        if (!sync) { rest = false; staticScroll(t, pos); tops(t); bump(); return }
+        rest = S.b("aRestCover") && restAt(pos)
         if (lyFree && t - lyFreeAt > 4000) freeEnd(t, pos)
         val i = findIdx(lines, pos); val e = if (i >= 0) lineEnd(lines[i]) else null; val out = e != null && pos >= e
         val nx = lines.getOrNull(i + 1)

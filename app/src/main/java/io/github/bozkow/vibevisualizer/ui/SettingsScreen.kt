@@ -230,6 +230,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sub("Sources"),
         Item.Custom("Sources, in priority order Spicy Lyrics LRCLIB NetEase AMLL Spotify your lyrics files") { Sources() },
         Item.Sw("lnotice", "No lyrics notice", "Say so when a song has no lyrics."),
+        Item.Sw("aRestCover", "Cover in long breaks", "When nothing is sung for 10 s or more, the cover takes the lyrics’ place, until 2 s before the next line."),
         Item.Sub("Text"),
         Item.Sl("lsize", "Text size", 70, 150),
         Item.Ch("lfont", "Lyrics font", listOf("vv" to "Vibe Visualizer", "spicy" to "Spicy Lyrics", "system" to "System font"), "Spicy Lyrics: the display cut Spicy Lyrics shows lyrics in."),

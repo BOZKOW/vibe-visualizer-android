@@ -86,6 +86,8 @@ fun VibeRoot() {
                 HeatWarning()
                 Snacks(Modifier.align(Alignment.BottomCenter).navBarsSpace().padding(bottom = 8.dp))
             }
+            // errors and warnings: in picture-in-picture too, so their time runs out
+            TopNotes(Modifier.align(Alignment.TopCenter).statusBarsSpace().padding(top = 8.dp))
         }
     }
 }

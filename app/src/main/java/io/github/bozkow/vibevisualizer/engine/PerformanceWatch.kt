@@ -16,7 +16,7 @@ object Perf {
     private var heatAt = 0.0; private var roomAt = 0.0; private var room = Float.NaN; private var spell = 0   // spell: the warmest it's asked about since the phone last cooled down (0, 1 warm, 2 hot)
 
     fun tick(t: Double) {
-        if (t - heatAt > 5000 && E.visible && !S.low && S.b("perfAsk")) { heatAt = t; heat(t) }
+        if (t - heatAt > 5000 && E.visible && S.b("perfAsk")) { heatAt = t; heat(t) }
         if (t - battAt > 60000 && E.visible) { battAt = t; E.batteryCheck() }   // low battery: once a minute is plenty
         val gap = t - prev; prev = t
         if (S.low || !S.b("perfAsk") || asked || !E.visible || !E.playing() || t < snooze || gap > 1000) { t0 = t; n = 0; slow = 0; secs = 0; bad = 0; sum = 0.0; return }   // only judged while a song plays on screen
@@ -44,6 +44,7 @@ object Perf {
         val c = batteryC()
         if (c != null) { temps.addLast(c); while (temps.size > 13) temps.removeFirst() }
         val dropping = c != null && temps.size >= 7 && c <= temps.first() - .2   // cooled 0.2 °C or more within the minute
+        hotC = c; hot = level   // shown at the top of the screen for as long as it lasts
         // cooled down for real (not just between two forecasts): the next warm spell may ask again
         if (level == 0) { if (st <= PowerManager.THERMAL_STATUS_LIGHT && (room.isNaN() || room < .75f)) { spell = 0; notNowAt = 0.0; refC = null }; return }
         if (S.low || warn > 0 || dropping) return   // it's cooling: no warning
@@ -82,6 +83,10 @@ object Perf {
     fun lowByHand() { pp.edit().putBoolean("auto", false).apply() }
     private var notNowAt = 0.0          // when the heat warning was last answered "Not now" (0: not in this warm spell)
     private var refC: Double? = null    // the battery's temperature then
+
+    /** How warm the phone is now (checked every 5 s): 0 fine, 1 getting warm, 2 hot; and the battery then, in °C. */
+    var hot by mutableIntStateOf(0); private set
+    var hotC: Double? = null; private set
 
     /** The heat warning over the whole screen: 0 none, 1 getting warm, 2 hot. */
     var warn by mutableIntStateOf(0); private set

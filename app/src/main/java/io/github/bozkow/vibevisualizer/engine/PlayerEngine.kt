@@ -81,9 +81,8 @@ object E {
     private var actRef: WeakReference<Activity>? = null
     val activity: Activity? get() = actRef?.get()
 
-    /* ---- notices, the Android way: a snackbar at the bottom (one at a time, one action at most), a dialog only for a
-       question you asked for, and problems in the top bar of the upright screens, or as the empty state where the lyrics go
-       on its side and in picture-in-picture (never on top of anything) ---- */
+    /* ---- notices: every error and warning at the top, where "Playing from …" goes (one-offs for a few seconds, problems
+       until they're solved); good news in a snackbar at the bottom; a dialog only for a question you asked for ---- */
     class Act(val label: String, val pri: Boolean = false, val fn: (() -> Unit)? = null)
     class Snack(val msg: String, val kind: String = "ok", val action: Act? = null, val long: Boolean = false, val onDismiss: (() -> Unit)? = null) { val id = ++noteSeq }
     class Ask(val title: String, val msg: String, val actions: List<Act>)
@@ -91,14 +90,38 @@ object E {
     class Prob(val pr: Int, val k: String, val id: String, val t: String, val s: String, val act: Act? = null)
     private var noteSeq = 0L
     val snacks = mutableStateListOf<Snack>()       // the first one is on screen, the others wait their turn
+    val notes = mutableStateListOf<Snack>()        // the same for errors and warnings, at the top
     var ask by mutableStateOf<Ask?>(null)
 
     fun snack(n: Snack) {
-        if (snacks.any { it.msg == n.msg }) return
-        snacks.add(n); while (snacks.size > 3) snacks.removeAt(1)
+        val q = if (n.kind == "ok") snacks else notes
+        if (q.any { it.msg == n.msg }) return
+        q.add(n); while (q.size > 3) q.removeAt(1)
     }
 
-    /** A short message at the bottom. Errors are saved in the error log on your server too. */
+    /** A one-off error or warning is done: its button was pressed, or its time is up. */
+    fun noteDone(n: Snack, acted: Boolean) {
+        if (!notes.remove(n)) return
+        if (acted) n.action?.fn?.invoke() else n.onDismiss?.invoke()
+    }
+
+    /** What the top of the screen says is wrong: a one-off error first (it's gone in a few seconds), then what's wrong
+     *  until it's solved, a warm phone while it's warm, lyrics that couldn't load, and an update on its way. */
+    fun notice(homeScreen: Boolean = false): Prob? {
+        notes.firstOrNull()?.let { n -> return Prob(0, if (n.kind == "err") "err" else "wait", "note" + n.id, n.msg, "", Act(n.action?.label ?: "OK") { noteDone(n, n.action != null) }) }
+        problems(homeScreen).firstOrNull()?.let { return it }
+        val h = Perf.hot
+        if (h > 0 && S.b("perfAsk")) return Prob(0, if (h >= 2) "err" else "wait", "heat", if (h >= 2) "Your phone is hot" else "Your phone is getting warm",
+            listOfNotNull(Perf.hotC?.let { "Battery at " + Math.round(it) + " °C" }, if (S.low) "Low performance mode is on" else null).joinToString(" · "),
+            if (S.low) null else Act("Low performance mode") { S.set("low", true) })
+        val m = Lyr.msg
+        if (!homeScreen && m != null && m.err) return Prob(0, "err", "lyrics", m.msg, m.sub, m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull())
+        if (Updates.downloading) return Prob(0, "wait", "update", "Downloading the update", (Updates.progress * 100).toInt().toString() + "%")
+        return null
+    }
+
+    /** A short message: errors and warnings at the top, the rest at the bottom. Errors are saved in the error log on
+     *  your server too. */
     fun toast(msg: String, kind: String = "err", @Suppress("UNUSED_PARAMETER") ms: Long = 0) {
         if (msg.isEmpty()) return
         if (kind == "err") Reports.report("notice", msg)
