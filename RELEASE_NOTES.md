@@ -1,14 +1,43 @@
-Vibe Visualizer for Android 0.34.0 (beta). Android 12 or newer; it installs over 0.33.3 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.35.0 (beta). Android 12 or newer; it installs over 0.34.0 (Settings → Help & about → Update now).
 
-### Settings that need another one are greyed out
+### The lyrics no longer stutter while a Canvas plays
+
+- **The blurred Canvas behind everything is drawn by the graphics chip itself.** Until now, 12 times a second a small frame of the video was copied back from it to make the blur, and every copy held up the next frame of the lyrics, the more so the faster the video moved.
+
+### Spotify's crossfade, gapless playback, Automix and the DJ
+
+- **The lyrics stay in step across song changes** when songs flow into each other. Spotify can say where the new song is a few seconds before it names it, or not say it at all, and the lyrics either started at 0:00 and waited, or jumped to the old song's end, until you pressed Resync. Now the app keeps the new song's early report, and when Spotify says nothing, it checks the position with Spotify's Web API and moves the lyrics if they're more than 1.5 s off.
+- **An ad or the DJ talking between songs** no longer shows "Nothing playing" for a moment.
+
+### Pick the buttons under the controls
+
+- **Settings → Player screen → Buttons under the controls**: four buttons of your choice: Lyrics, where it plays, what the bars hear, Visualizer, Resync, Lyrics timing, Translate, Romanize, Canvas on or off, Like, or nothing. The defaults are as before, and Settings always stays the last one (it's the way into them).
+- **Shuffle and repeat have a small dot under them** while they're on.
+
+### Skipping songs on Spotify
+
+- **The next five songs in your Spotify queue are got ready** (their lyrics, Canvas and cover), not just the next one, still with one request to Spotify a song. Skipping a few songs shows their lyrics at once, without the short wait for songs skipped through quickly.
+
+### Also
+
+- **Translate and romanize leave hidden controls hidden**: tapped while the controls are away, they only switch, like the seek bar.
+- **The credits no longer show twice** at the end of a song (under the lyrics and at the foot) while a Canvas plays with the cover hidden, or on its side.
+- **Focus mode's settings**: Cover in long breaks now goes with Focus mode (greyed without it), and what Focus mode does its own way is greyed while it's on: Blur inactive lines, Minimal lyrics mode, Early scroll and Keep overlapping lines. Background vocal pop-out is greyed until Simple and Refreshed simple lyrics mode are on.
+- **Settings tidied**: Ambient mode has its own page, and the lyrics experiments sit in Lyrics beside what they go with (Focus mode with the cover in long breaks, Refined credits with the credits, the simple modes' and Minimal mode's extras under them).
+- **Notices over Settings are frosted glass in the middle**, their words centred, clear of the close button.
+- **The heat warning starts when the battery reaches 40 °C** (45 °C: hot), and when Android itself says the phone is warm it says so ("Android says it's warm inside", "Android expects it to slow itself down within seconds"), with the battery's temperature.
+
+## From 0.34.0
+
+#### Settings that need another one are greyed out
 
 - **A setting that only works together with another one is greyed out and can't be changed until it can**, with a short line saying why: the Ambient mode options until Ambient mode is on, the Canvas options until Canvas is on (and the Canvas blur strength until a blur is picked, the smaller cover while the cover is hidden), "Hide them after" when the controls are always visible, the motion speed outside the Dynamic background, glow, motion blur and the frame rate limit in Low performance mode, the early scroll time, the credits' place, Refreshed simple lyrics mode and the picture-in-picture size until what they belong to is on, Vibe Bridge without a server and the Like button without Spotify.
 
-### More animation
+#### More animation
 
 - The translate and romanize buttons glide between on and off with a little pop, the Ambient mode clock rolls each new minute in, the dots under several notices stretch toward the one showing, a new choice in Settings slides in, release notes open and close smoothly, and greyed settings fade.
 
-### Also
+#### Also
 
 - **Notices stay much longer** at the top (15 seconds, 20 for the longer ones), so there's time to read them while they take turns.
 - **Release notes show their bold as bold** in Help & about (they showed the asterisks).
