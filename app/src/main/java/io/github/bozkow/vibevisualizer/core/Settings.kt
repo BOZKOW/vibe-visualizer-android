@@ -71,6 +71,8 @@ object Defaults {
         "aMarquee" to true,     //   long names scroll
         "aSeek" to "normal",    //   the seek bar: thin, normal, thick
         "aCoverR" to 22,        //   the cover's corners (dp)
+        "cvLyrA" to 25,         // how much of the Canvas video shows behind the lyrics (%; 0: only its soft glow)
+        "aPipTop" to false,     // the small window: the line being sung at the top
         "aBar1" to "lyrics",    //   the four buttons under the controls (Settings always last): lyrics, where, audio,
         "aBar2" to "where",     //   viz, resync, timing, tr, rom, canvas, like, none
         "aBar3" to "viz",

@@ -128,6 +128,7 @@ class MainActivity : ComponentActivity() {
             i.action == Intent.ACTION_SEND -> (if (Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java) else @Suppress("DEPRECATION") i.getParcelableExtra(Intent.EXTRA_STREAM))?.let { E.openFiles(listOf(it)) }
             i.action == Intent.ACTION_SEND_MULTIPLE -> (if (Build.VERSION.SDK_INT >= 33) i.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java) else @Suppress("DEPRECATION") i.getParcelableArrayListExtra(Intent.EXTRA_STREAM))?.let { E.openFiles(it) }
             i.action == "io.github.bozkow.vibevisualizer.LYRICS" -> E.show("lyrics")
+            i.action == "com.maxmpz.audioplayer.ACTION_LYRICS_LINK" -> E.show("lyrics")   // Poweramp's lyrics button (its song comes from its media session)
             i.action == "io.github.bozkow.vibevisualizer.VISUALIZER" -> E.show("viz")
             i.action == "io.github.bozkow.vibevisualizer.OPEN_FILE" -> window.decorView.post { FilePicker.pickAudio() }
             i.action == "io.github.bozkow.vibevisualizer.SETTINGS" -> E.openSettings()

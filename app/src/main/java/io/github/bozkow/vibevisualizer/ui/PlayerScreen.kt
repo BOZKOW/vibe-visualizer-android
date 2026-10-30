@@ -984,7 +984,7 @@ fun Cover(modifier: Modifier = Modifier) {
 @Composable
 private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
     val behindLyrics = !wide && E.screen == "lyrics" && !noLyrics()
-    val a by animateFloatAsState(if (!CanvasVideo.cvmode) 0f else if (behindLyrics) .25f else 1f, tween(800), label = "canvas")
+    val a by animateFloatAsState(if (!CanvasVideo.cvmode) 0f else if (behindLyrics) S.i("cvLyrA").coerceIn(0, 80) / 100f else 1f, tween(800), label = "canvas")
     // side by side without lyrics, the video glides to the middle and fades out on both sides (moved, not laid out
     // again: the video's crop is set for its size)
     val c by animateFloatAsState(if (centred) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else tween(700, easing = FastOutSlowInEasing), label = "cvcentre")

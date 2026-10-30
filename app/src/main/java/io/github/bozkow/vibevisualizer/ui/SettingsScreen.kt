@@ -18,6 +18,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -221,6 +222,7 @@ private fun pages(): List<Page> = listOf(
         Item.Ch("cvBehind", "Behind the controls", listOf("dark" to "Dark gradient", "blur" to "Blur", "both" to "Blur and dark gradient", "none" to "Nothing"),
             "With a Canvas: what’s under the top bar, the song, the seek bar, the bars and the controls, so they stay readable. Blur frosts the Canvas there."),
         Item.Sl("cvBlurAmt", "Canvas blur", 5, 100, 5, "How strong: Blur the Canvas, and Blur behind the controls."),
+        Item.Sl("cvLyrA", "Canvas behind the lyrics", 0, 80, 5, "How much of the video shows behind the lyrics, dimmed so they stay readable. 0: only its soft glow. From Spicy Lyrics Mobile 0.17.", fmt = pct),
         Item.Sub("Where it comes from"),
         Item.Sw("cvSpicy", "Spicy Lyrics’ Canvas service", "When your server has no Canvas for a Spotify song (or no server is set), its Spotify ID goes to Spicy Lyrics’ Canvas service (spicylyrics.org), which asks Spotify. Nothing else is sent. Unofficial: it may stop working."),
         Item.Custom("Choose canvas video Canvas endpoint") { CanvasSection() },
@@ -321,6 +323,7 @@ private fun pages(): List<Page> = listOf(
     Page("small", "Small window & widget", Icons.Rounded.PictureInPictureAlt, listOf(
         Item.Sub("Picture-in-picture"),
         Item.Sw("aPip", "Picture-in-picture", "Leaving the app while music plays keeps the lyrics in a small window over your other apps."),
+        Item.Sw("aPipTop", "Current line at the top", "In the small window, the line being sung sits just under its top edge instead of its middle, so the room goes to the lines coming next. From Spicy Lyrics Mobile 0.17."),
         Item.Sl("aPipSize", "Lyrics size in picture-in-picture", 60, 200, 10, "The small window’s own size, so big lyrics on the full screen don’t leave one word per row there."),
         Item.Sub("Home screen widget"),
         Item.Txt("Touch and hold your home screen, then Widgets → Vibe Visualizer. It follows the song line by line while the app runs. Each widget has its own settings: touch and hold it → Settings, or pick it here."),
@@ -503,7 +506,8 @@ private fun needs(k: String): String? = when (k) {
     "credPos" -> if (!S.b("xRefCred")) "Turn on Refined credits first (above)" else null
     "lcredLast" -> if (!S.b("xRefCred") || S.credPos != "lyrics") "Needs Refined credits under the lyrics" else null
     "xRefSimple" -> if (!S.lsimple) "Turn on Simple lyrics mode first" else null
-    "aPipSize" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
+    "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
+    "cvLyrA" -> if (!S.canvasOn) "Turn on Canvas first" else null
     "aLike" -> if (!Spotify.connected) "Needs Spotify connected" else null
     else -> null
 }
@@ -855,9 +859,17 @@ private fun md(s: String): androidx.compose.ui.text.AnnotatedString = androidx.c
 
 @Composable
 private fun NoteView(n: Updates.Note, open: Boolean) {
-    var o by remember { mutableStateOf(open) }
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = .05f)).clickable { o = !o }.animateContentSize().padding(12.dp)) {
-        Row { Text(n.title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White, modifier = Modifier.weight(1f)); Text(n.date.take(10), fontSize = 12.sp, color = Color.White.copy(alpha = .5f)) }
+    // the version you have is marked, and open (Spicy Lyrics Mobile 0.17's changelog)
+    val mine = Updates.isMine(n.tag)
+    var o by remember { mutableStateOf(open || mine) }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = if (mine) .1f else .05f))
+        .then(if (mine) Modifier.border(1.dp, GlassEdge, RoundedCornerShape(14.dp)) else Modifier).clickable { o = !o }.animateContentSize().padding(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(n.title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White, modifier = Modifier.weight(1f))
+            if (mine) Text("Yours", Modifier.padding(end = 8.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.primary.copy(alpha = .3f)).padding(horizontal = 8.dp, vertical = 2.dp),
+                fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(n.date.take(10), fontSize = 12.sp, color = Color.White.copy(alpha = .5f))
+        }
         if (o) n.points.forEach { Text(md("•  $it"), fontSize = 13.sp, color = Color.White.copy(alpha = .8f), modifier = Modifier.padding(top = 3.dp)) }
         else if (n.points.isNotEmpty()) Text("${n.points.size} change" + (if (n.points.size > 1) "s" else "") + " ›", fontSize = 12.sp, color = Color.White.copy(alpha = .5f))
     }

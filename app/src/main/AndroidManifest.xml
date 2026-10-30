@@ -36,6 +36,11 @@
         <intent>
             <action android:name="android.intent.action.MEDIA_BUTTON" />
         </intent>
+        <!-- which home screen app it is (One UI Home gives widget sizes its own way) -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
     </queries>
 
     <application
@@ -62,6 +67,12 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Poweramp's lyrics link: Poweramp can open the app as its 3rd party lyrics app (Spicy Lyrics Mobile 0.17).
+                 The song comes from its media session as always -->
+            <intent-filter>
+                <action android:name="com.maxmpz.audioplayer.ACTION_LYRICS_LINK" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <!-- Spotify's login comes back here (through your server's page, which hands it to the app) -->
             <intent-filter>

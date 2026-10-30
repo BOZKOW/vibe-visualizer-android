@@ -51,6 +51,8 @@ object Updates {
         return 0
     }
     private val mine get() = BuildConfig.VERSION_NAME.substringBefore("-dev").substringBefore("-debug")
+    /** Whether a release (its tag, "android-v0.35.4") is the version installed. */
+    fun isMine(tag: String) = tag.substringAfterLast("-v").removePrefix("v") == mine
 
     private fun points(body: String) = body.lines().map { it.trim() }.filter { it.startsWith("- ") || it.startsWith("* ") }.map { it.drop(2).trim() }.take(20)
 

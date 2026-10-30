@@ -99,8 +99,22 @@ object Widgets {
         fun get(k: String) = o.getInt(k).takeIf { it > 0 }
         val w = (if (land) get(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH) else null) ?: get(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) ?: 320
         val h = (if (land) get(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) else get(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)) ?: get(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT) ?: 180
-        return w to h
+        // Samsung's One UI Home gives the size in dp at the display's default density: with the display size changed
+        // (Settings → Display → Screen zoom) the lyrics were drawn for the wrong size and squeezed. Taken back to the
+        // app's dp (Spicy Lyrics Mobile 0.17)
+        val dpi = Vibe.app.resources.displayMetrics.densityDpi; val stable = android.util.DisplayMetrics.DENSITY_DEVICE_STABLE
+        if (home() != ONE_UI_HOME || dpi <= 0 || stable <= 0 || dpi == stable) return w to h
+        val k = dpi.toFloat() / stable
+        return Math.round(w * k) to Math.round(h * k)
     }
+
+    private const val ONE_UI_HOME = "com.sec.android.app.launcher"
+    private var homePkg: String? = null
+    /** The home screen app, looked up once (the widget redraws every second). */
+    private fun home(): String = homePkg ?: (runCatching {
+        Vibe.app.packageManager.resolveActivity(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_HOME),
+            android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+    }.getOrNull() ?: "").also { homePkg = it }
 
     /** Widget [id] as [look] sets it out (the settings screen shows it too, before you're done). */
     fun views(id: Int, look: WidgetLook, size: Pair<Int, Int> = sizeDp(id)): RemoteViews {

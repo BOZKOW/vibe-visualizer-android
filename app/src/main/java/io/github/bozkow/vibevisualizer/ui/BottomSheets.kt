@@ -73,6 +73,7 @@ import io.github.bozkow.vibevisualizer.engine.Desync
 import io.github.bozkow.vibevisualizer.engine.E
 import io.github.bozkow.vibevisualizer.engine.CanvasVideo
 import io.github.bozkow.vibevisualizer.media.Outputs
+import io.github.bozkow.vibevisualizer.media.PlayerDelays
 import io.github.bozkow.vibevisualizer.engine.FilePicker
 import io.github.bozkow.vibevisualizer.engine.Lyr
 import io.github.bozkow.vibevisualizer.engine.Ping
@@ -272,6 +273,19 @@ private fun TimingSheet() {
         if (oo != 0) VTonalButton(onClick = { Outputs.set(0) }) { Text("Reset") }
     }
     Spacer(Modifier.height(14.dp))
+    // the player app's own (Spicy Lyrics Mobile 0.17)
+    PlayerDelays.ver
+    if (PlayerDelays.key() != null) {
+        val po = PlayerDelays.ms()
+        Text(PlayerDelays.name() + ": " + (if (po > 0) "+" else "") + po + " ms", fontWeight = FontWeight.Bold, color = Color.White)
+        Hint("For a player that runs early or late on every song: kept for this app, whatever plays in it.")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            VOutlinedButton(onClick = { PlayerDelays.set(po - 50) }) { Text("−50 ms") }
+            VOutlinedButton(onClick = { PlayerDelays.set(po + 50) }) { Text("+50 ms") }
+            if (po != 0) VTonalButton(onClick = { PlayerDelays.set(0) }) { Text("Reset") }
+        }
+        Spacer(Modifier.height(14.dp))
+    }
     val so = Lyr.songOffMs
     Text("This song: " + (if (so > 0) "+" else "") + so + " ms", fontWeight = FontWeight.Bold, color = Color.White)
     Hint("Only for the song that’s playing, on top of the setting above (as Spicy Lyrics Mobile’s song delay).")

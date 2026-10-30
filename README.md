@@ -93,9 +93,11 @@ From [Spicy Lyrics Mobile](https://github.com/spicylyrics/mobile) by TheX24 (GNU
 brackets and a song's own lyrics delay, the lyric clock that reads music apps' position reports, the timing kept per
 audio output, the lookup order (the first source alone, then the rest at once, better timing winning), the back-off
 for failing sources, the 20-second limit per source, the song-change handling at the end of a track, the cleaning of
-file names, word timing in LRC lyrics and the translations under their lines, the Unison, LRCMux, lrc.red, KuGou, QQ
-Music and Kuwo sources, the translation services, session stickiness, Spicy Lyrics' Canvas service, Ambient mode, the
-widget and the Now Playing layout. Its LRCMux source is itself adapted from Lyrica's lrcmux adapter (MIT).
+file names, word timing in LRC lyrics and the translations under their lines, the delay per music app, the Canvas
+behind the lyrics, the small window's line at the top, Poweramp's lyrics link, the One UI widget size fix, the Unison,
+LRCMux, lrc.red, KuGou, QQ Music and Kuwo sources, the translation services, session stickiness, Spicy Lyrics' Canvas
+service, Ambient mode, the widget and the Now Playing layout. Its LRCMux source is itself adapted from Lyrica's lrcmux
+adapter (MIT).
 
 The lyrics font option "Spicy Lyrics" uses [Inter](https://rsms.me/inter/) by Rasmus Andersson (SIL Open Font
 License 1.1). Japanese romanization uses [kuromoji](https://github.com/atilika/kuromoji) (Apache 2.0).

@@ -119,6 +119,7 @@ class LyricsRenderer {
     var rest by mutableStateOf(false); private set
     private var restAt = 0.0
     var covered = false   // the break's cover is fully over the lyrics on screen (set by the Lyrics screen)
+    var lineAtTop: () -> Boolean = { false }   // the line being sung at the top, not the middle (the small window's setting)
     private var lyFreeY = 0f; private var lyFreeAt = 0.0
     var dragged = false
     private var lyTall = false; private var lyTallAt = 0.0
@@ -456,8 +457,10 @@ class LyricsRenderer {
         tops(t)
         val el = lv.getOrNull(max(if (lsi >= 0) lsi else li, 0)) ?: return
         val hh = if (S.xFocus && S.view == "both") areaH * .74f - 24 * dens else H   // Focus mode in Both: the same middle as before
-        var y = hh * .38f - (el.top + el.h / 2)
-        val top = hh * .16f; if (el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
+        // the small window can keep the line being sung just under its top, the room going to the lines coming next
+        // (Spicy Lyrics Mobile 0.17)
+        var y = if (lineAtTop()) hh * .06f - el.top else hh * .38f - (el.top + el.h / 2)
+        val top = if (lineAtTop()) hh * .06f else hh * .16f; if (el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
         setLyY(fitLine(el, y, pos), t)
     }
 

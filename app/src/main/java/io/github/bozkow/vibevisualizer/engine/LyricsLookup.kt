@@ -46,6 +46,7 @@ import io.github.bozkow.vibevisualizer.lyrics.parseLRC
 import io.github.bozkow.vibevisualizer.lyrics.parseSpicy
 import io.github.bozkow.vibevisualizer.lyrics.songKeys
 import io.github.bozkow.vibevisualizer.media.Outputs
+import io.github.bozkow.vibevisualizer.media.PlayerDelays
 import io.github.bozkow.vibevisualizer.spotify.Spotify
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -96,12 +97,12 @@ object Lyr {
     var lAdj = 0.0
     var songOffMs by mutableIntStateOf(0); private set
     fun lyrT() = E.curTime() * lPace + offS()
-    /** Every offset on top of the song's time (s): yours, this song's, this output's and any desync fix. */
-    private fun offS() = (S.loff + songOffMs + Outputs.lyricsOffMs(E.src)) / 1000.0 + lAdj
+    /** Every offset on top of the song's time (s): yours, this song's, this output's, the player app's and any desync fix. */
+    private fun offS() = (S.loff + songOffMs + Outputs.lyricsOffMs(E.src) + PlayerDelays.ms()) / 1000.0 + lAdj
 
     fun curSong(): SongMeta? = cur?.m
 
-    init { view.durFn = { E.curDur() }; view.reduceMotion = { E.reduceMotion() } }
+    init { view.durFn = { E.curDur() }; view.reduceMotion = { E.reduceMotion() }; view.lineAtTop = { E.inPip && S.b("aPipTop") } }
 
     /* ================= sources ================= */
 
