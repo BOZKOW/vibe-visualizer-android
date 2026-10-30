@@ -64,10 +64,11 @@ fun AmbientScreen(modifier: Modifier = Modifier) {
             E.sec.intValue   // once a second
             val now = java.util.Date()
             val pat = if (android.text.format.DateFormat.is24HourFormat(ctx)) "HH:mm" else "h:mm"
+            val loc = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]   // follows a language change while it's open
             Column(horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
                 if (S.b("aAmbClock")) {
-                    Text(java.text.SimpleDateFormat(pat, java.util.Locale.getDefault()).format(now), fontSize = 72.sp, fontWeight = FontWeight.Light, color = Color.White, letterSpacing = (-1).sp)
-                    val day = android.text.format.DateFormat.format(android.text.format.DateFormat.getBestDateTimePattern(java.util.Locale.getDefault(), "EEEMMMMd"), now).toString()
+                    Text(java.text.SimpleDateFormat(pat, loc).format(now), fontSize = 72.sp, fontWeight = FontWeight.Light, color = Color.White, letterSpacing = (-1).sp)
+                    val day = android.text.format.DateFormat.format(android.text.format.DateFormat.getBestDateTimePattern(loc, "EEEMMMMd"), now).toString()
                     Text(day, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = .7f))
                 }
                 if (S.b("aAmbBattery")) {
