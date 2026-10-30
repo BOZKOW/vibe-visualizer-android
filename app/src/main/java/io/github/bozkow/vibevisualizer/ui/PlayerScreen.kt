@@ -132,6 +132,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -217,6 +218,9 @@ private fun LyricsWithLyrics() {
         // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
         val rest = Lyr.view.rest && !Lyr.view.lyFree && !(CanvasVideo.cvmode && S.b("cvNoArt"))
         val rk by animateFloatAsState(if (rest) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, if (rest) Spring.StiffnessVeryLow else Spring.StiffnessLow), label = "rest")
+        val over = rk >= .99f
+        androidx.compose.runtime.SideEffect { Lyr.view.covered = over }
+        androidx.compose.runtime.DisposableEffect(Unit) { onDispose { Lyr.view.covered = false } }
         Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
             LyricsPane(Modifier.fillMaxSize().graphicsLayer { alpha = (1f - rk).coerceIn(0f, 1f) }, areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false)
             if (rk > .01f) Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp).ambientOut()
@@ -304,11 +308,17 @@ private fun LandscapeSplit() {
             Column(Modifier.fillMaxHeight().weight(.42f)) {
                 // where it plays and what's wrong: at the top of this side, clear of the lyrics
                 TopBar(side = true)
-                Box(Modifier.weight(1f).fillMaxWidth().padding(bottom = 10.dp), contentAlignment = Alignment.BottomStart) {
-                    ArtUnlessCanvas(withCanvas = noLyrics() && !S.b("cvNoArt"))
+                // the song beside the cover (there's no height for one under the other): the cover as tall as this side
+                // allows, the name and the artist next to it, at its foot
+                Row(Modifier.weight(1f).fillMaxWidth().padding(top = 6.dp, bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
+                    val keep = noLyrics() && !S.b("cvNoArt")
+                    val art = !CanvasVideo.cvmode || keep   // a Canvas without the cover: the name gets the whole width
+                    if (art) {
+                        Box(Modifier.fillMaxHeight().widthIn(max = 260.dp).fillMaxWidth(.56f), contentAlignment = Alignment.BottomStart) { ArtUnlessCanvas(withCanvas = keep) }
+                        Spacer(Modifier.width(14.dp))
+                    }
+                    Column(Modifier.weight(1f)) { TitleRow(big = !art) }
                 }
-                TitleRow(big = true)
-                Spacer(Modifier.height(4.dp))
                 SeekRow()
             }
             Spacer(Modifier.width(20.dp))
@@ -407,7 +417,7 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
         if (side) {
             // on its side, one line: "PLAYING FROM SPOTIFY ON <DEVICE>"
             val one = if (dev.startsWith("PLAYING ON ")) top + " " + dev.removePrefix("PLAYING ") else if (dev.isNotEmpty()) "$top · $dev" else top
-            Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().height(26.dp), contentAlignment = Alignment.Center) {
                 AnimatedContent(one, Modifier.fillMaxWidth(), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdone") { t ->
                     TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
                 }
@@ -493,7 +503,7 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
             horizontalAlignment = Alignment.CenterHorizontally) {
             // a different one cross-fades in; a countdown in the same one just counts
             AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
-                Column(Modifier.fillMaxWidth().padding(vertical = if (row) 2.dp else 6.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
+                Column(Modifier.fillMaxWidth().padding(vertical = if (row) 0.dp else 6.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
             }
             if (all.size > 1) Row(Modifier.padding(bottom = if (row) 2.dp else 4.dp)) {
                 all.indices.forEach { i -> Box(Modifier.padding(horizontal = 3.dp).size(5.dp).clip(CircleShape).background(Color.White.copy(alpha = if (i == k) .9f else .3f))) }
@@ -511,8 +521,11 @@ private fun NoticeLines(p: E.Prob, row: Boolean = false) {
         p.act?.let { a -> TextButton(onClick = { E.haptic(); a.fn?.invoke() }, Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text(a.label, fontSize = 13.sp, color = tint) } }
     }
     if (row) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        Text(p.t, Modifier.weight(1f, fill = false), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (p.s.isNotEmpty()) Text("  ·  " + p.s, Modifier.weight(1f, fill = false), fontSize = 12.sp, color = dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // one text: the title whole first, the detail after it cut short if the row runs out
+        Text(androidx.compose.ui.text.buildAnnotatedString {
+            withStyle(androidx.compose.ui.text.SpanStyle(color = tint, fontWeight = FontWeight.Bold)) { append(p.t) }
+            if (p.s.isNotEmpty()) withStyle(androidx.compose.ui.text.SpanStyle(color = dim, fontSize = 12.sp)) { append("  ·  " + p.s) }
+        }, Modifier.weight(1f, fill = false), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         act()
     } else {
         Text(p.t, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = if (p.s.isEmpty()) 2 else 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
@@ -533,7 +546,7 @@ private fun AwayNote(modifier: Modifier) {
         val where = when (E.src) { "spotify" -> Spotify.device?.name ?: "another device"; else -> "another device" }
         Column(Modifier.widthIn(max = 360.dp).padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Playing on $where", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("The bars only hear this phone. The microphone, or Vibe Bridge on that computer, can hear it.", Modifier.padding(top = 4.dp),
+            Text("The bars only hear this phone. Pick the microphone if the music plays in the room.", Modifier.padding(top = 4.dp),
                 fontSize = 13.sp, color = dim, textAlign = TextAlign.Center)
             TextButton(onClick = { E.haptic(); E.openSheet("audio") }) { Text("What the bars hear") }
         }

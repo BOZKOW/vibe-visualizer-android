@@ -118,6 +118,7 @@ class LyricsRenderer {
     /** A long break: nothing sung for 10 s or more around now, and the next line over 2 s away (the cover shows). */
     var rest by mutableStateOf(false); private set
     private var restAt = 0.0
+    var covered = false   // the break's cover is fully over the lyrics on screen (set by the Lyrics screen)
     private var lyFreeY = 0f; private var lyFreeAt = 0.0
     var dragged = false
     private var lyTall = false; private var lyTallAt = 0.0
@@ -365,7 +366,7 @@ class LyricsRenderer {
         if (!sync) { rest = false; staticScroll(t, pos); tops(t); bump(); return }
         val r = S.b("aRestCover") && restAt(pos)
         if (r != rest) { rest = r; restAt = t }
-        if (rest && !lyFree && t - restAt > 1500) return   // the cover's up and the lyrics faded: they rest until it goes
+        if (rest && covered && !lyFree) return   // the cover's over them (upright): they rest until it goes
         if (lyFree && t - lyFreeAt > 4000) freeEnd(t, pos)
         val i = findIdx(lines, pos); val e = if (i >= 0) lineEnd(lines[i]) else null; val out = e != null && pos >= e
         val nx = lines.getOrNull(i + 1)
