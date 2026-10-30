@@ -18,6 +18,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -127,7 +128,7 @@ fun Modifier.popBounds(into: (Rect) -> Unit): Modifier = onGloballyPositioned { 
  *  down on its handle closes it. [key] is what it shows (null: closed); [content] keeps showing the last one while it
  *  closes. */
 @Composable
-fun <T : Any> PopSheet(key: T?, onDismiss: () -> Unit, color: Color, content: @Composable (T) -> Unit) {
+fun <T : Any> PopSheet(key: T?, onDismiss: () -> Unit, color: Color, glass: Boolean = false, content: @Composable (T) -> Unit) {
     val vis = remember { MutableTransitionState(false) }; vis.targetState = key != null
     val last = remember { object { var k: Any? = null } }; if (key != null) last.k = key
     val o = rememberPopOrigin(key != null)
@@ -147,6 +148,8 @@ fun <T : Any> PopSheet(key: T?, onDismiss: () -> Unit, color: Color, content: @C
             Column(Modifier.align(Alignment.BottomCenter).animateEnterExit(enter = popIn(o, .12f), exit = popOut(o, .12f)).then(popClip(64.dp))
                 .widthIn(max = 640.dp).fillMaxWidth().heightIn(max = maxH).graphicsLayer { translationY = drag.value }
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(color)
+                // frosted glass, as everything in the Glass design: the light edge along its top
+                .then(if (glass) Modifier.background(GlassFill).border(1.dp, GlassEdge, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) else Modifier)
                 .clickable(remember { MutableInteractionSource() }, null) {}) {   // taps on the sheet stay on it
                 // the handle: pull it down to close
                 Box(Modifier.fillMaxWidth().height(28.dp).draggable(rememberDraggableState { dy -> scope.launch { drag.snapTo((drag.value + dy).coerceAtLeast(0f)) } }, Orientation.Vertical,
@@ -172,7 +175,8 @@ fun PopDialog(open: Boolean, onDismiss: () -> Unit, title: String, text: String,
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(Modifier.fillMaxSize().animateEnterExit(enter = fadeIn(tween(200)), exit = fadeOut(tween(200))).background(Color.Black.copy(alpha = .45f))
                 .clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss))
-            Column(Modifier.animateEnterExit(enter = popIn(o, .2f), exit = popOut(o, .2f)).padding(32.dp).widthIn(min = 280.dp, max = 560.dp).clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            Column(Modifier.animateEnterExit(enter = popIn(o, .2f), exit = popOut(o, .2f)).padding(32.dp).widthIn(min = 280.dp, max = 560.dp).then(if (io.github.bozkow.vibevisualizer.core.S.glass) Modifier.glass(RoundedCornerShape(28.dp), strong = true).background(Color(0xFF101018).copy(alpha = .4f))
+                else Modifier.clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh))
                 .clickable(remember { MutableInteractionSource() }, null) {}.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 18.dp)) {
                 Text(last.t, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text(last.x, Modifier.padding(top = 16.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

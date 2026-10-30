@@ -145,7 +145,7 @@ private fun Welcome(f: Boolean, s: Boolean, setF: (Boolean) -> Unit, setS: (Bool
     H("Welcome to Vibe Visualizer")
     P("A quick setup to get you going. Pick what you want to use; you can change anything later in Settings.")
     @Composable fun opt(on: Boolean, t: String, d: String, set: (Boolean) -> Unit) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(20.dp)).background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.White.copy(alpha = .06f)).clickable { set(!on) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).choiceCard(on, RoundedCornerShape(20.dp), .06f).clickable { set(!on) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { Text(t, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White); Text(d, fontSize = 13.sp, color = Color.White.copy(alpha = .7f)) }
             Checkbox(on, null)
         }
@@ -217,7 +217,7 @@ private fun ServerStep() {
 fun ServerChoice() {
     val local = Vibe.cfg.local
     @Composable fun card(on: Boolean, t: String, d: String, pick: () -> Unit) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(20.dp)).background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.White.copy(alpha = .06f)).clickable { E.haptic(); pick() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).choiceCard(on, RoundedCornerShape(20.dp), .06f).clickable { E.haptic(); pick() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { Text(t, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White); Text(d, fontSize = 13.sp, color = Color.White.copy(alpha = .7f)) }
             RadioButton(on, null)
         }

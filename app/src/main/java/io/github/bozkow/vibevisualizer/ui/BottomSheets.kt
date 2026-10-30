@@ -87,7 +87,7 @@ import kotlinx.coroutines.launch
 fun Sheets() {
     val close = { E.sheet = null; Ping.open = false; E.poke() }
     // the sheet pops out of the button that opened it
-    PopSheet(E.sheet, close, if (S.glass) Color(0xFF0E0E14).copy(alpha = .72f) else MaterialTheme.colorScheme.surfaceContainer) { s ->
+    PopSheet(E.sheet, close, if (S.glass) Color(0xFF0E0E14).copy(alpha = .62f) else MaterialTheme.colorScheme.surfaceContainer, glass = S.glass) { s ->
         Column(Modifier.fillMaxWidth().then(if (S.glass) Modifier.fadeEdges(16.dp, 16.dp) else Modifier).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(bottom = 18.dp).navBarsSpace()) {
             when (s) {
                 "audio" -> AudioSheet()
@@ -129,8 +129,7 @@ private fun AudioSheet() {
     @Composable
     fun opt(k: String, icon: ImageVector, t: String, d: String) {
         val on = cur == k
-        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(18.dp))
-            .background(if (on) MaterialTheme.colorScheme.primaryContainer else Color.White.copy(alpha = .05f))
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).choiceCard(on, RoundedCornerShape(18.dp), .05f)
             .clickable {
                 E.haptic()
                 if (k != "off" && !Audio.permitted()) Perms.mic { ok -> if (ok) S.set("aCap", k) else E.toast("Without microphone access the bars can’t hear the phone", "warn") }
@@ -258,49 +257,58 @@ private fun TimingSheet() {
     Hint("Lyrics behind the music? Move them earlier.")
     Row(verticalAlignment = Alignment.CenterVertically) {
         VOutlinedButton(onClick = { Lyr.nudge(-100) }) { Text("Later") }
-        Slider(off / 3000f, { S.set("loff", (Math.round(it * 3000 / 50f) * 50)) }, Modifier.weight(1f).padding(horizontal = 10.dp), valueRange = -1f..1f)
+        Slider(off / 3000f, { S.set("loff", (Math.round(it * 3000 / 50f) * 50)) }, Modifier.weight(1f).padding(horizontal = 10.dp), valueRange = -1f..1f, colors = glassSlider())
         VOutlinedButton(onClick = { Lyr.nudge(100) }) { Text("Earlier") }
     }
     Spacer(Modifier.height(14.dp))
-    LaunchedEffect(Unit) { Outputs.refresh() }
-    val oo = Outputs.offMs
-    Text(Outputs.route.label + ": " + (if (oo > 0) "+" else "") + oo + " ms", fontWeight = FontWeight.Bold, color = Color.White)
-    Hint(if (Outputs.here(E.src)) "Headphones, a car or a speaker can run behind: each output keeps its own timing, used whenever it plays (as Spicy Lyrics Mobile does)."
-        else "The music plays on another device now, so this phone’s output timing isn’t used.")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        VOutlinedButton(onClick = { Outputs.set(oo - 50) }) { Text("−50 ms") }
-        VOutlinedButton(onClick = { Outputs.set(oo + 50) }) { Text("+50 ms") }
-        if (oo != 0) VTonalButton(onClick = { Outputs.set(0) }) { Text("Reset") }
-    }
-    Spacer(Modifier.height(14.dp))
-    // the player app's own (Spicy Lyrics Mobile 0.17)
-    PlayerDelays.ver
-    if (PlayerDelays.key() != null) {
-        val po = PlayerDelays.ms()
-        Text(PlayerDelays.name() + ": " + (if (po > 0) "+" else "") + po + " ms", fontWeight = FontWeight.Bold, color = Color.White)
-        Hint("For a player that runs early or late on every song: kept for this app, whatever plays in it.")
+    TimingParts()
+    if (Desync.stat.isNotEmpty()) { Spacer(Modifier.height(10.dp)); Hint("Desync detection: " + Desync.stat) }
+}
+
+/** This output's, the music app's and this song's timing, and Resync: in the timing sheet and in Settings → Lyrics
+ *  timing alike. */
+@Composable
+fun TimingParts() {
+    Column {
+        LaunchedEffect(Unit) { Outputs.refresh() }
+        val oo = Outputs.offMs
+        Text(Outputs.route.label + ": " + (if (oo > 0) "+" else "") + oo + " ms", fontWeight = FontWeight.Bold, color = Color.White)
+        Hint(if (Outputs.here(E.src)) "Headphones, a car or a speaker can run behind: each output keeps its own timing, used whenever it plays (as Spicy Lyrics Mobile does)."
+            else "The music plays on another device now, so this phone’s output timing isn’t used.")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            VOutlinedButton(onClick = { PlayerDelays.set(po - 50) }) { Text("−50 ms") }
-            VOutlinedButton(onClick = { PlayerDelays.set(po + 50) }) { Text("+50 ms") }
-            if (po != 0) VTonalButton(onClick = { PlayerDelays.set(0) }) { Text("Reset") }
+            VOutlinedButton(onClick = { Outputs.set(oo - 50) }) { Text("−50 ms") }
+            VOutlinedButton(onClick = { Outputs.set(oo + 50) }) { Text("+50 ms") }
+            if (oo != 0) VTonalButton(onClick = { Outputs.set(0) }) { Text("Reset") }
         }
         Spacer(Modifier.height(14.dp))
+        // the player app's own (Spicy Lyrics Mobile 0.17)
+        PlayerDelays.ver
+        if (PlayerDelays.key() != null) {
+            val po = PlayerDelays.ms()
+            Text(PlayerDelays.name() + ": " + (if (po > 0) "+" else "") + po + " ms", fontWeight = FontWeight.Bold, color = Color.White)
+            Hint("For a player that runs early or late on every song: kept for this app, whatever plays in it.")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                VOutlinedButton(onClick = { PlayerDelays.set(po - 50) }) { Text("−50 ms") }
+                VOutlinedButton(onClick = { PlayerDelays.set(po + 50) }) { Text("+50 ms") }
+                if (po != 0) VTonalButton(onClick = { PlayerDelays.set(0) }) { Text("Reset") }
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+        val so = Lyr.songOffMs
+        Text("This song: " + (if (so > 0) "+" else "") + so + " ms", fontWeight = FontWeight.Bold, color = Color.White)
+        Hint("Only for the song that’s playing, on top of the setting above (as Spicy Lyrics Mobile’s song delay).")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            VOutlinedButton(onClick = { Lyr.songOffSet(so - 100) }) { Text("−100 ms") }
+            VOutlinedButton(onClick = { Lyr.songOffSet(so + 100) }) { Text("+100 ms") }
+            if (so != 0) VTonalButton(onClick = { Lyr.songOffSet(0) }) { Text("Reset") }
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            VTonalButton(onClick = { Lyr.resync() }) { Icon(VIcons.resync, null, Modifier.size(18.dp)); HSpace(6.dp); Text("Resync now") }
+            Spacer(Modifier.width(12.dp))
+            Text(if (Spotify.appTiming()) "Timing comes from the Spotify app on this phone." else "", fontSize = 12.sp, color = Color.White.copy(alpha = .6f), modifier = Modifier.weight(1f))
+        }
     }
-    val so = Lyr.songOffMs
-    Text("This song: " + (if (so > 0) "+" else "") + so + " ms", fontWeight = FontWeight.Bold, color = Color.White)
-    Hint("Only for the song that’s playing, on top of the setting above (as Spicy Lyrics Mobile’s song delay).")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        VOutlinedButton(onClick = { Lyr.songOffSet(so - 100) }) { Text("−100 ms") }
-        VOutlinedButton(onClick = { Lyr.songOffSet(so + 100) }) { Text("+100 ms") }
-        if (so != 0) VTonalButton(onClick = { Lyr.songOffSet(0) }) { Text("Reset") }
-    }
-    Spacer(Modifier.height(14.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        VTonalButton(onClick = { Lyr.resync() }) { Icon(VIcons.resync, null, Modifier.size(18.dp)); HSpace(6.dp); Text("Resync now") }
-        Spacer(Modifier.width(12.dp))
-        Text(if (Spotify.appTiming()) "Timing comes from the Spotify app on this phone." else "", fontSize = 12.sp, color = Color.White.copy(alpha = .6f), modifier = Modifier.weight(1f))
-    }
-    if (Desync.stat.isNotEmpty()) { Spacer(Modifier.height(10.dp)); Hint("Desync detection: " + Desync.stat) }
 }
 
 @Suppress("unused") private val keepBorder = Modifier.border(0.dp, Color.Transparent)

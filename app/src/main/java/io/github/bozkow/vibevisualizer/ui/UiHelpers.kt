@@ -27,6 +27,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SliderColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.BorderStroke
@@ -106,6 +108,24 @@ fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled:
     if (!S.glass) return androidx.compose.material3.OutlinedButton(onClick, modifier, enabled, content = content)
     androidx.compose.material3.OutlinedButton(onClick, modifier, enabled, border = BorderStroke(1.dp, if (enabled) GlassEdge else Color.White.copy(alpha = .08f)),
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White.copy(alpha = .05f), contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+}
+
+/** A choice's card (one of several to pick from): the chosen one in the cover's colour. In the Glass design both are
+ *  frosted glass, the chosen one tinted and with a brighter edge. */
+@Composable
+fun Modifier.choiceCard(on: Boolean, shape: Shape, off: Float = .06f): Modifier {
+    val acc = MaterialTheme.colorScheme
+    if (!S.glass) return this.clip(shape).background(if (on) acc.primaryContainer else Color.White.copy(alpha = off))
+    return this.clip(shape).background(if (on) acc.primary.copy(alpha = .26f) else GlassFill.copy(alpha = .08f))
+        .border(1.dp, if (on) Color.White.copy(alpha = .36f) else GlassEdge, shape)
+}
+
+/** A slider's colours: in the Glass design its track is frosted glass, filled with the cover's colour as far as it goes. */
+@Composable
+fun glassSlider(): SliderColors = if (!S.glass) SliderDefaults.colors() else {
+    val acc = MaterialTheme.colorScheme.primary
+    SliderDefaults.colors(thumbColor = acc, activeTrackColor = acc, inactiveTrackColor = Color.White.copy(alpha = .16f), activeTickColor = Color.White.copy(alpha = .5f),
+        inactiveTickColor = acc, disabledInactiveTrackColor = Color.White.copy(alpha = .05f))
 }
 
 /** Material's switch; in the Glass design an off switch is frosted glass (on, it keeps the cover's colour, so on and

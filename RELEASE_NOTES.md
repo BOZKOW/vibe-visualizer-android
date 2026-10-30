@@ -1,8 +1,15 @@
-Vibe Visualizer for Android 0.36.0 (beta). Android 12 or newer; it installs over 0.35.4 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.36.1 (beta). Android 12 or newer; it installs over 0.36.0 (Settings → Help & about → Update now).
+
+### Changed
+
+- **Lyrics timing is right in Settings** (Settings → Lyrics timing): all songs, this output, this music app and this song, and Resync, on the page itself instead of behind a button that opened a separate window. The timing button under the controls still opens it as a quick pop-up.
+- **More frosted glass in the Glass design**: the pop-up sheets (Lyrics timing, where it plays, what the bars hear…) and the questions the app asks, the sliders' tracks, and the options to pick from in the sheets and the setup guide (the picked one tinted with the cover's colour).
+
+## From 0.36.0
 
 From Spicy Lyrics Mobile 0.17.0:
 
-### New
+#### New
 
 - **A delay for each music app** (Lyrics timing): for a player that runs early or late on every song, kept for that app (Spotify, YouTube Music, Poweramp…, or this app's own player) and added to yours, the output's and the song's.
 - **Canvas behind the lyrics** (Settings → Canvas): how much of the video shows behind the lyrics, dimmed so they stay readable, from none (only its soft glow) to 80 % (it was always 25 %).
@@ -10,7 +17,7 @@ From Spicy Lyrics Mobile 0.17.0:
 - **Poweramp can open Vibe Visualizer** as its 3rd party lyrics app (its lyrics button), straight on the Lyrics screen.
 - **The release notes mark the version you have** (Help & about), open, with "Yours" beside it.
 
-### Fixed
+#### Fixed
 
 - **The widget's lyrics too small or squeezed on Samsung phones** with the display size (Screen zoom) changed from the default: One UI's home screen gives the widget's size for the default display size, which is now corrected for.
 

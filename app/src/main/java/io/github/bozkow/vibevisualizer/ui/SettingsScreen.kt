@@ -279,12 +279,13 @@ private fun pages(): List<Page> = listOf(
         Item.Custom("Add lyrics files use a file for this song remove all") { MyFiles() },
     ), sub = "Sources, size, font, style, Focus mode, scrolling, credits, your lyrics files", group = 1),
     Page("timing", "Lyrics timing", Icons.Rounded.Timer, listOf(
-        Item.Custom("Lyrics timing earlier later this song this output resync") { Buttons("Lyrics timing…" to { E.settingsPage = null; E.sheet = "timing" }) },
-        Item.Sl("loff", "Timing offset (ms)", -3000, 3000, 50, "Lyrics behind the music? Raise it. Lyrics timing (above) also has this song’s and this output’s own.", fmt = { (if (it > 0) "+" else "") + it + " ms" }),
+        Item.Sl("loff", "All songs (ms)", -3000, 3000, 50, "Lyrics behind the music? Raise it. Below: this output’s, this music app’s and this song’s own, added to it.", fmt = { (if (it > 0) "+" else "") + it + " ms" }),
+        Item.Custom("this output headphones car speaker this music app player delay this song resync now") { TimingParts() },
+        Item.Sub("Desync"),
         Item.Ch("lDesync", "Desync detection", listOf("ask" to "Ask before fixing", "auto" to "Fix automatically", "off" to "Off"), "Listens to the music and checks that the singing lines up with the lyrics. Needs real sound for the bars (phone sound, Vibe Bridge, the microphone or your own file). A fix only applies to the song playing."),
         Item.Custom("desync status") { if (Desync.stat.isNotEmpty()) Hint(Desync.stat) },
         Item.Sw("lseekFade", "Seek fade-in compensation", "Tapping a line starts Spotify 300 ms before it, so its fade-in doesn’t clip the first word."),
-    ), sub = "Offset, this song’s and this output’s timing, the desync fix", group = 1),
+    ), sub = "All songs, this output, this music app, this song, the desync fix", group = 1),
     Page("tr", "Translation", VIcons.translate, listOf(
         Item.Sub("Romanization"),
         Item.Ch("romMode", "Romanization (Japanese, Korean, Chinese, Russian…)", listOf("replace" to "Instead of the original line", "below" to "Below the original line", "off" to "Off")),
@@ -551,7 +552,7 @@ fun ItemView(it: Item) {
                 Text(it.fmt(S.i(it.k)), fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
             val range = (it.max - it.min).toFloat()
-            Slider((S.i(it.k) - it.min) / range, { f -> S.set(it.k, it.min + (Math.round(f * range / it.step) * it.step)) }, enabled = on, steps = 0)
+            Slider((S.i(it.k) - it.min) / range, { f -> S.set(it.k, it.min + (Math.round(f * range / it.step) * it.step)) }, enabled = on, steps = 0, colors = glassSlider())
             if (it.d.isNotEmpty()) Hint(it.d)
         } }
         is Item.Ch -> Needs(it.k) { on ->
