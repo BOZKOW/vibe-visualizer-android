@@ -132,6 +132,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -766,11 +767,13 @@ private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val k by animateFloatAsState(if (on) 1f else 0f, tween(260), label = "baron")   // the highlight fades between screens
     val a by animateFloatAsState(if (enabled) 1f else .4f, tween(220), label = "barok")
-    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).background(Color.White.copy(alpha = .16f * k))
-        .border(1.dp, Color.White.copy(alpha = .32f + .23f * k), CircleShape).clickable(src, androidx.compose.material3.ripple(), enabled = enabled) { E.haptic(); onClick() }
-        .semantics { contentDescription = desc }, contentAlignment = Alignment.Center) {
-        if (icon != null) Icon(icon, null, Modifier.size(d * .42f), tint = Color.White)
-        else Text(text ?: "", fontSize = (d.value * .3f).sp, fontWeight = FontWeight.Bold, color = Color.White)
+    // on: filled white with a dark icon, as the translate and romanize buttons, so on and off can't be mistaken
+    val fg = androidx.compose.ui.graphics.lerp(Color.White, Color(0xFF111116), k)
+    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).background(Color.White.copy(alpha = .92f * k))
+        .border(1.dp, Color.White.copy(alpha = .32f + .6f * k), CircleShape).clickable(src, androidx.compose.material3.ripple(), enabled = enabled) { E.haptic(); onClick() }
+        .semantics { contentDescription = desc; selected = on }, contentAlignment = Alignment.Center) {
+        if (icon != null) Icon(icon, null, Modifier.size(d * .42f), tint = fg)
+        else Text(text ?: "", fontSize = (d.value * .3f).sp, fontWeight = FontWeight.Bold, color = fg)
     }
 }
 
@@ -786,7 +789,9 @@ private fun CtlIcon(icon: ImageVector, desc: String, size: Dp = 24.dp, enabled: 
     IconButton(onClick = {
         E.haptic(); onClick()
         if (nudge != 0 && !Pop.calm) scope.launch { k.snapTo(0f); k.animateTo(1f, tween(130, easing = androidx.compose.animation.core.FastOutLinearInEasing)); k.snapTo(-1f); k.animateTo(0f, spring(.62f, 520f)) }
-    }, enabled = enabled, interactionSource = src, modifier = Modifier.size(maxOf(48.dp, size + 12.dp)).pressScale(src, .86f).semantics { contentDescription = desc },
+    }, enabled = enabled, interactionSource = src, modifier = Modifier.size(maxOf(48.dp, size + 12.dp)).pressScale(src, .86f)
+        .background(tint.copy(alpha = .2f * dk.coerceIn(0f, 1f)), CircleShape)   // a toggle that's on sits in a soft circle of its colour
+        .semantics { contentDescription = desc; if (dot) selected = on },
         colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent, contentColor = tint, disabledContentColor = Color.White.copy(alpha = .3f))) {
         Icon(icon, null, Modifier.size(size).graphicsLayer { val x = k.value; translationX = x * nudge * size.toPx() * .38f; alpha = 1f - kotlin.math.abs(x) * .9f }
             .drawWithContent { drawContent(); if (dk > .01f) drawCircle(tint, 2.2.dp.toPx() * dk.coerceAtMost(1.2f), Offset(this.size.width / 2, this.size.height + 5.dp.toPx()), alpha = dk.coerceIn(0f, 1f)) })

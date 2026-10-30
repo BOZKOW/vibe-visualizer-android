@@ -21,6 +21,7 @@ import io.github.bozkow.vibevisualizer.core.fmtWait
 import io.github.bozkow.vibevisualizer.core.now
 import io.github.bozkow.vibevisualizer.core.wall
 import io.github.bozkow.vibevisualizer.engine.E
+import io.github.bozkow.vibevisualizer.engine.Preload
 import io.github.bozkow.vibevisualizer.lyrics.SongMeta
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -307,7 +308,7 @@ object Spotify {
         else spSlew = if (same && err != null && abs(err) > 15) err to nowT else null
         isPlaying = st.playing
         meta = m
-        if (m.id != spId) { spId = m.id; E.onSpTrack(m) }
+        if (m.id != spId) { spId = m.id; aheadOf = aheadOf?.takeIf { it.first == m.id }; E.onSpTrack(m) }
         // the Spotify app on this phone changed song without saying where it is yet: Spotify's word for it
         if (appTiming()) SpotifyApp.webPosition(st.progress + if (st.playing) nowT - spFetched else 0.0)
         E.onSpUpdate()
@@ -319,10 +320,22 @@ object Spotify {
         return S.b("aSession") && SpotifyApp.matches(m.title, m.duration * 1000)
     }
 
-    fun spPlaying() = if (appTiming()) SpotifyApp.playing else spState?.playing == true
+    fun spPlaying() = if (aheadMs() != null) true else if (appTiming()) SpotifyApp.playing else spState?.playing == true
+
+    /** Next pressed in this app with the next song found ahead (E.showAhead): until Spotify names a new song, its time
+     *  counts from the press, so the old song's position doesn't drive the new song's lyrics (8 s at most). */
+    private var aheadOf: Triple<String, Double, Double>? = null   // (the song's id, when Next was pressed, its length in ms)
+    fun skippedTo(m: SongMeta) { aheadOf = Triple(m.id, now(), m.duration * 1000) }
+    private fun aheadMs(): Double? {
+        val a = aheadOf ?: return null
+        if (meta?.id == a.first) { aheadOf = null; return null }
+        if (now() - a.second > 8000) { aheadOf = null; Vibe.scope.launch { E.aheadGone() }; return null }   // the skip didn't happen
+        return now() - a.second
+    }
 
     /** Spotify position in ms, with any resync correction still gliding in. */
     fun curMs(): Double {
+        aheadMs()?.let { return it }
         if (appTiming()) SpotifyApp.positionMs()?.let { return it }
         val st = spState ?: return 0.0
         val n = now()
@@ -331,7 +344,7 @@ object Spotify {
         return t
     }
 
-    fun durationMs() = spState?.duration ?: ((meta?.duration ?: 0.0) * 1000)
+    fun durationMs() = aheadOf?.takeIf { aheadMs() != null }?.third ?: spState?.duration ?: ((meta?.duration ?: 0.0) * 1000)
 
     // the Spotify app on this phone tells the app at once when it plays, pauses, seeks or changes song
     init { SpotifyApp.onTrack = { onAppTrack() }; SpotifyApp.onState = { onAppState() } }
@@ -436,6 +449,7 @@ object Spotify {
     fun toggleShuffle() {
         if (spState == null) return
         val v = !shuffle; shuffle = v; spxHold = now() + 1500; version++
+        Preload.forget()   // the queue is another one now
         Vibe.scope.launch { if (!ctl("PUT", "/me/player/shuffle?state=$v")) { shuffle = !v; version++ } }
     }
 

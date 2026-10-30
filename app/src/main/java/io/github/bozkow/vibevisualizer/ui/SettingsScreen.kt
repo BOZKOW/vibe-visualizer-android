@@ -534,14 +534,14 @@ fun ItemView(it: Item) {
         // a Column, not a Box: rows that put several things one under another (the server field, its Test and save
         // button and its answer) were drawn over each other
         is Item.Custom -> Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) { it.c() }
-        is Item.Sw -> Needs(it.k) { on -> Row(Modifier.fillMaxWidth().then(if (on) Modifier.squishClick { E.haptic(); S.set(it.k, !S.b(it.k)) } else Modifier).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        is Item.Sw -> Needs(it.k) { on -> Row(Modifier.fillMaxWidth().then(if (on) Modifier.squishClick { S.set(it.k, !S.b(it.k)); E.haptic() } else Modifier).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
                 if (it.d.isNotEmpty()) Text(it.d, fontSize = 13.5.sp, lineHeight = 19.sp, color = Color.White.copy(alpha = .62f), modifier = Modifier.padding(top = 2.dp))
             }
             if (on) ResetBtn(it.k)
             Spacer(Modifier.width(8.dp))
-            Switch(S.b(it.k), { v -> E.haptic(); S.set(it.k, v) }, enabled = on)
+            Switch(S.b(it.k), { v -> S.set(it.k, v); E.haptic() }, enabled = on)
         } }
         is Item.Sl -> Needs(it.k) { on -> Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

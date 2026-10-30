@@ -247,7 +247,7 @@ object E {
      *  to name it (which brings its id, and with it the lyrics and the Canvas, a moment later). */
     private var appShown = ""; private var appArt = false
     fun onAppSong(t: String, a: String, art: android.graphics.Bitmap?) {
-        if (t.isEmpty() || t == title || src != "spotify") return
+        if (t.isEmpty() || t == title || src != "spotify" || aheadId.isNotEmpty()) return   // (a skip from here: shown already)
         val tok = ++coverTok
         Audio.dropBars(); CanvasVideo.clear(true); Lyr.loading()
         title = t; artist = a; year = ""; status = "Spotify"; trackVer++
@@ -259,15 +259,39 @@ object E {
     }
     private var earlyId = ""   // the song the Spotify app started with what was found ahead
 
+    /** Next pressed here, with the next song found ahead: its name, cover, lyrics and Canvas (got ready while the song
+     *  before played) show at once, without waiting for Spotify to name it; its time counts from the press meanwhile. */
+    private var aheadId = ""
+    private fun showAhead(m: SongMeta) {
+        if (m.id.isEmpty() || m.title.isEmpty()) return
+        val tok = ++coverTok
+        Audio.dropBars(); CanvasVideo.clear(true)
+        title = m.title; artist = m.artist; year = m.year; status = "Spotify"; trackVer++
+        aheadId = m.id; appShown = ""; appArt = false; earlyId = ""
+        Spotify.skippedTo(m)
+        Vibe.scope.launch { if (!(m.cover.isNotEmpty() && setCover(m.cover, "", tok))) { if (tok == coverTok) resetCover() } }
+        Lyr.load(m, tok); CanvasVideo.lookup(m, tok)
+    }
+
+    /** Spotify still names the song before 8 s after Next (the skip failed, or went elsewhere): back to what plays. */
+    fun aheadGone() {
+        if (aheadId.isEmpty()) return
+        aheadId = ""
+        Spotify.meta?.let { onSpTrack(it) }
+    }
+
     fun onSpTrack(m: SongMeta) {
         curArtistId = m.artistId
         Spotify.likeCheck(m)
         // already showing from the Spotify app: no second drop of the bars, no title animating in again, and the cover
         // only gets sharper
-        val same = appShown.isNotEmpty() && appShown == SpotifyApp.title && SpotifyApp.matches(m.title, m.duration * 1000)
-        val quiet = same && appArt
-        val early = same && earlyId == m.id   // its lyrics and Canvas are already on their way: they carry on
-        appShown = ""; appArt = false; earlyId = ""
+        Preload.arrived(m.id)
+        // shown at the press already (Next here, found ahead): it carries on as it is
+        val ahead = aheadId.isNotEmpty() && aheadId == m.id
+        val same = ahead || (appShown.isNotEmpty() && appShown == SpotifyApp.title && SpotifyApp.matches(m.title, m.duration * 1000))
+        val quiet = ahead || (same && appArt)
+        val early = ahead || (same && earlyId == m.id)   // its lyrics and Canvas are already on their way: they carry on
+        appShown = ""; appArt = false; earlyId = ""; aheadId = ""
         if (!same) Audio.dropBars()   // the bars drop and grow back with the new song
         val tok = if (early) coverTok else ++coverTok
         if (!early) CanvasVideo.clear(true)
@@ -414,8 +438,7 @@ object E {
 
     private fun updPlay() { val p = playing(); if (p != playingState) { playingState = p; activeAt = wall() } }
 
-    fun toggle() {
-        haptic()
+    fun toggle() {   // (the button that calls it ticks: one click a tap)
         when (src) {
             "spotify" -> Spotify.toggle()
             "file" -> Local.toggle()
@@ -424,8 +447,13 @@ object E {
         }
     }
 
-    fun prev() { haptic(); when (src) { "spotify" -> Spotify.previous(); "file" -> Local.previous(); "media" -> MediaApps.previous() } }
-    fun next() { haptic(); when (src) { "spotify" -> Spotify.next(); "file" -> Local.next(); "media" -> MediaApps.next() } }
+    fun prev() { when (src) { "spotify" -> Spotify.previous(); "file" -> Local.previous(); "media" -> MediaApps.previous() } }
+    fun next() {
+        when (src) {
+            "spotify" -> { Spotify.next(); if (S.b("aPreload")) Preload.skip()?.let { showAhead(it) } }
+            "file" -> Local.next(); "media" -> MediaApps.next()
+        }
+    }
     fun canNext() = src == "spotify" || src == "media" || (src == "file" && Local.hasNext())
 
     /** Jump to a time (seconds) in whatever is playing; used by the lyrics. */
@@ -484,7 +512,7 @@ object E {
         else if (uiHidden && !can) uiHidden = false
     }
 
-    fun show(s: String) { if (screen != s) { screen = s; haptic() }; poke() }
+    fun show(s: String) { if (screen != s) screen = s; poke() }
     fun lyricsVisible() = inPip || (ambient && S.b("aAmbLyrics")) || ((wide || screen == "lyrics") && (settingsPage == null || !S.low) && !wizard)   // they go on under Settings' blur   // they go on behind Settings' blur
     fun goHome() { settingsPage = null; screen = "player" }
 
@@ -569,9 +597,19 @@ object E {
     }
 
     private val vib by lazy { Vibe.app.getSystemService(android.os.Vibrator::class.java) }
+    /** A light tick on a tap or a toggle (Settings → Player screen → Haptic feedback): a click played on the vibrator
+     *  itself. The view's CONTEXT_CLICK it asked for before plays nothing on some phones (Samsung's), and the phone's
+     *  own touch vibration being off silenced it too, so the setting seemed to do nothing. As strong as the phone's
+     *  touch feedback; with that off, as its media vibration (this setting asks for it). */
     fun haptic() {
         if (!S.b("aHaptics")) return
-        activity?.window?.decorView?.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK)
+        val v = vib?.takeIf { it.hasVibrator() } ?: return
+        val fx = android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_CLICK)
+        val touchOn = runCatching { android.provider.Settings.System.getInt(Vibe.app.contentResolver, android.provider.Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0 }.getOrDefault(true)
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT >= 33) v.vibrate(fx, android.os.VibrationAttributes.createForUsage(if (touchOn) android.os.VibrationAttributes.USAGE_TOUCH else android.os.VibrationAttributes.USAGE_MEDIA))
+            else @Suppress("DEPRECATION") v.vibrate(fx, android.media.AudioAttributes.Builder().setUsage(if (touchOn) android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION else android.media.AudioAttributes.USAGE_MEDIA).build())
+        }
     }
 
     /* ================= settings changed ================= */

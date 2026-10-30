@@ -1,24 +1,35 @@
-Vibe Visualizer for Android 0.35.0 (beta). Android 12 or newer; it installs over 0.34.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.35.1 (beta). Android 12 or newer; it installs over 0.35.0 (Settings → Help & about → Update now).
 
-### The lyrics no longer stutter while a Canvas plays
+### Fixed
+
+- **Haptic feedback works**: the tick it asked Android for plays nothing on some phones (Samsung's), so the setting seemed to do nothing. It's now a click played on the vibrator itself, as strong as your phone's touch vibration (and still there when that's off, since you asked for it here). Turning the setting on ticks at once, and each tap ticks once (the play button and the screen buttons ticked twice).
+- **Buttons that are on are easy to tell**: a button under the controls that's on (the screen you're on, Translate, Romanize, Canvas, Like) is filled white with a dark icon, as the translate and romanize buttons by the song; shuffle and repeat sit in a soft circle of their colour, besides the dot.
+
+### Next shows the next song at once
+
+- **Pressing Next in the app shows the next song straight away**: its name, cover, lyrics and Canvas, got ready while the song before played, without waiting for Spotify to say a new song started (its time counts from the press until Spotify does). Pressing Next again before Spotify answers goes on to the one after. If Spotify still plays the old song 8 seconds later, the app goes back to it.
+
+## From 0.35.0
+
+#### The lyrics no longer stutter while a Canvas plays
 
 - **The blurred Canvas behind everything is drawn by the graphics chip itself.** Until now, 12 times a second a small frame of the video was copied back from it to make the blur, and every copy held up the next frame of the lyrics, the more so the faster the video moved.
 
-### Spotify's crossfade, gapless playback, Automix and the DJ
+#### Spotify's crossfade, gapless playback, Automix and the DJ
 
 - **The lyrics stay in step across song changes** when songs flow into each other. Spotify can say where the new song is a few seconds before it names it, or not say it at all, and the lyrics either started at 0:00 and waited, or jumped to the old song's end, until you pressed Resync. Now the app keeps the new song's early report, and when Spotify says nothing, it checks the position with Spotify's Web API and moves the lyrics if they're more than 1.5 s off.
 - **An ad or the DJ talking between songs** no longer shows "Nothing playing" for a moment.
 
-### Pick the buttons under the controls
+#### Pick the buttons under the controls
 
 - **Settings → Player screen → Buttons under the controls**: four buttons of your choice: Lyrics, where it plays, what the bars hear, Visualizer, Resync, Lyrics timing, Translate, Romanize, Canvas on or off, Like, or nothing. The defaults are as before, and Settings always stays the last one (it's the way into them).
 - **Shuffle and repeat have a small dot under them** while they're on.
 
-### Skipping songs on Spotify
+#### Skipping songs on Spotify
 
 - **The next five songs in your Spotify queue are got ready** (their lyrics, Canvas and cover), not just the next one, still with one request to Spotify a song. Skipping a few songs shows their lyrics at once, without the short wait for songs skipped through quickly.
 
-### Also
+#### Also
 
 - **Translate and romanize leave hidden controls hidden**: tapped while the controls are away, they only switch, like the seek bar.
 - **The credits no longer show twice** at the end of a song (under the lyrics and at the foot) while a Canvas plays with the cover hidden, or on its side.

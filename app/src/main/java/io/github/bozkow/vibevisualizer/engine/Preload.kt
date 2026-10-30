@@ -24,6 +24,21 @@ object Preload {
 
     /** The next songs as found ahead (the Spotify app's song change starts its lookups at once when it's one of them). */
     private var next: List<SongMeta> = emptyList()
+    private var at = 0   // how many of them Next in this app has gone past before Spotify named a song
+
+    /** Next pressed in this app: the song found ahead that comes now (pressing again before Spotify answers gives the
+     *  one after), or null. */
+    fun skip(): SongMeta? = next.getOrNull(at)?.also { at++ }
+
+    /** Spotify names the song that plays: the ones found ahead up to it are gone; one that wasn't among them (you
+     *  picked another song, or the queue changed) makes the rest unsure, so they're forgotten until the next look. */
+    fun arrived(id: String) {
+        val i = next.indexOfFirst { it.id == id }
+        if (i >= 0) { next = next.drop(i + 1); at = maxOf(0, at - i - 1) } else forget()
+    }
+
+    /** The queue changed (shuffle): what was found ahead no longer follows. */
+    fun forget() { next = emptyList(); at = 0 }
 
     /** A song started: in a few seconds (after its own lookups), find the next ones and get them ready. */
     fun songStarted() {
@@ -40,7 +55,7 @@ object Preload {
                 else -> emptyList()
             }.filter { it.title.isNotEmpty() }
             if (tok != E.coverTok || ms.isEmpty()) return@launch
-            next = ms
+            next = ms; at = 0
             // the nearest first, one song at a time (its lyrics, Canvas and cover together), so the sources aren't asked
             // for five songs at once; what's ready already (saved, or got ready from an earlier song) is skipped quickly
             work?.cancel()
