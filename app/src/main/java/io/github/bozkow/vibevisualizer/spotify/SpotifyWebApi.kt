@@ -268,11 +268,12 @@ object Spotify {
             year = ((if (ep) it.optString("release_date") else it.optJSONObject("album")?.optString("release_date")) ?: "").take(4).takeIf { y -> y.length == 4 && y.all(Char::isDigit) } ?: "", artistId = if (ep) "" else artists.optJSONObject(0)?.optString("id") ?: "", ep = ep)
     }
 
-    /** The next song in your Spotify queue (one request), or null (none, or Spotify asked to wait). */
-    suspend fun queueNext(): SongMeta? {
-        if (!connected || wall() < backoff) return null
-        val q = (runCatching { api("/me/player/queue") }.getOrNull() as? JSONObject)?.optJSONArray("queue") ?: return null
-        return q.optJSONObject(0)?.takeIf { it.optString("id").isNotEmpty() }?.let { metaOf(it) }
+    /** The next [n] songs in your Spotify queue (one request: Spotify sends them all at once), or none (nothing
+     *  queued, or Spotify asked to wait). */
+    suspend fun queueAhead(n: Int): List<SongMeta> {
+        if (!connected || wall() < backoff) return emptyList()
+        val q = (runCatching { api("/me/player/queue") }.getOrNull() as? JSONObject)?.optJSONArray("queue") ?: return emptyList()
+        return (0 until minOf(q.length(), n)).mapNotNull { i -> q.optJSONObject(i)?.takeIf { it.optString("id").isNotEmpty() }?.let { metaOf(it) } }
     }
 
     private fun apply(d: JSONObject?, mid: Double) {

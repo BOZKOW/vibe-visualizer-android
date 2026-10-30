@@ -401,7 +401,9 @@ object Lyr {
     private suspend fun doLoad(m: SongMeta, tok: Int, skip: List<String>, fresh: Boolean) {
         loading()
         val quick = wall() - lyAskAt < 1200; lyAskAt = wall()
-        if (quick && !fresh) { delay(650); if (tok != E.coverTok) return }   // skipping through songs: only ask for the one you stop on
+        // skipping through songs: only ask for the one you stop on (lyrics got ready ahead show at once)
+        val ready = !fresh && (lcache.containsKey(keyOf(m)) || soft.containsKey(softKey(m)))
+        if (quick && !fresh && !ready) { delay(650); if (tok != E.coverTok) return }
         val skipS = skip.toSet(); val order = provList().filter { it.on && it.k !in skipS }.map { it.k }
         val log = ArrayList<Look>()
         fun note(p: String, st: String, ms: Long? = null) { log.add(Look(p, st, ms)); if (tok == E.coverTok) { lookupLog.clear(); lookupLog.addAll(log) } }

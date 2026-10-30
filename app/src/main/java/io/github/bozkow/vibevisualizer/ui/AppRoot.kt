@@ -55,7 +55,7 @@ fun VibeRoot() {
                 if (!(E.uiHidden && !E.ambient && Quiet.has(down.position))) {
                     E.wakeTap = E.uiHidden || E.ambient
                     E.poke()
-                }
+                } else E.nudge()
             }
         }) {
             // while Settings or the setup guide cover the screen, the player isn't drawn at all (it would cost every frame)

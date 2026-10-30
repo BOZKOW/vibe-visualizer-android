@@ -88,6 +88,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -220,7 +221,7 @@ private fun LyricsWithLyrics() {
         TopBar(Modifier.padding(horizontal = 24.dp))
         var areaH by remember { mutableFloatStateOf(0f) }
         // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
-        val rest = Lyr.view.rest && !Lyr.view.lyFree && !(CanvasVideo.cvmode && S.b("cvNoArt"))
+        val rest = restCover()
         val rk by animateFloatAsState(if (rest) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, if (rest) Spring.StiffnessVeryLow else Spring.StiffnessLow), label = "rest")
         val over = rk >= .99f
         androidx.compose.runtime.SideEffect { Lyr.view.covered = over }
@@ -233,7 +234,7 @@ private fun LyricsWithLyrics() {
             }
         }
         if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
-        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true) }
+        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true, restCover = rest) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
         }
@@ -597,7 +598,7 @@ private fun AwayNote(modifier: Modifier) {
 /** The foot of every portrait screen: the song, the seek bar and where the lyrics are from. They stay when the
  *  controls slide away. */
 @Composable
-private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false, name: Boolean = true) {
+private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false, name: Boolean = true, restCover: Boolean = false) {
     Column(Modifier.fillMaxWidth()) {
         if (name) TitleRow(big = big, toggles = toggles)
         else if (toggles && (Lyr.needTr || Lyr.needRom)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -608,9 +609,12 @@ private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = fal
         Spacer(Modifier.height(if (big) 10.dp else 6.dp))
         SeekRow()
         val c = Lyr.credit
-        // on the Lyrics screen, Refined credits under the last line say it already while they're on screen
+        // on the Lyrics screen, Refined credits under the last line say it already while they're on screen (a break's
+        // cover over the lyrics hides them; with the Canvas and no cover, or on its side, the lyrics stay and so do they)
         val v = Lyr.view
-        val refined = lyrics && S.credPos == "lyrics" && S.b("xRefCred") && (v.allsung || v.isStatic) && !(v.rest && !v.lyFree)
+        val under by remember { derivedStateOf { v.creditsShown() } }
+        val refined = lyrics && S.credPos == "lyrics" && S.b("xRefCred") && !restCover &&
+            (if (S.xFocus && !v.isStatic) v.allsung else v.allsung || v.isStatic || under)
         AnimatedVisibility(c != null && Lyr.lines > 0 && !refined, enter = fadeIn(tween(600)) + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             if (c != null) CreditsLine(c, Modifier.fillMaxWidth().padding(bottom = 4.dp))
         }
@@ -623,7 +627,8 @@ private fun SmallToggle(icon: ImageVector?, desc: String, on: Boolean, text: Str
     val fg by androidx.compose.animation.animateColorAsState(if (on) Color(0xFF111116) else Color.White, tween(220), label = "tglfg")
     val pop = remember { Animatable(1f) }
     LaunchedEffect(on) { if (!S.low && !E.reduceMotion() && pop.value == 1f) { pop.snapTo(.82f); pop.animateTo(1f, spring(.45f, Spring.StiffnessMedium)) } }
-    IconButton(onClick = { E.haptic(); onClick() }, Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }.semantics { contentDescription = desc },
+    // like the seek bar: tapped while the controls are hidden, it only does its job (they stay away)
+    IconButton(onClick = { E.haptic(); onClick() }, Modifier.quietTouch().graphicsLayer { scaleX = pop.value; scaleY = pop.value }.semantics { contentDescription = desc },
         colors = IconButtonDefaults.iconButtonColors(containerColor = bg, contentColor = fg)) {
         if (icon != null) Icon(icon, null, Modifier.size(20.dp)) else Text(text ?: "", fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
@@ -1010,6 +1015,10 @@ fun PipCanvas() {
 private fun CanvasView() {
     AndroidView({ ctx -> TextureView(ctx).also { CanvasVideo.bindView(it) } }, Modifier.fillMaxSize(), update = { tv -> tv.post { coverFit(tv) } }, onRelease = { CanvasVideo.unbind(it) })
 }
+
+/** A long break on the upright Lyrics screen: the cover takes the lyrics' place (not while you scroll them, nor while a
+ *  Canvas plays with the cover hidden). */
+private fun restCover() = Lyr.view.rest && !Lyr.view.lyFree && !(CanvasVideo.cvmode && S.b("cvNoArt"))
 
 /** The lookup is done and found no lyrics: the cover takes their place (what's wrong, if anything, is at the top). */
 private fun noLyrics() = Lyr.empty && Lyr.lines == 0

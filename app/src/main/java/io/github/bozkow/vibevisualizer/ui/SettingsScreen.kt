@@ -237,8 +237,8 @@ private fun pages(): List<Page> = listOf(
         Item.Sub("Sources"),
         Item.Custom("Sources, in priority order Spicy Lyrics LRCLIB NetEase AMLL Spotify your lyrics files") { Sources() },
         Item.Sw("lnotice", "No lyrics notice", "Say so when a song has no lyrics."),
-        Item.Sw("aPreload", "Get the next song ready", "A few seconds into a song, the next one in the queue (Spotify’s, the music app’s or your files’) has its lyrics, Canvas and cover looked up, so they show the moment it starts. One more request to Spotify a song."),
-        Item.Sw("aRestCover", "Cover in long breaks", "When nothing is sung for 10 s or more, the cover takes the lyrics’ place, until 2 s before the next line."),
+        Item.Sw("aPreload", "Get the next songs ready", "A few seconds into a song, the next ones in the queue (the next five in Spotify’s, the next one in the music app’s or your files’) have their lyrics, Canvas and cover looked up, so they show the moment one starts, also when you skip a few. One more request to Spotify a song."),
+        Item.Sw("aRestCover", "Cover in long breaks", "With Focus mode: when nothing is sung for 10 s or more, the cover takes the lyrics’ place, until 2 s before the next line."),
         Item.Sub("Text"),
         Item.Sl("lsize", "Text size", 70, 150),
         Item.Ch("lfont", "Lyrics font", listOf("vv" to "Vibe Visualizer", "spicy" to "Spicy Lyrics", "system" to "System font"), "Spicy Lyrics: the display cut Spicy Lyrics shows lyrics in."),
@@ -480,7 +480,15 @@ private fun needs(k: String): String? = when (k) {
     "bgspeed" -> if (S.str("bgStyle") != "dynamic") "Only with the Dynamic background" else if (S.low) "Still in Low performance mode" else null
     "bgblur" -> if (S.str("bgStyle") in setOf("color", "none")) "Not with this background" else null
     "fpscap" -> if (S.low) "Low performance mode keeps it at 30 fps" else null
-    "learlyMs" -> if (!S.learly) "Turn on Early scroll first" else null
+    // Focus mode (Experiments) places, fades and blurs the lines its own way: what it does instead is greyed while
+    // it's on, and the cover in long breaks goes with it
+    "aRestCover" -> if (!S.xFocus) "Turn on Focus mode first (Experiments)" else null
+    "lblur" -> if (S.xFocus) "Focus mode blurs the lines its own way" else null
+    "lminimal" -> if (S.xFocus) "Focus mode already hides the sung lines" else null
+    "learly" -> if (S.xFocus) "Focus mode brings each line in its own way" else null
+    "learlyMs" -> if (S.xFocus) "Focus mode brings each line in its own way" else if (!S.learly) "Turn on Early scroll first" else null
+    "xKeep" -> if (S.xFocus) "Not in Focus mode" else if (!S.lminimal) "Turn on Minimal lyrics mode first" else null
+    "xBgPop" -> if (!S.lsimple || !S.b("xRefSimple")) "Needs Simple lyrics and Refreshed simple lyrics mode" else null
     "credPos" -> if (!S.b("xRefCred")) "Needs Refined credits (Experiments)" else null
     "lcredLast" -> if (!S.b("xRefCred") || S.credPos != "lyrics") "Needs Refined credits under the lyrics" else null
     "xRefSimple" -> if (!S.lsimple) "Turn on Simple lyrics mode first" else null

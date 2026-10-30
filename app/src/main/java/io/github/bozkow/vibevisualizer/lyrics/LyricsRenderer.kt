@@ -133,6 +133,8 @@ class LyricsRenderer {
     private val leaveA = Tween(1f)
     var pressed = -1
     var creditsY by mutableStateOf(0f); private set    // where credits under the lyrics go (screen y inside the view)
+    /** The credits under the last line are on screen (clear of the fade at the view's foot). */
+    fun creditsShown() = H > 0 && creditsY < H - F * 2
 
     val isStatic get() = !sync && lines.isNotEmpty()
     val empty get() = lines.isEmpty()
@@ -364,7 +366,7 @@ class LyricsRenderer {
         else if (lyTall && !lyFree && t - lyTallAt > 250) { lyTallAt = t; place(t, pos) }
         if (!viewOn) return
         if (!sync) { rest = false; staticScroll(t, pos); tops(t); bump(); return }
-        val r = S.b("aRestCover") && restAt(pos)
+        val r = S.b("aRestCover") && S.xFocus && restAt(pos)   // one of Focus mode's (Settings greys it without)
         if (r != rest) { rest = r; restAt = t }
         if (rest && covered && !lyFree) return   // the cover's over them (upright): they rest until it goes
         if (lyFree && t - lyFreeAt > 4000) freeEnd(t, pos)

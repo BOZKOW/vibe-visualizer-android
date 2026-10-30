@@ -456,6 +456,10 @@ object E {
         if (ambient) { ambient = false; CanvasVideo.syncPlay() }
     }
 
+    /** A touch that leaves the hidden controls away (the seek bar, translate, romanize): still a touch for Ambient
+     *  mode's wait and the frame rate. */
+    fun nudge() { activeAt = wall() }
+
     /** Ambient mode may dim the screen: on, music plays, nothing's open, the app is on screen (not in a small window). */
     private fun canAmbient() = S.b("aAmbient") && playingState && settingsPage == null && sheet == null && !wizard && !seeking && !inPip && visible
 
