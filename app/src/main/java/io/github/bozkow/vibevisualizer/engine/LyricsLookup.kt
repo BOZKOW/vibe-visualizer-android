@@ -387,6 +387,7 @@ object Lyr {
             }
         }
         val errs = ArrayList<String>()
+        var answered = false   // a source answered (not found): a failing one doesn't make it "couldn't load"
         val t0 = now()
         // Spicy Lyrics Mobile's lookup: the first source asks alone (one request usually settles the song); if it misses
         // or takes over a second, the rest are asked together. Better timing wins (word-synced over line-synced over
@@ -442,7 +443,7 @@ object Lyr {
                         errs.add(PROVS.getValue(p).name + ": " + (g.e.message ?: "error"))
                         if (p != "local") ladder(p).failure(wall())
                     }
-                    r != null && SourceParse.placeholder(r.lines) -> { ladder(p).success(); note(p, "not found (only a “no lyrics” note)", g.ms) }
+                    r != null && SourceParse.placeholder(r.lines) -> { ladder(p).success(); answered = true; note(p, "not found (only a “no lyrics” note)", g.ms) }
                     r != null && r.lines.any { !it.dots } -> {
                         ladder(p).success()
                         r.prov = p
@@ -460,7 +461,7 @@ object Lyr {
                             if (tok != E.coverTok) break
                         }
                     }
-                    else -> { ladder(p).success(); note(p, "not found", g.ms) }
+                    else -> { ladder(p).success(); answered = true; note(p, "not found", g.ms) }
                 }
                 if (lead) { fanned = true; fanOut() }
             }
@@ -469,7 +470,11 @@ object Lyr {
         if (tok != E.coverTok || best != null) return
         if (skipS.isNotEmpty()) return otherDone(m, tok)
         if (errs.isEmpty()) LyricsCache.put(key, null)   // remember "none" for a day; failures aren't remembered
-        if (errs.isNotEmpty()) clear("Couldn’t load lyrics", errs.first(), "none", listOf(
+        // only when no source could answer is it an error; else there are none, and the ones that failed are asked again
+        // next time (nothing is remembered then)
+        if (errs.isNotEmpty() && answered) clear("No lyrics for this song", errs.joinToString(" · ") { it.substringBefore(":") } + " didn’t answer; the rest had none.", "none", listOf(
+            E.Act("Try again", pri = true) { ladders.clear(); lcache.remove(key); Vibe.scope.launch { LyricsCache.del(key) }; load(m, E.coverTok) }))
+        else if (errs.isNotEmpty()) clear("Couldn’t load lyrics", errs.first(), "none", listOf(
             E.Act("Try again", pri = true) { ladders.clear(); lcache.remove(key); Vibe.scope.launch { LyricsCache.del(key) }; load(m, E.coverTok) },
             E.Act("Copy details") { copy(m.artist + " – " + m.title + "\n" + errs.joinToString("\n")); E.copied("Details") }), err = true)
         else clear("No lyrics for this song", "It may be instrumental. You can add your own .lrc or .ttml file.", "none", listOf(E.Act("Add a file") { FilePicker.lyrics?.invoke(true) }))

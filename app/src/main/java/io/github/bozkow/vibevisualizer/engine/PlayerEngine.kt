@@ -493,6 +493,7 @@ object E {
     private var last = 0.0; private var fAcc = 0.0; private var fPrev = 0.0; private var lastUi = 0.0
     private var fc = 0; private var ft = 0.0
     private var wasActive = false
+    private var movedAt = 0.0
     private var secAt = 0L
 
     fun frame(t: Double) {
@@ -500,7 +501,10 @@ object E {
         // Limit frame rate: time adds up between screen refreshes and a frame is drawn once a whole frame's worth has
         // passed, so 60 on a 120 Hz screen really gives 60
         val cap = S.str("fpscap").toIntOrNull() ?: 0
-        val iv = 1000.0 / min(if (cap > 0) cap else 240, if (S.low) 30 else 240)
+        // paused with nothing moving and no touch for 2 s (no bars, no colours gliding, no seeking): 30 a second are plenty;
+        // a touch brings the full rate back at once
+        val still = t - movedAt > 2000 && wall() - activeAt > 2000
+        val iv = 1000.0 / min(if (cap > 0) cap else 240, if (S.low || still) 30 else 240)
         fAcc += min(t - (if (fPrev == 0.0) t else fPrev), 100.0); fPrev = t
         if (fAcc < iv - .5) return
         fAcc = min(fAcc - iv, iv)
@@ -522,6 +526,7 @@ object E {
         val active = pl || Audio.mxv > .003f || Audio.idleK > .005f || palMoving
         if ((active || wasActive) && step) barsTick.longValue++
         wasActive = active
+        if (active || seeking || ambient) movedAt = t
         if (S.b("fps")) { fc++; if (t - ft > 500) { fpsText = "${Math.round(fc * 1000 / (t - ft))} fps"; fc = 0; ft = t } }
     }
 
