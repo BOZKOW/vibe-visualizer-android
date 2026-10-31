@@ -461,13 +461,30 @@ class LyricsRenderer {
         // (Spicy Lyrics Mobile 0.17)
         var y = if (lineAtTop()) hh * .06f - el.top else hh * .38f - (el.top + el.h / 2)
         // two lines sung at once (a duet, or lines whose times overlap, as some Spicy Lyrics syncs have): both in view,
-        // the pair around the middle; too tall for that, lower, so more of the earlier one stays (the newer one whole)
+        // the pair around the middle, or in the whole height when it's taller; taller than the view, the newer one whole
         val first = lAct.minOrNull()?.takeIf { it < el.i && !S.xFocus && !lineAtTop() }?.let { k -> lv.firstOrNull { it.i == k } }
         if (first != null) {
             val top0 = first.top; val bot = el.top + el.h
-            y = if (bot - top0 <= hh * .64f) hh * .46f - (top0 + bot) / 2 else max(y, hh * .8f - bot)
+            val span = bot - top0
+            y = when {
+                span <= hh * .64f -> hh * .46f - (top0 + bot) / 2   // around the middle
+                span <= hh * .92f -> hh * .5f - (top0 + bot) / 2    // taller: both whole in the whole height
+                // taller than the view: the two rows being sung (one in each) in view together, around the middle; when
+                // even they're too far apart, the earlier one's near the top and the newer one below as far as there's
+                // room; followed as the singing moves on
+                else -> {
+                    val a = top0 + sungRow(first, pos); val b = el.top + sungRow(el, pos)
+                    if (b - a <= hh * .84f) hh * .5f - (a + b) / 2 else min(hh * .07f - top0, hh * .14f - a)
+                }
+            }
+            lyTall = span > hh * .92f; lyTallAt = t
+            // the pair is placed as a whole: fitting the newer line alone into view (as for one line) pushed the earlier
+            // one out over the top; the clear band reaches over both
+            band(max(0f, min(H * .14f, top0 + y - 2)), min(H, max(H * .8f, bot + y + 2)))
+            setLyY(y, t)
+            return
         }
-        val top = if (lineAtTop()) hh * .06f else hh * .16f; if (first == null && el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
+        val top = if (lineAtTop()) hh * .06f else hh * .16f; if (el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
         setLyY(fitLine(el, y, pos), t)
     }
 

@@ -63,6 +63,8 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Cast
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.automirrored.rounded.NoteAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PhoneAndroid
@@ -303,13 +305,13 @@ private fun LandscapeCanvas() {
     Row(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
         BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().ambientOut()) {
             val noArt = S.b("cvNoArt")
-            val side = minOf(maxWidth * .5f, maxHeight - (if (S.view == "both") 170.dp else 130.dp), 220.dp).coerceAtLeast(96.dp)
-            // over the Canvas: the cover, the song and the seek bar (the credits stay with the lyrics)
-            Column(Modifier.fillMaxSize().padding(bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = if (noArt) Arrangement.Bottom else Arrangement.Center) {
-                if (!noArt) { CoverArt(Modifier.size(side), corner = 16.dp); Spacer(Modifier.height(12.dp)) }
-                TitleRow(big = false, center = true)
-                Box(Modifier.widthIn(max = maxOf(side * 1.6f, 260.dp)).padding(top = 6.dp)) { SeekRow() }
-                if (S.view == "both") ExtraBars(Modifier.widthIn(max = maxOf(side * 1.6f, 260.dp)).fillMaxWidth().height(36.dp))
+            val side = minOf(maxWidth * .62f, maxHeight - 150.dp).coerceAtLeast(96.dp)
+            val wide = minOf(maxWidth * .94f, 480.dp)
+            // over the Canvas: the cover, the song in its big size and a wide seek bar (the credits stay with the lyrics)
+            Column(Modifier.fillMaxSize().padding(bottom = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = if (noArt) Arrangement.Bottom else Arrangement.Center) {
+                if (!noArt) { CoverArt(Modifier.size(side), corner = 18.dp); Spacer(Modifier.height(12.dp)) }
+                Box(Modifier.widthIn(max = wide)) { TitleRow(big = true, center = true) }
+                Box(Modifier.widthIn(max = wide).padding(top = 4.dp)) { SeekRow() }
             }
         }
         Spacer(Modifier.width(20.dp))
@@ -317,19 +319,19 @@ private fun LandscapeCanvas() {
     }
 }
 
-/** Without a Canvas: the cover on the left with the song and the seek bar under it, the lyrics with the room of the
- *  whole height on the right (duets and background vocals have space), the credits and the controls under them. */
+/** Without a Canvas: the cover as tall as the screen on the left, the song in its big size and the seek bar over its
+ *  foot (on a soft shade, so they read on any cover); the lyrics with the whole height on the right (duets and
+ *  background vocals have room), the bars, the credits and the controls under them. */
 @Composable
 private fun LandscapeCover() {
     Row(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
-        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().ambientOut(), contentAlignment = Alignment.Center) {
-            val side = minOf(maxWidth, maxHeight - (if (S.view == "both") 160.dp else 120.dp)).coerceAtLeast(96.dp)
-            Column(Modifier.width(side)) {
-                CoverArt(Modifier.size(side), corner = 16.dp)
-                Spacer(Modifier.height(10.dp))
-                TitleRow(big = false)
+        Box(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true).ambientOut()) {
+            CoverArt(Modifier.fillMaxSize(), corner = 18.dp)
+            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp))
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .35f), Color.Black.copy(alpha = .7f))))
+                .padding(start = 18.dp, end = 18.dp, top = 44.dp, bottom = 6.dp)) {
+                TitleRow(big = true)
                 SeekRow()
-                if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(36.dp))
             }
         }
         Spacer(Modifier.width(20.dp))
@@ -350,6 +352,7 @@ private fun SideColumn(modifier: Modifier, name: Boolean, seek: Boolean = true) 
             if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 8.dp)); AwayNote(Modifier.align(Alignment.Center)) }
             else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false)
         }
+        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(34.dp))
         SongInfo(big = false, toggles = !bars, lyrics = !bars, name = name, seek = seek)
         // the controls in two rows, each its full size (side by side in one row they were too small to hit); they hide
         // after a few seconds, and the lyrics get the room back
@@ -776,6 +779,8 @@ private fun BarButton(k: String, d: Dp) {
             BarIcon(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Remove from Liked Songs" else "Save to Liked Songs", liked, d,
                 enabled = sp && Spotify.meta?.ep == false) { Spotify.toggleLike() }
         }
+        "addlyr" -> BarIcon(Icons.AutoMirrored.Rounded.NoteAdd, "Add a lyrics file for this song", false, d) { FilePicker.lyrics?.invoke(true) }
+        "songs" -> BarIcon(Icons.Rounded.LibraryMusic, "Play songs from your phone", false, d) { FilePicker.pickAudio() }
         "none" -> Spacer(Modifier.size(d))
         else -> BarIcon(VIcons.resync, "Resync the lyrics", false, d) { Lyr.resync() }
     }

@@ -32,6 +32,7 @@ private fun navLang(): String {
 
 object Defaults {
     val S: Map<String, Any> = linkedMapOf(
+        "lstyle" to "spicy",    // the lyrics' style: spicy, simple (lsimple) or focus (xFocus), one of them (kept in step)
         "bridge" to true, "xFocus" to false, "bgStyle" to "dynamic", "lfont" to "vv", "lsimple" to false, "lminimal" to false,
         "lhover" to true, "lduet" to true, "lcredLast" to false, "lsmooth" to true, "learly" to false, "learlyMs" to 250,
         "lseekFade" to true, "lnotice" to true, "aRestCover" to true, "aPreload" to true, "aCoverLine" to true, "volshow" to true, "fpscap" to "60", "credPos" to "corner", "cvNoArt" to false, "cvBlur" to false, "cvBlurAmt" to 50, "cvShrink" to true, "cvSpicy" to true, "cvBehind" to "dark",
@@ -112,7 +113,12 @@ class Settings(ctx: Context) {
             if (s("aDesign") == "oneui") v.getValue("aDesign").value = "glass"
             sp.edit().putString("S", toJson().toString()).putInt("mig", 2).apply()
         }
+        v.getValue("lstyle").value = style()   // from Simple lyrics mode and Focus mode as they are (older settings, a backup)
     }
+
+    /** The lyrics' style as Simple lyrics mode and Focus mode make it (Focus wins when both were on). */
+    private fun style() = if (b("xFocus")) "focus" else if (b("lsimple")) "simple" else "spicy"
+    private var syncing = false
 
     operator fun get(k: String): Any = v[k]?.value ?: Defaults.S.getValue(k)
     fun b(k: String): Boolean = get(k) as Boolean
@@ -128,6 +134,9 @@ class Settings(ctx: Context) {
         st.value = x
         persist()
         onChange?.invoke(k)
+        // Settings → Lyrics → Lyrics style is Simple lyrics mode and Focus mode as one choice: kept in step both ways
+        if (k == "lstyle" && !syncing) { syncing = true; set("xFocus", x == "focus"); set("lsimple", x == "simple"); syncing = false }
+        else if ((k == "lsimple" || k == "xFocus") && !syncing) { syncing = true; set("lstyle", style()); syncing = false }
     }
 
     fun reset(k: String) = set(k, Defaults.S.getValue(k))
