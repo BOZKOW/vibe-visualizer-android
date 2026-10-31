@@ -154,8 +154,8 @@ class Page(val id: String, val name: String, val icon: ImageVector, val items: L
 private val pct: (Int) -> String = { "$it%" }
 
 /** What the buttons under the controls can be (PlayerScreen's BarButton). */
-private val BAR_CHOICES = listOf("lyrics" to "Lyrics", "where" to "Where it plays (Spotify) / what the bars hear", "audio" to "What the bars hear",
-    "viz" to "Visualizer", "resync" to "Resync the lyrics", "timing" to "Lyrics timing", "tr" to "Translate", "rom" to "Romanize",
+private val BAR_CHOICES = listOf("where" to "Where it plays (Spotify) / what the bars hear", "audio" to "What the bars hear",
+    "bars" to "The bars on or off", "resync" to "Resync the lyrics", "timing" to "Lyrics timing", "tr" to "Translate", "rom" to "Romanize",
     "canvas" to "Canvas on or off", "like" to "Like (Spotify)", "none" to "Nothing")
 
 private fun pages(): List<Page> = listOf(
@@ -233,7 +233,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("bridge", "Vibe Bridge", "Bars from the device that plays the music, through your server: it hears everything that device plays, the Spotify app included."),
         Item.Custom("bridge status") { Hint(if (!S.b("bridge")) "Off." else if (Audio.bridgeOn) "Connected through your server" + (Audio.bridge.device.takeIf { it.isNotEmpty() }?.let { " · listening to $it" } ?: "") + "." else "Not connected. Start Vibe Bridge with --server ${Server.base?.removePrefix("https://") ?: "<your server>"} on the device that plays the music.") },
         Item.Sub("Where"),
-        Item.Custom("Bars in every view under the cover and the lyrics") { SwitchRow("Bars in every view", "Under the cover and the lyrics too, not only on the Visualizer screen.", S.view == "both") { S.set("view", if (it) "both" else "lyrics") } },
+        Item.Custom("Bars under the lyrics and the cover") { SwitchRow("The bars", "A strip of bars moving with the music, under the lyrics (and the cover when a song has none). Off: only the cover and the lyrics.", S.view == "both") { S.set("view", if (it) "both" else "lyrics") } },
         Item.Sub("Movement"),
         Item.Sw("auto", "Auto sensitivity"),
         Item.Sl("boost", "Sensitivity / boost", 30, 300),

@@ -460,7 +460,14 @@ class LyricsRenderer {
         // the small window can keep the line being sung just under its top, the room going to the lines coming next
         // (Spicy Lyrics Mobile 0.17)
         var y = if (lineAtTop()) hh * .06f - el.top else hh * .38f - (el.top + el.h / 2)
-        val top = if (lineAtTop()) hh * .06f else hh * .16f; if (el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
+        // two lines sung at once (a duet, or lines whose times overlap, as some Spicy Lyrics syncs have): both in view,
+        // the pair around the middle; too tall for that, lower, so more of the earlier one stays (the newer one whole)
+        val first = lAct.minOrNull()?.takeIf { it < el.i && !S.xFocus && !lineAtTop() }?.let { k -> lv.firstOrNull { it.i == k } }
+        if (first != null) {
+            val top0 = first.top; val bot = el.top + el.h
+            y = if (bot - top0 <= hh * .64f) hh * .46f - (top0 + bot) / 2 else max(y, hh * .8f - bot)
+        }
+        val top = if (lineAtTop()) hh * .06f else hh * .16f; if (first == null && el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
         setLyY(fitLine(el, y, pos), t)
     }
 

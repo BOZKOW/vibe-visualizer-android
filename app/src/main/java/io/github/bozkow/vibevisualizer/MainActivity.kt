@@ -215,9 +215,7 @@ class MainActivity : ComponentActivity() {
             KeyEvent.KEYCODE_R -> { toggleRom(); true }
             KeyEvent.KEYCODE_RIGHT_BRACKET -> { Lyr.nudge(100); true }
             KeyEvent.KEYCODE_LEFT_BRACKET -> { Lyr.nudge(-100); true }
-            KeyEvent.KEYCODE_1 -> { E.show("viz"); true }
-            KeyEvent.KEYCODE_2 -> { E.show("lyrics"); true }
-            KeyEvent.KEYCODE_3 -> { E.show("player"); true }
+            KeyEvent.KEYCODE_1 -> { S.set("view", if (S.view == "both") "lyrics" else "both"); true }   // the bars on or off
             KeyEvent.KEYCODE_DPAD_UP -> { E.nudgeVol(5); true }
             KeyEvent.KEYCODE_DPAD_DOWN -> { E.nudgeVol(-5); true }
             KeyEvent.KEYCODE_DPAD_RIGHT -> { if (E.src == "file") { Local.seek((Local.positionMs() + 5000).toLong()); true } else false }

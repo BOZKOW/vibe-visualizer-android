@@ -59,7 +59,9 @@ object E {
     var visible = false                            // the activity is on screen (or in picture-in-picture)
         private set
     var inPip by mutableStateOf(false)
-    var screen by mutableStateOf("player")         // the music app's screens: player (Now Playing) | lyrics | viz
+    // one screen since 0.38.0: the cover, the lyrics and the bars together (the big cover when a song has none); the
+    // Now Playing and Visualizer screens are gone. Kept as a value for what reads it
+    var screen by mutableStateOf("lyrics")
     var wide by mutableStateOf(false)               // side by side (landscape, tablets): the lyrics are always on screen
     var uiHidden by mutableStateOf(false)
     var wakeTap = false                            // this touch only brought the controls back
@@ -537,7 +539,7 @@ object E {
         else if (uiHidden && !can) uiHidden = false
     }
 
-    fun show(s: String) { if (screen != s) screen = s; poke() }
+    @Suppress("UNUSED_PARAMETER") fun show(s: String) { poke() }   // (one screen: a shortcut or a key just wakes it)
     fun lyricsVisible() = inPip || (ambient && S.b("aAmbLyrics")) || ((wide || screen == "lyrics") && (settingsPage == null || !S.low) && !wizard)   // they go on under Settings' blur   // they go on behind Settings' blur
     fun goHome() { settingsPage = null; screen = "player" }
 
