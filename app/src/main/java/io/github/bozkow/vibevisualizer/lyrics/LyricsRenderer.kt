@@ -40,6 +40,9 @@ import kotlin.math.sin
  *  translation under them), with its classes (active, sung, distance, Focus mode) as states that glide like its CSS
  *  transitions, and the Spicy Lyrics word animation. Each line is drawn into its own GPU layer, so lines that don't
  *  change cost nothing but moving and blurring that layer. */
+/** A break this long (s) has no dots: the cover takes its place with the Focus style (restAt's 10 s). */
+const val LONG_BREAK = 10.0
+
 class LyricsRenderer {
     /* ================= model ================= */
     inner class Lt(val ch: String, val ts: TS) { var dx = 0f; var w = 0f; var sp: Springs? = null }
@@ -65,6 +68,8 @@ class LyricsRenderer {
     }
     inner class LV(val i: Int, val l: Line) {
         val dots = l.dots
+        /** A break of 10 s or more: no dots (as Spicy Lyrics), the cover in its place with the Focus style. */
+        val longBreak = l.dots && (l.end ?: 0.0) - (l.t ?: 0.0) >= LONG_BREAK
         val opp = l.opp
         val rows = ArrayList<Row>()
         var mainTs: List<TS>? = null
@@ -333,7 +338,7 @@ class LyricsRenderer {
         var y = 0f
         for (d in lv) {
             d.h = when {
-                d.dots -> if (d.a) d.hText else 0f
+                d.dots -> if (d.a && !d.longBreak) d.hText else 0f
                 S.xBgPop && !isStatic && d.bgH > 0 -> d.hText - d.bgH * (1 - d.bgOpen.value(now))
                 else -> d.hText
             }
@@ -352,10 +357,12 @@ class LyricsRenderer {
         var p = a; while (p >= 0 && lines[p].dots) p--
         var n = a + 1; while (n < lines.size && (lines[n].dots || lines[n].t == null)) n++
         val next = lines.getOrNull(n)?.t ?: durFn?.invoke()?.takeIf { it > 0 } ?: return false
-        if (pos >= next - 2) return false
+        // the cover goes 2 s before the next line, so it's there when it's sung; the Focus style brings a line in only
+        // just before it's sung, so the cover stays until then (it left an empty screen in between)
+        if (pos >= next - (if (S.xFocus) .6 else 2.0)) return false
         var end = if (p < 0) 0.0 else lineEnd(lines[p]) ?: lines.getOrNull(p + 1)?.takeIf { it.dots }?.t ?: return false
         for (k in max(0, p - 6) until max(p, 0)) if (!lines[k].dots) lineEnd(lines[k])?.let { if (it > end) end = it }   // a duet's line still going
-        return pos >= end && next - end >= 10
+        return pos >= end && next - end >= LONG_BREAK
     }
 
     fun frame(t: Double, pos: Double, viewOn: Boolean) {
@@ -383,7 +390,10 @@ class LyricsRenderer {
                 val l = lines[k]; val nx = lines.getOrNull(k + 1)
                 if (l.dots) return nx?.t?.minus(.2) ?: (l.t ?: 0.0)
                 val end = lineEnd(l) ?: nx?.t ?: Double.POSITIVE_INFINITY
-                return if (nx != null && !nx.dots && nx.t != null) max(end, nx.t!! - .2) else end
+                // a long break after it, without the cover to take its place: the line stays until the next one
+                val longNext = nx != null && nx.dots && (nx.end ?: 0.0) - (nx.t ?: 0.0) >= LONG_BREAK && !S.b("aRestCover")
+                val after = if (longNext) lines.getOrNull(k + 2) else nx
+                return if (after != null && !after.dots && after.t != null) max(end, after.t!! - .2) else end
             }
             var f = findIdx(lines, pos + .2); while (f > 0 && en(f - 1) > pos) f--
             fi = f; fo = f >= 0 && pos >= en(f); si = max(f, 0)
@@ -448,15 +458,15 @@ class LyricsRenderer {
             else if (d.fu) { op = 0f; bl = .35f; y = -.34f * screenH; dO = 450.0; dB = 450.0; dT = 600.0; eT = Ease.fuMove }
             else if (d.fn) { op = if (d.fs) 1f else .5f; bl = if (d.fs) 0f else .125f }
             else { op = 0f; bl = .35f; y = .6f * screenH; if (duet) x = if (d.opp) .06f * screenW else -.06f * screenW }
-            if (d.dots && !d.fv) op = 0f   // a break's dots only while it's the one in focus
+            if (d.dots && (!d.fv || d.longBreak)) op = 0f   // a break's dots only while it's the one in focus (a long one has none)
         }
-        if (d.dots && !focus) op = if (d.a) 1f else 0f
+        if (d.dots && !focus) op = if (d.a && !d.longBreak) 1f else 0f
         if (free) { bl = 0f; if (!d.a && !d.fv) op = .55f; y = 0f; x = 0f; dO = 300.0 }
         d.opacity.set(op, t, if (d.dots) 140.0 else dO, eO)
         d.blur.set(bl, t, dB, eB)
         d.fy.set(y, t, dT, eT); d.fx.set(x, t, dT, eT)
         if (S.xBgPop) d.bgOpen.set(if (d.a) 1f else 0f, t, 500.0, Ease.eOut) else d.bgOpen.snap(1f)
-        if (d.dots) d.dotOp.set(if (d.a) 1f else 0f, t, 140.0, Ease.linear)
+        if (d.dots) d.dotOp.set(if (d.a && !d.longBreak) 1f else 0f, t, 140.0, Ease.linear)
     }
 
     /* ---- where the lyrics sit (place / fitLine) ---- */
