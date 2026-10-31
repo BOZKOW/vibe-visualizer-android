@@ -333,7 +333,7 @@ class LyricsRenderer {
         var y = 0f
         for (d in lv) {
             d.h = when {
-                d.dots -> if (d.a && !S.xFocus) d.hText else 0f
+                d.dots -> if (d.a) d.hText else 0f
                 S.xBgPop && !isStatic && d.bgH > 0 -> d.hText - d.bgH * (1 - d.bgOpen.value(now))
                 else -> d.hText
             }
@@ -376,7 +376,15 @@ class LyricsRenderer {
         var si = if (S.learly && nx?.t != null && pos >= nx.t!! - S.learlyMs / 1000.0) i + 1 else i
         var fi = -2; var fo = false; var fn = ""; var fs = ""
         if (S.xFocus) {   // a line is due on screen 200 ms before it's sung, but the line before holds until it's sung to the end
-            fun en(k: Int): Double { val l = lines[k]; if (l.dots) return l.t ?: 0.0; return lineEnd(l) ?: lines.getOrNull(k + 1)?.t ?: Double.POSITIVE_INFINITY }
+            // a break (its dots) holds until the next line is due, as a line holds until it's sung (it went at once,
+            // and the intro and short breaks were an empty screen)
+            // and a line sung to the end stays until the next one comes in (a short gap with no dots was empty)
+            fun en(k: Int): Double {
+                val l = lines[k]; val nx = lines.getOrNull(k + 1)
+                if (l.dots) return nx?.t?.minus(.2) ?: (l.t ?: 0.0)
+                val end = lineEnd(l) ?: nx?.t ?: Double.POSITIVE_INFINITY
+                return if (nx != null && !nx.dots && nx.t != null) max(end, nx.t!! - .2) else end
+            }
             var f = findIdx(lines, pos + .2); while (f > 0 && en(f - 1) > pos) f--
             fi = f; fo = f >= 0 && pos >= en(f); si = max(f, 0)
             var k = max(f + 1, 0)
@@ -440,7 +448,7 @@ class LyricsRenderer {
             else if (d.fu) { op = 0f; bl = .35f; y = -.34f * screenH; dO = 450.0; dB = 450.0; dT = 600.0; eT = Ease.fuMove }
             else if (d.fn) { op = if (d.fs) 1f else .5f; bl = if (d.fs) 0f else .125f }
             else { op = 0f; bl = .35f; y = .6f * screenH; if (duet) x = if (d.opp) .06f * screenW else -.06f * screenW }
-            if (d.dots) op = 0f
+            if (d.dots && !d.fv) op = 0f   // a break's dots only while it's the one in focus
         }
         if (d.dots && !focus) op = if (d.a) 1f else 0f
         if (free) { bl = 0f; if (!d.a && !d.fv) op = .55f; y = 0f; x = 0f; dO = 300.0 }
@@ -456,10 +464,12 @@ class LyricsRenderer {
         if (lv.isEmpty() || isStatic) return
         tops(t)
         val el = lv.getOrNull(max(if (lsi >= 0) lsi else li, 0)) ?: return
-        val hh = if (S.xFocus && S.view == "both") areaH * .74f - 24 * dens else H   // Focus mode in Both: the same middle as before
+        // (Focus once took .74 of the area with the bars on, for the web app's bars over the lyrics; here they're under
+        // the lyrics' area already, and it put the line near the top)
+        val hh = H
         // the small window can keep the line being sung just under its top, the room going to the lines coming next
         // (Spicy Lyrics Mobile 0.17)
-        var y = if (lineAtTop()) hh * .06f - el.top else hh * .38f - (el.top + el.h / 2)
+        var y = if (lineAtTop()) hh * .06f - el.top else hh * (if (S.xFocus) .44f else .38f) - (el.top + el.h / 2)   // Focus: in the middle
         // two lines sung at once (a duet, or lines whose times overlap, as some Spicy Lyrics syncs have): both in view,
         // the pair around the middle, or in the whole height when it's taller; taller than the view, the newer one whole
         val first = lAct.minOrNull()?.takeIf { it < el.i && !S.xFocus && !lineAtTop() }?.let { k -> lv.firstOrNull { it.i == k } }
