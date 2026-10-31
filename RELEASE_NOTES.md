@@ -1,6 +1,12 @@
-Vibe Visualizer for Android 0.38.3 (beta). Android 12 or newer; it installs over 0.38.2 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.38.4 (beta). Android 12 or newer; it installs over 0.38.3 (Settings → Help & about → Update now).
 
-### Changed
+### Fixed
+
+- **Nothing at the top of a pop-up or of Settings is faded any more until you scroll**: a pop-up's title (Lyrics timing, Make the bars react to…) and the first card in Settings sat in the soft fade that lets things scroll away under the top, so their upper half looked faded. The setup guide too.
+
+## From 0.38.3
+
+#### Changed
 
 - **The pop-ups from the player look like Settings**: Lyrics timing in frosted cards with thin lines between its parts, Play on (where Spotify plays) with each device as a frosted card and the one playing highlighted, What the bars hear with Vibe Bridge in its own card, and the ping meter in a card.
 

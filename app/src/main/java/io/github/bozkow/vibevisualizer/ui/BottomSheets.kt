@@ -89,7 +89,8 @@ fun Sheets() {
     val close = { E.sheet = null; Ping.open = false; E.poke() }
     // the sheet pops out of the button that opened it
     PopSheet(E.sheet, close, if (S.glass) Color(0xFF0E0E14).copy(alpha = .62f) else MaterialTheme.colorScheme.surfaceContainer, glass = S.glass) { s ->
-        Column(Modifier.fillMaxWidth().then(if (S.glass) Modifier.fadeEdges(16.dp, 16.dp) else Modifier).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(bottom = 18.dp).navBarsSpace()) {
+        // at rest nothing sits in the fades (the title's top was faded): the room they take, above and below
+        Column(Modifier.fillMaxWidth().then(if (S.glass) Modifier.fadeEdges(16.dp, 16.dp) else Modifier).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(top = 12.dp, bottom = 18.dp).navBarsSpace()) {
             when (s) {
                 "audio" -> AudioSheet()
                 "net" -> NetSheet()

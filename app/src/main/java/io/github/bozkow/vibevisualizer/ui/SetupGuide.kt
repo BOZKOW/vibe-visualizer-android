@@ -96,7 +96,7 @@ fun SetupWizard() {
                 TextButton(onClick = done) { Text("Skip setup") }
             }
             AnimatedContent(cur, Modifier.weight(1f), transitionSpec = { (slideInHorizontally { it / 4 } + fadeIn()) togetherWith (slideOutHorizontally { -it / 4 } + fadeOut()) }, label = "wz") { st ->
-                Column(Modifier.fillMaxSize().then(if (S.glass) Modifier.fadeEdges(24.dp, 24.dp) else Modifier).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(Modifier.fillMaxSize().then(if (S.glass) Modifier.fadeEdges(24.dp, 24.dp) else Modifier).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = if (S.glass) 24.dp else 0.dp), horizontalAlignment = Alignment.CenterHorizontally) {   // at rest clear of the fades
                     Column(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
                         when (st) {
                             "welcome" -> Welcome(useFile, useSp, { useFile = it }, { useSp = it })

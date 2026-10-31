@@ -403,7 +403,7 @@ fun SettingsScreen() {
                             colors = if (S.glass) TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
                                 else TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent))
                         if (q.isNotEmpty() && !wide) SearchResults(all, q, Modifier.weight(1f))
-                        else LazyColumn(Modifier.weight(1f).navBarsSpace().fadeEdges(20.dp, 28.dp), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 28.dp)) {
+                        else LazyColumn(Modifier.weight(1f).navBarsSpace().fadeEdges(20.dp, 28.dp), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 28.dp)) {
                             cardPages(all, page, wide) { open(it) }
                         }
                     }
@@ -464,7 +464,7 @@ private fun SearchResults(all: List<Page>, q: String, modifier: Modifier) {
         }.sortedByDescending { it.third }.map { it.first to it.second }
     }
     if (hits.isEmpty()) { Text("No setting matches that.", Modifier.padding(24.dp), color = Color.White.copy(alpha = .6f)); return }
-    LazyColumn(modifier.navBarsSpace().fadeEdges(20.dp, 28.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 40.dp)) {
+    LazyColumn(modifier.navBarsSpace().fadeEdges(20.dp, 28.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 40.dp)) {
         hits.forEach { (p, its) ->
             item(key = "h" + p.id) { Box(Modifier.animateItem()) { CardLabel(Item.Sub(p.name)) } }
             item(key = "c" + p.id) { Box(Modifier.animateItem()) { CardGroup { its.forEachIndexed { i, x -> if (i > 0) CardDivider(); Box(Modifier.padding(horizontal = 18.dp, vertical = 2.dp)) { ItemView(x) } } } } }
@@ -475,7 +475,7 @@ private fun SearchResults(all: List<Page>, q: String, modifier: Modifier) {
 @Composable
 private fun ItemsList(items: List<Item>, modifier: Modifier) {
     val st = rememberLazyListState()
-    LazyColumn(modifier.navBarsSpace().fadeEdges(20.dp, 28.dp), state = st, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 48.dp)) {
+    LazyColumn(modifier.navBarsSpace().fadeEdges(20.dp, 28.dp), state = st, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 48.dp)) {
         cardItems(items)
     }
 }
