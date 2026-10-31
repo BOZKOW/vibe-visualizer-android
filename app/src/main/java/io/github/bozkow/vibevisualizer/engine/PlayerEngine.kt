@@ -102,6 +102,9 @@ object E {
     fun snack(n: Snack) {
         if (notes.any { it.msg == n.msg }) return
         notes.add(n); while (notes.size > 4) notes.removeAt(1)
+        // good news (white: up to date, in sync, copied…) goes by itself after 5 s, its button unpressed; red and
+        // yellow ones stay until OK
+        if (n.kind == "ok" && n.action == null) Vibe.scope.launch { delay(5000); noteDone(n, false) }
     }
 
     /** A one-off error or warning is done: its button was pressed, or its time is up. */
