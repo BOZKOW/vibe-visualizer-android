@@ -1,16 +1,27 @@
-Vibe Visualizer for Android 0.38.0 (beta). Android 12 or newer; it installs over 0.37.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.38.1 (beta). Android 12 or newer; it installs over 0.38.0 (Settings → Help & about → Update now).
 
-### One screen
+### Notices
+
+- **What's still wrong stays at the top after OK** (no internet, the server or Spotify not answering, a warm phone, lyrics that couldn't load): OK only closes its screen, and it goes once it's solved. A one-off notice still goes with OK.
+- **Animated**: a notice's screen grows out of the notice you tapped and shrinks back into it, its icon pops in and the words, the steps one by one and the buttons follow; the notice gives a little when pressed, and a new one springs in.
+
+### Also
+
+- **The line at the top can be turned off** (Settings → Player screen → The line at the top): where it plays from and on; what's wrong still shows.
+
+## From 0.38.0
+
+#### One screen
 
 - **The cover, the lyrics and the bars are on one screen**: no separate Now Playing (cover only), Lyrics and Visualizer screens any more. The lyrics fill it, the bars move under them, and the cover sits small beside the song's name; a song without lyrics shows the big cover, as before. The bars can be turned off (Settings → Visualizer → The bars, or the bars button).
 - **The buttons under the controls**: the Lyrics and Visualizer buttons are gone (a button you had set to them turns the bars on and off, or opens Lyrics timing); the default row is where it plays, the bars, Lyrics timing and Resync, then Settings. The home screen shortcuts to Lyrics and the Visualizer are gone too.
 
-### On its side
+#### On its side
 
 - **The cover, the song and the seek bar on the left, the lyrics with the whole height on the right**, so duets and background vocals have room; with a Canvas, the song's name and the seek bar are over the Canvas too, and the credits stay with the lyrics. With the bars on, they're under the seek bar.
 - **The controls in two rows, each its full size**: side by side in one row they were too small to hit. They hide after a few seconds and the lyrics get the room back.
 
-### Lyrics
+#### Lyrics
 
 - **Two lines sung at the same time stay in view together** (a duet, or lines whose times overlap, as some Spicy Lyrics syncs have): the pair sits around the middle, and when they're too tall for that, the newer one stays whole with as much of the earlier one as fits.
 

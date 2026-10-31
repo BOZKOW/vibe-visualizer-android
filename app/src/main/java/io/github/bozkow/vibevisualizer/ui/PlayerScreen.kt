@@ -435,7 +435,7 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
     val devIcon = when (E.src) { "spotify" -> sd?.let { deviceIcon(it.type) }; "file" -> Icons.AutoMirrored.Rounded.QueueMusic; else -> null }
     Column(modifier.fillMaxWidth().reportTop()) {
         // the status bar hidden: the line goes up where it was, either side of the camera, and takes no room here
-        if (side) {
+        if (side && S.b("aTopLine")) {
             // on its side, one line with room for the words: "PLAYING FROM SPOTIFY ON <DEVICE>"
             val one = when (E.src) {
                 "spotify" -> "PLAYING FROM SPOTIFY" + (if (sd != null) " ON $dev" else if (dev.isNotEmpty()) " · $dev" else "")
@@ -448,7 +448,7 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
                     TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
                 }
             }
-        } else TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"))
+        } else if (S.b("aTopLine")) TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"))
         NoticeSpace(home, row = side)
     }
 }
@@ -554,12 +554,17 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
             // on frosted glass, as the seek bar's track: a soft white pill with a light edge (no blur of its own: what's
             // under it is the blurred background already); it grows and shrinks to each notice
             val shape = RoundedCornerShape(if (row) 14.dp else 18.dp)
-            // tapped: its detail screen (what's wrong, what to do, OK)
-            Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).clip(shape)
+            // tapped: its detail screen (what's wrong, what to do, OK), growing out of it; pressed, it gives a little
+            val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape)
                 .background(Color.White.copy(alpha = .12f)).border(1.dp, Color.White.copy(alpha = .22f), shape)
-                .quietTouch().clickable { last[0]?.let { E.haptic(); E.noticeOpen = it } }.animateContentSize(tween(260))) {
+                .quietTouch().clickable(press, androidx.compose.material3.ripple()) { last[0]?.let { E.haptic(); E.noticeOpen = it } }
+                .animateContentSize(if (Pop.calm) tween(0) else spring(.8f, Spring.StiffnessMediumLow))) {
                 // a different one cross-fades in; a countdown in the same one just counts
-                AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
+                AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, contentAlignment = Alignment.Center, transitionSpec = {
+                    if (Pop.calm) fadeIn(tween(200)) togetherWith fadeOut(tween(120))
+                    else (fadeIn(tween(260)) + slideInVertically(spring(.7f, Spring.StiffnessMediumLow)) { it / 2 } + scaleIn(spring(.6f, Spring.StiffnessMediumLow), initialScale = .92f)) togetherWith (fadeOut(tween(160)) + scaleOut(tween(160), targetScale = .96f))
+                }, label = "notice") { q ->
                     // words alone, in the middle of the glass: OK and what fixes it are on the screen tapping opens
                     Column(Modifier.padding(horizontal = 16.dp, vertical = if (row) 4.dp else 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }

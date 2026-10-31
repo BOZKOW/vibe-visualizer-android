@@ -90,7 +90,7 @@ object E {
     class Ask(val title: String, val msg: String, val actions: List<Act>)
     /** id: offline | server | spotify | wait (its icon); act: the one thing to do about it */
     /** Something the top of the screen says. [steps]: what to do about it (its detail screen lists them); [ok]: what
-     *  OK does (null: it can't be put away, as an update downloading). */
+     *  OK does besides closing that screen (a one-off notice is put away; null: what's still wrong stays). */
     class Prob(val pr: Int, val k: String, val id: String, val t: String, val s: String, val act: Act? = null, val steps: List<String> = emptyList(), val ok: (() -> Unit)? = null)
     private var noteSeq = 0L
     val snacks = mutableStateListOf<Snack>()       // the first one is on screen, the others wait their turn
@@ -111,11 +111,10 @@ object E {
     }
 
     /** Everything the top of the screen says, most important first (the space under the top line shows them in turn):
-     *  one-off notices (the next one waits its turn), what's wrong until it's solved, a warm phone while it's warm,
-     *  lyrics that couldn't load, and an update on its way. Nothing goes by itself: OK puts it away (a condition comes
-     *  back if it ends and starts again). Tapped, one opens its detail screen: what's wrong, what to do, OK. */
+     *  one-off notices (the next one waits its turn; OK puts one away, it doesn't go by itself), what's wrong until
+     *  it's solved (OK can't put that away), a warm phone while it's warm, lyrics that couldn't load, and an update on
+     *  its way. Tapped, one opens its detail screen: what's wrong, what to do, OK. */
     fun notices(homeScreen: Boolean = false): List<Prob> {
-        noticeVer.intValue
         val out = ArrayList<Prob>()
         notes.firstOrNull()?.let { n ->
             val k = when (n.kind) { "err" -> "err"; "ok" -> "ok"; else -> "wait" }
@@ -134,14 +133,10 @@ object E {
             listOf("Try again, or another source: Settings → Help & about → Last lookup.", "Check which sources are on, and their order: Settings → Lyrics → Sources.")))
         if (Updates.downloading) out.add(Prob(0, "wait", "update", "Downloading the update", (Updates.progress * 100).toInt().toString() + "%",
             steps = listOf("When it's down, Android asks to install it over this version; your settings and saved lyrics stay.")))
-        // what's been put away stays away while it lasts; gone, it may come back next time
-        val keys = out.map { it.id + "|" + it.t }.toSet()
-        acked.retainAll(keys)
-        return out.filter { it.id.startsWith("note") || (it.id + "|" + it.t) !in acked }
-            .map { p -> if (p.ok != null || p.id == "update") p else Prob(p.pr, p.k, p.id, p.t, p.s, p.act, p.steps) { acked.add(p.id + "|" + p.t); noticeVer.intValue++ } }
+        // what's still wrong stays at the top until it's solved: its OK only closes its screen (a one-off notice's OK
+        // puts it away)
+        return out
     }
-    private val acked = HashSet<String>()   // conditions put away with OK (their id and title), while they last
-    private val noticeVer = mutableIntStateOf(0)
 
     /** The notice whose detail screen is open (tapped at the top), or null. */
     var noticeOpen by mutableStateOf<Prob?>(null)

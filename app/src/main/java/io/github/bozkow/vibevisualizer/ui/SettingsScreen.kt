@@ -184,6 +184,8 @@ private fun pages(): List<Page> = listOf(
         Item.Ch("aBar2", "Second button", BAR_CHOICES),
         Item.Ch("aBar3", "Third button", BAR_CHOICES),
         Item.Ch("aBar4", "Fourth button", BAR_CHOICES),
+        Item.Sub("The line at the top"),
+        Item.Sw("aTopLine", "Where it plays from and on", "The line at the top: Spotify (or the music app, or this phone) and the device it plays on. Off, nothing's there; what's wrong still shows."),
         Item.Sub("Song name and seek bar"),
         Item.Ch("aTitle", "Song name size", listOf("s" to "Small", "m" to "Medium", "l" to "Large")),
         Item.Sw("aMarquee", "Scroll long names", "A song name too long for its row scrolls through, fading at the sides. Off, it ends in “…”."),

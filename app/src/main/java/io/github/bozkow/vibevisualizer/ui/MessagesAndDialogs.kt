@@ -2,6 +2,8 @@ package io.github.bozkow.vibevisualizer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.CheckCircleOutline
@@ -179,12 +181,32 @@ fun NoticeDetail() {
     if (!vis.currentState && !vis.targetState) return
     val q = last[0] ?: return
     val close = { E.noticeOpen = null }
+    // it grows out of the notice tapped and shrinks back into it; its parts come in one after another, the icon with
+    // a little bounce (only a fade with animations off)
+    val o = rememberPopOrigin(p != null)
+    val appear = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(0f) }
+    val pop = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(.5f) }
+    androidx.compose.runtime.LaunchedEffect(p != null) {
+        if (p == null) return@LaunchedEffect
+        if (Pop.calm) { appear.snapTo(1f); pop.snapTo(1f); return@LaunchedEffect }
+        appear.snapTo(0f); pop.snapTo(.5f)
+        kotlinx.coroutines.coroutineScope {
+            launch { appear.animateTo(1f, androidx.compose.animation.core.tween(720, easing = androidx.compose.animation.core.LinearEasing)) }
+            launch { kotlinx.coroutines.delay(60); pop.animateTo(1f, androidx.compose.animation.core.spring(.42f, androidx.compose.animation.core.Spring.StiffnessMediumLow)) }
+        }
+    }
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    /** Part [k] of the screen: in after the ones before it, rising a little. */
+    fun Modifier.part(k: Int): Modifier = graphicsLayer {
+        val t = ((appear.value - k * .1f) / .45f).coerceIn(0f, 1f); val e = 1f - (1f - t) * (1f - t) * (1f - t)
+        alpha = e; translationY = (1f - e) * with(d) { 18.dp.toPx() }
+    }
     androidx.compose.animation.AnimatedVisibility(vis, enter = androidx.compose.animation.EnterTransition.None, exit = androidx.compose.animation.ExitTransition.None) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(Modifier.fillMaxSize().animateEnterExit(enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)), exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(220)))
                 .background(Color.Black.copy(alpha = if (E.wizard || E.settingsPage != null) .86f else .62f)).clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) { close() })
             val short = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 520
-            Column(Modifier.animateEnterExit(enter = popIn(androidx.compose.ui.graphics.TransformOrigin.Center, .6f), exit = popOut(androidx.compose.ui.graphics.TransformOrigin.Center, .8f))
+            Column(Modifier.animateEnterExit(enter = popIn(o, .3f), exit = popOut(o, .3f))
                 .statusBarsSpace().navBarsSpace().verticalScroll(rememberScrollState()).padding(if (short) 16.dp else 32.dp).widthIn(max = if (short) 560.dp else 420.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 val tint = when (q.k) { "err" -> Color(0xFFFF5449); "ok" -> Color.White; else -> Color(0xFFFFD27A) }
                 val icon = when (q.id) {
@@ -197,22 +219,25 @@ fun NoticeDetail() {
                     "update" -> androidx.compose.material.icons.Icons.Rounded.Download
                     else -> if (q.k == "err") androidx.compose.material.icons.Icons.Rounded.ErrorOutline else if (q.k == "ok") androidx.compose.material.icons.Icons.Rounded.CheckCircleOutline else androidx.compose.material.icons.Icons.Rounded.Info
                 }
-                Box(Modifier.size(if (short) 56.dp else 96.dp).clip(CircleShape).background(tint.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(if (short) 56.dp else 96.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value; alpha = (pop.value - .5f) * 2f }
+                    .clip(CircleShape).background(tint.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
                     Icon(icon, null, Modifier.size(if (short) 32.dp else 52.dp), tint = tint)
                 }
-                Text(q.t, Modifier.padding(top = if (short) 10.dp else 24.dp), fontSize = if (short) 22.sp else 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
-                if (q.s.isNotEmpty()) Text(q.s, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint, textAlign = TextAlign.Center)
-                if (q.steps.isNotEmpty()) Column(Modifier.padding(top = if (short) 10.dp else 18.dp).fillMaxWidth().glassCard().padding(16.dp)) {
+                Text(q.t, Modifier.part(1).padding(top = if (short) 10.dp else 24.dp), fontSize = if (short) 22.sp else 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
+                if (q.s.isNotEmpty()) Text(q.s, Modifier.part(2).padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint, textAlign = TextAlign.Center)
+                if (q.steps.isNotEmpty()) Column(Modifier.part(3).padding(top = if (short) 10.dp else 18.dp).fillMaxWidth().glassCard().padding(16.dp)) {
                     Text("What to do", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = .6f), letterSpacing = 1.sp)
                     q.steps.forEachIndexed { i, st ->
-                        Row(Modifier.padding(top = 8.dp)) {
+                        // each step after the one before
+                        Row(Modifier.part(4 + i).padding(top = 8.dp)) {
                             Text("${i + 1}", Modifier.width(22.dp), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = tint)
                             Text(st, fontSize = 15.sp, lineHeight = 21.sp, color = Color.White.copy(alpha = .85f))
                         }
                     }
                 }
-                q.act?.let { a -> VButton(onClick = { E.haptic(); close(); a.fn?.invoke() }, Modifier.padding(top = if (short) 14.dp else 24.dp).fillMaxWidth().height(if (short) 46.dp else 54.dp)) { Text(a.label, fontSize = 16.sp) } }
-                VTonalButton(onClick = { E.haptic(); close(); q.ok?.invoke() }, Modifier.padding(top = if (q.act != null) 8.dp else if (short) 14.dp else 24.dp).fillMaxWidth().height(if (short) 44.dp else 50.dp)) { Text("OK", fontSize = 16.sp) }
+                val after = 4 + q.steps.size
+                q.act?.let { a -> VButton(onClick = { E.haptic(); close(); a.fn?.invoke() }, Modifier.part(after).padding(top = if (short) 14.dp else 24.dp).fillMaxWidth().height(if (short) 46.dp else 54.dp)) { Text(a.label, fontSize = 16.sp) } }
+                VTonalButton(onClick = { E.haptic(); close(); q.ok?.invoke() }, Modifier.part(after + 1).padding(top = if (q.act != null) 8.dp else if (short) 14.dp else 24.dp).fillMaxWidth().height(if (short) 44.dp else 50.dp)) { Text("OK", fontSize = 16.sp) }
             }
         }
     }
