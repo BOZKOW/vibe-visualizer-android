@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -99,6 +100,18 @@ fun Sheets() {
     }
 }
 
+/** A group in a sheet, as the cards in Settings: frosted glass in the Glass design. */
+@Composable
+private fun SheetCard(content: @Composable ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(22.dp)
+    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)
+        .then(if (S.glass) Modifier.glass(shape) else Modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)).padding(16.dp), content = content)
+}
+
+/** A thin line between the parts of a card (as in Settings). */
+@Composable
+fun PartDivider() { androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 12.dp), thickness = 1.dp, color = Color.White.copy(alpha = .08f)) }
+
 @Composable
 private fun SheetTitle(t: String, note: String = "") {
     Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
@@ -148,7 +161,8 @@ private fun AudioSheet() {
     opt("mic", Icons.Rounded.Mic, "Microphone", "The sound in the room, for music playing on a speaker nearby.")
     opt("off", Icons.Rounded.VolumeOff, "Nothing on this phone", "Only your own files, and Vibe Bridge, move the bars.")
     if (cur == "phone" && Audio.phone.error != null) Hint("Android didn’t let the app listen: ${Audio.phone.error}. Some phones only allow it while music plays; try again then.")
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(6.dp))
+    SheetCard {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("Vibe Bridge", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
@@ -163,6 +177,7 @@ private fun AudioSheet() {
         Audio.bridgeOn -> "Connected through your server" + (if (b.device.isNotEmpty()) " · listening to ${b.device}" else "") + "."
         else -> "Not connected. On the device that plays the music, start Vibe Bridge with:  vibe-bridge --server ${Server.base?.removePrefix("https://")}  (see the README)."
     })
+    }
     Spacer(Modifier.height(8.dp))
     Text(Audio.labelTip, fontSize = 13.sp, color = Color.White.copy(alpha = .8f))
 }
@@ -187,6 +202,7 @@ private fun NetSheet() {
             Text(v, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White, fontFamily = FontFamily.Monospace)
         }
     }
+    SheetCard {
     if (Server.set) {
         Net.stats["app"].let { n -> if (n == null) row("App server", "nginx on your server · checking…", "–", "") else { val ok = n.status != null && n.status < 500; row("App server", "nginx on your server · " + if (ok) "live" else "not answering", if (ok && n.ms != null) "${n.ms} ms" else "—", if (ok) Ping.lvl(n.ms) else "bad") } }
         Net.stats["helper"].let { n -> if (n == null) row("Server helper", "lyrics, Canvas, settings · checking…", "–", "") else { val ok = n.status != null && n.status < 500; row("Server helper", "lyrics, Canvas, settings · " + if (ok) "live" else "not answering", if (ok && n.ms != null) "${n.ms} ms" else "—", if (ok) Ping.lvl(n.ms) else "bad") } }
@@ -207,6 +223,7 @@ private fun NetSheet() {
     lastRow("lrclib", "LRCLIB", "lyrics", "not used yet")
     if (Server.set) { lastRow("spotifylyr", "Spotify lyrics", "via your server", "not used yet"); lastRow("netease", "NetEase Cloud Music", "via your server", "not used yet") }
     lastRow("google", "Google Translate", "translation & romanization", if (S.tr || S.romMode != "off") "not used yet" else "off")
+    }
     Spacer(Modifier.height(6.dp))
     Hint("Your server is pinged live. Outside services are timed on real requests only, so they show the last one.")
 }
@@ -228,7 +245,7 @@ private fun DevicesSheet(close: () -> Unit) {
         else -> list!!.forEach { d ->
             val icon = deviceIcon(d.type)
             val col = if (d.active) Color(0xFF1ED760) else Color.White
-            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = if (d.active) .08f else .04f))
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).choiceCard(d.active, RoundedCornerShape(18.dp), .04f)
                 .clickable(enabled = !d.restricted) {
                     if (d.active) { close(); return@clickable }
                     switching = d.id
@@ -253,16 +270,17 @@ private fun DevicesSheet(close: () -> Unit) {
 private fun TimingSheet() {
     SheetTitle("Lyrics timing")
     val off = S.loff
-    Text("All songs: " + (if (off > 0) "+" else "") + off + " ms" + if (off > 0) " (earlier)" else if (off < 0) " (later)" else "", fontWeight = FontWeight.Bold, color = Color.White)
-    Hint("Lyrics behind the music? Move them earlier.")
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        VOutlinedButton(onClick = { Lyr.nudge(-100) }) { Text("Later") }
-        Slider(off / 3000f, { S.set("loff", (Math.round(it * 3000 / 50f) * 50)) }, Modifier.weight(1f).padding(horizontal = 10.dp), valueRange = -1f..1f, colors = glassSlider())
-        VOutlinedButton(onClick = { Lyr.nudge(100) }) { Text("Earlier") }
+    SheetCard {
+        Text("All songs: " + (if (off > 0) "+" else "") + off + " ms" + if (off > 0) " (earlier)" else if (off < 0) " (later)" else "", fontWeight = FontWeight.Bold, color = Color.White)
+        Hint("Lyrics behind the music? Move them earlier.")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            VOutlinedButton(onClick = { Lyr.nudge(-100) }) { Text("Later") }
+            Slider(off / 3000f, { S.set("loff", (Math.round(it * 3000 / 50f) * 50)) }, Modifier.weight(1f).padding(horizontal = 10.dp), valueRange = -1f..1f, colors = glassSlider())
+            VOutlinedButton(onClick = { Lyr.nudge(100) }) { Text("Earlier") }
+        }
     }
-    Spacer(Modifier.height(14.dp))
-    TimingParts()
-    if (Desync.stat.isNotEmpty()) { Spacer(Modifier.height(10.dp)); Hint("Desync detection: " + Desync.stat) }
+    SheetCard { TimingParts() }
+    if (Desync.stat.isNotEmpty()) { Spacer(Modifier.height(6.dp)); Hint("Desync detection: " + Desync.stat) }
 }
 
 /** This output's, the music app's and this song's timing, and Resync: in the timing sheet and in Settings → Lyrics
@@ -280,7 +298,7 @@ fun TimingParts() {
             VOutlinedButton(onClick = { Outputs.set(oo + 50) }) { Text("+50 ms") }
             if (oo != 0) VTonalButton(onClick = { Outputs.set(0) }) { Text("Reset") }
         }
-        Spacer(Modifier.height(14.dp))
+        PartDivider()
         // the player app's own (Spicy Lyrics Mobile 0.17)
         PlayerDelays.ver
         if (PlayerDelays.key() != null) {
@@ -292,7 +310,7 @@ fun TimingParts() {
                 VOutlinedButton(onClick = { PlayerDelays.set(po + 50) }) { Text("+50 ms") }
                 if (po != 0) VTonalButton(onClick = { PlayerDelays.set(0) }) { Text("Reset") }
             }
-            Spacer(Modifier.height(14.dp))
+            PartDivider()
         }
         val so = Lyr.songOffMs
         Text("This song: " + (if (so > 0) "+" else "") + so + " ms", fontWeight = FontWeight.Bold, color = Color.White)
@@ -302,7 +320,7 @@ fun TimingParts() {
             VOutlinedButton(onClick = { Lyr.songOffSet(so + 100) }) { Text("+100 ms") }
             if (so != 0) VTonalButton(onClick = { Lyr.songOffSet(0) }) { Text("Reset") }
         }
-        Spacer(Modifier.height(14.dp))
+        PartDivider()
         Row(verticalAlignment = Alignment.CenterVertically) {
             VTonalButton(onClick = { Lyr.resync() }) { Icon(VIcons.resync, null, Modifier.size(18.dp)); HSpace(6.dp); Text("Resync now") }
             Spacer(Modifier.width(12.dp))
