@@ -1,0 +1,727 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Status updates | Spicy Lyrics</title>
+    <description>Incidents and maintenance reported on status page for Spicy Lyrics</description>
+    <link>https://status.spicylyrics.org/</link>
+    <image>
+      <url>https://d1lppblt9t2x15.cloudfront.net/logos/973910d1171d3e686b06416af0703a7e.png</url>
+      <title>Status updates | Spicy Lyrics</title>
+      <link>https://status.spicylyrics.org/</link>
+    </image>
+    <language>en</language>
+    <atom:link rel="self" type="application/rss+xml" href="https://status.spicylyrics.org/feed"/>
+    <item>
+      <title>Maintenance: Unison EU SLNode Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1109606</link>
+      <pubDate>Sat, 31 Oct 2026 16:48:32 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1109606#461e70eac53f6fbcc1b836f3730ef48dd9c97a4c76e3cc50d8018e790a0f772e</guid>
+      <category>Maintenance</category>
+      <description>Maintenance completed</description>
+    </item>
+    <item>
+      <title>Maintenance: Unison EU SLNode Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1109606</link>
+      <pubDate>Sat, 31 Oct 2026 16:48:32 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1109606#c54dfb87219be208538f53b6b91783f0aeb3327c07a4186d2c5f175c99439a12</guid>
+      <category>Maintenance</category>
+      <description>Maintenance has been completed.</description>
+    </item>
+    <item>
+      <title>Maintenance: Unison EU SLNode Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1109606</link>
+      <pubDate>Sat, 31 Oct 2026 15:15:32 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1109606#d7d5253326162eb8fd1b950d8b071a7006da1d89602d3ab530cff351efbbd685</guid>
+      <category>Maintenance</category>
+      <description>Our Unison EU SLNode will not be available during this duration of time. Requests will fall back to the US node, service will not be impacted.</description>
+    </item>
+    <item>
+      <title>Scheduled maintenance: Generic Backend Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1109186</link>
+      <pubDate>Sat, 31 Oct 2026 00:36:51 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1109186#db78ace9ff430885aa1a27ac1a47f6034afc3a5c2749c5266ebef6f9a90ff6e7</guid>
+      <category>Maintenance</category>
+      <description>Generic maintenance of Spicy Lyrics' backend services. Spicy Lyrics will be unavailable during this period, including the main API, developer API, website, Developers Platform, Application Portal, Discord bot. This partially excludes mobile Canvas APIs and Unison SLNodes.</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance: Security Updates</title>
+      <link>https://status.spicylyrics.org/maintenance/1100888</link>
+      <pubDate>Fri, 23 Oct 2026 23:52:31 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1100888#ee9e4c671c8cb6d60d5b805b86008cdb15c2e300bdb2938924c0d80e0c15f913</guid>
+      <category>Maintenance</category>
+      <description>Maintenance completed</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance: Security Updates</title>
+      <link>https://status.spicylyrics.org/maintenance/1100888</link>
+      <pubDate>Fri, 23 Oct 2026 23:30:45 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1100888#9f3c19c48c441af39d2224fb7dc3d7f3876c57ce30c7f116803c80fc89f85de2</guid>
+      <category>Maintenance</category>
+      <description>We're applying security updates to the server that hosts the Guides Platform, including a kernel update and reboot. The Guides may be briefly unavailable during this window.</description>
+    </item>
+    <item>
+      <title>Maintenance: Generic Backend Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1087426</link>
+      <pubDate>Wed, 14 Oct 2026 19:15:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1087426#48e54ca4ea2dbccfeaad378af0ce2af7fad14434777a999aaf703e15298a4f1e</guid>
+      <category>Maintenance</category>
+      <description>Maintenance completed</description>
+    </item>
+    <item>
+      <title>Maintenance: Generic Backend Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1087426</link>
+      <pubDate>Wed, 14 Oct 2026 19:15:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1087426#b9c474864f9082afcbe2031e23aceea5d193d48e7c69a6f072dc66dc4aedadae</guid>
+      <category>Maintenance</category>
+      <description>Maintenance done. Spicy Lyrics is now fully back up and our services are available. Thanks for your patience</description>
+    </item>
+    <item>
+      <title>Maintenance: Generic Backend Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1087426</link>
+      <pubDate>Sun, 11 Oct 2026 16:11:35 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1087426#b9f3eb41fff4f8526f7d9509b8e48b0f4ff4fb3600bde17b3ab9e06b7387a978</guid>
+      <category>Maintenance</category>
+      <description>Generic maintenance of Spicy Lyrics' backend services. Spicy Lyrics will be unavailable during this period, including the main API, developer API, website, Developers Platform. This excludes the Guides Platform, bproxy routes, and edge services.</description>
+    </item>
+    <item>
+      <title>API is experiencing issues</title>
+      <link>https://status.spicylyrics.org/incident/1074852</link>
+      <pubDate>Sat, 26 Sep 2026 22:00:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1074852#bdcfbe46ae2644bdab62294a5a4fc9070dbfd30a910e472f7c39f2d3f949b1b7</guid>
+      <category>Incident</category>
+      <description>We're fully back up</description>
+    </item>
+    <item>
+      <title>API is experiencing issues</title>
+      <link>https://status.spicylyrics.org/incident/1074852</link>
+      <pubDate>Sat, 26 Sep 2026 21:35:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1074852#9162fae2b3c515bc92664217bfe45c20cd6276f84c229bebdef3ba5c274df141</guid>
+      <category>Incident</category>
+      <description>We're seeing great recovery. We're actively monitoring our services closely.</description>
+    </item>
+    <item>
+      <title>API is experiencing issues</title>
+      <link>https://status.spicylyrics.org/incident/1074852</link>
+      <pubDate>Sat, 26 Sep 2026 21:05:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1074852#3c2dc3cb750f81897a7f5c1706c0dd010f9fcb7688333f038c18cddfaf617fd0</guid>
+      <category>Incident</category>
+      <description>We've applied fixes that improved service availability. We're still closely monitoring it.</description>
+    </item>
+    <item>
+      <title>API is experiencing issues</title>
+      <link>https://status.spicylyrics.org/incident/1074852</link>
+      <pubDate>Sat, 26 Sep 2026 20:54:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1074852#b2840c6c08534eca494ca53703663b1ef1b73994d818092ccb35bbaf7875d97e</guid>
+      <category>Incident</category>
+      <description>We're noticing failed requests</description>
+    </item>
+    <item>
+      <title>API is experiencing issues</title>
+      <link>https://status.spicylyrics.org/incident/1074852</link>
+      <pubDate>Sat, 26 Sep 2026 20:39:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1074852#8b3581fb81a24250fa9797fd011609e56e71ea1037381c7eef273a818c19f05b</guid>
+      <category>Incident</category>
+      <description>We have fully fixed the issue. Service is operating back as usual.</description>
+    </item>
+    <item>
+      <title>API is experiencing issues</title>
+      <link>https://status.spicylyrics.org/incident/1074852</link>
+      <pubDate>Sat, 26 Sep 2026 20:37:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1074852#27e487e4c4c52e199826e715a9acc9794ebb186c631b85cf8409b60392942573</guid>
+      <category>Incident</category>
+      <description>We have identified the source of the issue. We applied a fix and are seeing recovery.</description>
+    </item>
+    <item>
+      <title>API is experiencing issues</title>
+      <link>https://status.spicylyrics.org/incident/1074852</link>
+      <pubDate>Sat, 26 Sep 2026 20:36:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1074852#9fb62e8a4915853bccebe24de7aab55138665cbc24d519779923432508a86c99</guid>
+      <category>Incident</category>
+      <description>We'll keep you posted</description>
+    </item>
+    <item>
+      <title>Maintenance: Scheduled Guides Platform maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1069114</link>
+      <pubDate>Sat, 19 Sep 2026 21:11:59 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1069114#1bc0a2c9a157bea9af62a76689dd31c8a323d0fb995e322b12eb8986f6bce265</guid>
+      <category>Maintenance</category>
+      <description>Maintenance completed</description>
+    </item>
+    <item>
+      <title>Maintenance: Scheduled Guides Platform maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1069114</link>
+      <pubDate>Sat, 19 Sep 2026 21:11:59 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1069114#62503383aa69a7fc55c39460abb810f28e9fbf0226c923b8b8edc802a1d8d2b0</guid>
+      <category>Maintenance</category>
+      <description>Scheduled maintenance is complete. The Guides Platform has been updated and is operating normally.</description>
+    </item>
+    <item>
+      <title>Maintenance: Scheduled Guides Platform maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1069114</link>
+      <pubDate>Sat, 19 Sep 2026 21:00:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1069114#44ec31be95fc3491c3192e3cf00150225bcb65689a4a8d0e6c6cd41ca1c1afd4</guid>
+      <category>Maintenance</category>
+      <description>The Spicy Lyrics Guides Platform will be temporarily unavailable while routine server maintenance and an Outline update are performed. Other Spicy Lyrics services are not affected.</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1067581</link>
+      <pubDate>Thu, 17 Sep 2026 21:25:29 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1067581#506a675b76e3b23dec22f9e6704d85445f1b51757ad74cfb834343a193f7f279</guid>
+      <category>Maintenance</category>
+      <description>Maintenance completed</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1067581</link>
+      <pubDate>Thu, 17 Sep 2026 21:25:29 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1067581#c7b0042755df5aaf04ce18b7c7879cc081279f247a77c3649144394baa898b73</guid>
+      <category>Maintenance</category>
+      <description>We have found the initial cause, and applied proper fixes. Maintenance is now over, our services are fully available.
+If you're seeing issues with Spicy Lyrics not even being loaded in, please try restarting Spotify now.
+
+Thanks for your patience.</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1067581</link>
+      <pubDate>Thu, 17 Sep 2026 21:20:23 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1067581#799f976fcd3f14c1940f581e57b11d435b95501f215fe3f35a9f8c237130ca9c</guid>
+      <category>Maintenance</category>
+      <description>We're opening traffic back up to our users.</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1067581</link>
+      <pubDate>Thu, 17 Sep 2026 21:11:02 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1067581#2588678b7edd476b15ec56793966909f60c76b8e3ac268b5dccc887555cfaea6</guid>
+      <category>Maintenance</category>
+      <description>A complication has occured. We had to delay the maintenance window by a bit.</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/1067581</link>
+      <pubDate>Thu, 17 Sep 2026 20:41:47 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1067581#509d64cdce5d8cbed56fb518b8e6862ab0fb7c4ef438cfb4915c76318537fb04</guid>
+      <category>Maintenance</category>
+      <description>Server Maintenance of Server 1 (main services). This excludes our guides platform and remaining services hosted on the edge.</description>
+    </item>
+    <item>
+      <title>Maintenance: System-wide improvements of request handling</title>
+      <link>https://status.spicylyrics.org/maintenance/1042069</link>
+      <pubDate>Mon, 31 Aug 2026 00:19:14 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1042069#83db9e49fe2a97acd9045afab599e69cadbffb3930b49204cbdfa29bc74fffab</guid>
+      <category>Maintenance</category>
+      <description>System-wide improvements of request handling</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1038688</link>
+      <pubDate>Sat, 29 Aug 2026 01:26:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1038688#7c489bc9f4f1e8451a7971fabc709189162c38a5a1fec74c064dd8a34a60b0e5</guid>
+      <category>Incident</category>
+      <description>We have now correctly and properly identified the root cause, and made sure the actual fix applied is properly working.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1038688</link>
+      <pubDate>Sat, 29 Aug 2026 01:13:59 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1038688#eb6433b53c39770387617eed0f208db963636345fa1bf4515c7462826d874b9b</guid>
+      <category>Incident</category>
+      <description>API recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1038688</link>
+      <pubDate>Sat, 29 Aug 2026 01:13:26 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1038688#ce265712be8cef552004aee55f808a7a03a938d6e2d544f61f3f0bc13ce80f5c</guid>
+      <category>Incident</category>
+      <description>Web client recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1038688</link>
+      <pubDate>Sat, 29 Aug 2026 01:11:10 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1038688#c4d3c7196f83510973571d010769a88f1a6e40e7a35db1222834c7369719fb65</guid>
+      <category>Incident</category>
+      <description>API and Web client went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1038666</link>
+      <pubDate>Sat, 29 Aug 2026 01:10:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1038666#8500676d15ee3e9cc4a17e0deacec521ef71e8c74432567199325a0b61f44926</guid>
+      <category>Incident</category>
+      <description>We have identified the root cause and applied proper fixes</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1038666</link>
+      <pubDate>Sat, 29 Aug 2026 01:04:59 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1038666#cd9cc2715a2de9b23eaa2c953f0dd81a2bd0646df6c41afbf30bad574ef90df9</guid>
+      <category>Incident</category>
+      <description>Web client went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1038666</link>
+      <pubDate>Sat, 29 Aug 2026 01:04:35 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1038666#3052271a5563c3a26e4528561ee1e817f4062dbb0945cac152f08c780370f556</guid>
+      <category>Incident</category>
+      <description>API went down and Web client recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1038666</link>
+      <pubDate>Sat, 29 Aug 2026 01:04:12 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1038666#e8839bb3244153229c846714a338e7e6f71f60057cdbadc2879a4181259d6997</guid>
+      <category>Incident</category>
+      <description>API recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1038666</link>
+      <pubDate>Sat, 29 Aug 2026 00:56:08 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1038666#2e3513b41b1dddf20cbf2d49c0baea50a0a735919a8bdaecfa64c32c60f372ec</guid>
+      <category>Incident</category>
+      <description>API and Web client went down.</description>
+    </item>
+    <item>
+      <title>Deliberate DDoS attack at one of our public web services</title>
+      <link>https://status.spicylyrics.org/incident/1037898</link>
+      <pubDate>Fri, 28 Aug 2026 23:54:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1037898#79c4f325fea3b58ccfed77415c13f6f1ce43e7b42f443ad5131a5a7011846873</guid>
+      <category>Incident</category>
+      <description>We have fully recovered. Service is operating as normal.</description>
+    </item>
+    <item>
+      <title>Deliberate DDoS attack at one of our public web services</title>
+      <link>https://status.spicylyrics.org/incident/1037898</link>
+      <pubDate>Fri, 28 Aug 2026 19:40:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1037898#e57707f93ec8bed037377ac740821e0adc4f2e78c0112b8e3eca2e0177c426b8</guid>
+      <category>Incident</category>
+      <description>We're seeing recovery in our services and are allowing a percentage of traffic through.</description>
+    </item>
+    <item>
+      <title>Deliberate DDoS attack at one of our public web services</title>
+      <link>https://status.spicylyrics.org/incident/1037898</link>
+      <pubDate>Fri, 28 Aug 2026 18:47:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1037898#4762ac72539b2106fb6cdd3bf80e20ac2c72ce8785cdd5ae1a0dbb25def9f201</guid>
+      <category>Incident</category>
+      <description>We'll be remaining shut down for the next few hours as we find the cause, and find ways to prevent attacks like this happening. We apologize for this decision, but it's the only way to let us test if our fixes are working properly instead of just "waiting for another one"
+
+Spicy Lyrics services will remain unavailable until further notice.</description>
+    </item>
+    <item>
+      <title>Deliberate DDoS attack at one of our public web services</title>
+      <link>https://status.spicylyrics.org/incident/1037898</link>
+      <pubDate>Fri, 28 Aug 2026 17:17:19 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1037898#22ac055acfa9b2cbf961f6941acb6f17d6724a529acd56ba831544f29e81a098</guid>
+      <category>Incident</category>
+      <description>Web client went down.</description>
+    </item>
+    <item>
+      <title>Deliberate DDoS attack at one of our public web services</title>
+      <link>https://status.spicylyrics.org/incident/1037898</link>
+      <pubDate>Fri, 28 Aug 2026 17:16:19 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1037898#58dd611c0b59f04a476c5989a709b4432f1b92feb5f0d879ff3ff2890096c970</guid>
+      <category>Incident</category>
+      <description>API went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036581</link>
+      <pubDate>Thu, 27 Aug 2026 21:24:52 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036581#57f74e1a49aa3e5c1d2e49e7049b40cc131c550a73dbf8c5c7c9c3075a23646b</guid>
+      <category>Incident</category>
+      <description>API recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036581</link>
+      <pubDate>Thu, 27 Aug 2026 21:18:53 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036581#f7c8b2b8a8826ebb6f51c914351d5d3040043f83ea1fd957de72ac1359c43c23</guid>
+      <category>Incident</category>
+      <description>API went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036581</link>
+      <pubDate>Thu, 27 Aug 2026 21:13:15 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036581#3c095794896843ad6e5bf2653daf3e34412d2647705d55092377d47c89ad1836</guid>
+      <category>Incident</category>
+      <description>API and Web client recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036581</link>
+      <pubDate>Thu, 27 Aug 2026 20:53:24 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036581#07afe28c107ac014fd8c97ea165a8f861a88090d5106bc09584bb8615335cca2</guid>
+      <category>Incident</category>
+      <description>API and Web client went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 19:43:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#9c18da2a2fb1a3b3485248426359dea6b4a8763a211a3515487bdd91130f000b</guid>
+      <category>Incident</category>
+      <description>We have identified the root cause, issue resolved.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 19:34:30 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#eca27052c0b5ab7e11b87e01fd7a73f2c2c1b69408b396dd7b2e5a6d80ee35e1</guid>
+      <category>Incident</category>
+      <description>API and Web client recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 19:29:13 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#53fc89ed9273ce593ba8ac3bb700edd81f2c98b40c3cce01352a3f56465f750b</guid>
+      <category>Incident</category>
+      <description>Web client went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 19:28:45 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#3b35aa7f09166f03523b9538b68278e49b2bc69782381e268ba0dae6c73a237b</guid>
+      <category>Incident</category>
+      <description>API went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 19:12:55 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#fb6a484754554f18180dad432801337c0cfdd857f4cf3cc4901671409f2a7ec7</guid>
+      <category>Incident</category>
+      <description>API recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 19:00:52 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#19cdecea902e4c2f1cd396c62f4bbb417d95a0898a4d21ab88f1937e6da9e2ad</guid>
+      <category>Incident</category>
+      <description>API went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 18:58:52 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#69e086168db67b136c52e5dbdb0474ed3fd4c5f88acd1d4fd176ee26293d25e2</guid>
+      <category>Incident</category>
+      <description>Web client recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 18:58:03 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#7424e9a22cf0455f56cf5782f11d834ef57748082dd076125eebb3179f8934d9</guid>
+      <category>Incident</category>
+      <description>API recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 18:49:57 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#aba6cac89fcaed59717ec3dfba016ae22c9edf0318c135625eaa12437dfe793d</guid>
+      <category>Incident</category>
+      <description>Web client went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1036445</link>
+      <pubDate>Thu, 27 Aug 2026 18:49:31 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1036445#1054299a5d19ab6be84d6e74fd1f24d312126660f0055db5c8a90f438104308d</guid>
+      <category>Incident</category>
+      <description>API went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1033082</link>
+      <pubDate>Tue, 25 Aug 2026 21:01:47 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033082#cd9dcda54907bea16e05595ef4e39460c34f9b07a456a9fc2d265fd5a4c7f9f8</guid>
+      <category>Incident</category>
+      <description>Web client recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1033082</link>
+      <pubDate>Tue, 25 Aug 2026 21:01:13 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033082#d2548bce28ea5739c18e76a14e70a14935d1ae3f22dae0016da2e09519cc4bdb</guid>
+      <category>Incident</category>
+      <description>API recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1033082</link>
+      <pubDate>Tue, 25 Aug 2026 20:49:10 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033082#4dd791c33d79c7b92a62515b1d65be5659ade1f306afc0ee44c3089368041cfb</guid>
+      <category>Incident</category>
+      <description>Web client went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1033082</link>
+      <pubDate>Tue, 25 Aug 2026 20:48:45 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033082#cda42649aabba0aa5f6e6f09311aea8c5c9d9bd02eb82d2d84fb7ff3066c3559</guid>
+      <category>Incident</category>
+      <description>API went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1033082</link>
+      <pubDate>Tue, 25 Aug 2026 20:46:11 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033082#94522eeb9dbdc97688b2709574977bd51a81c195bb2bc0fb4955f63baa223996</guid>
+      <category>Incident</category>
+      <description>API and Web client recovered.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1033082</link>
+      <pubDate>Tue, 25 Aug 2026 20:41:04 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033082#772c732bd323528f73193f5b01c155e9054577f343984604d91444796dacdb45</guid>
+      <category>Incident</category>
+      <description>Web client went down.</description>
+    </item>
+    <item>
+      <title>API and Web client are down</title>
+      <link>https://status.spicylyrics.org/incident/1033082</link>
+      <pubDate>Tue, 25 Aug 2026 20:36:51 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033082#b209bfb4e7d18cee67ae1935a246a2c47bb55b746124784bc0e786bf92b501dc</guid>
+      <category>Incident</category>
+      <description>API went down.</description>
+    </item>
+    <item>
+      <title>System-wide downtime</title>
+      <link>https://status.spicylyrics.org/incident/1033016</link>
+      <pubDate>Tue, 25 Aug 2026 20:36:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033016#87cda752cf3e5da9d410dc1789fde5fb31cbd573e34ce73fdf8a2e7f8870fdd1</guid>
+      <category>Incident</category>
+      <description>Issue fully resolved. Our systems are fully restored for usage.</description>
+    </item>
+    <item>
+      <title>System-wide downtime</title>
+      <link>https://status.spicylyrics.org/incident/1033016</link>
+      <pubDate>Tue, 25 Aug 2026 20:15:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033016#726d6dacc111c3625cf222a29ecae8eb798729b6b5b2b7d5737192b5e88cd879</guid>
+      <category>Incident</category>
+      <description>Fixes have been deployed and we are gradually restoring access. We are monitoring the rollout closely and will continue expanding availability as stability is confirmed.</description>
+    </item>
+    <item>
+      <title>System-wide downtime</title>
+      <link>https://status.spicylyrics.org/incident/1033016</link>
+      <pubDate>Tue, 25 Aug 2026 20:00:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033016#8b9bd9a0d36eb477f09d7251429506694fbd89784ddb10c841ba58ee6eddf68a</guid>
+      <category>Incident</category>
+      <description>We have identified the root cause and are applying a patch</description>
+    </item>
+    <item>
+      <title>System-wide downtime</title>
+      <link>https://status.spicylyrics.org/incident/1033016</link>
+      <pubDate>Tue, 25 Aug 2026 19:44:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033016#f94a559a9bb05dae8d577eb6e268919ab71a9494525f62d68d3a1f1b7bafc822</guid>
+      <category>Incident</category>
+      <description>We are investigating the issue</description>
+    </item>
+    <item>
+      <title>System-wide downtime</title>
+      <link>https://status.spicylyrics.org/incident/1033016</link>
+      <pubDate>Tue, 25 Aug 2026 19:38:07 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1033016#5d20d33ed77098018dd58158078d41196a74e464f68d86819288c2616ff970f4</guid>
+      <category>Incident</category>
+      <description>API and Web client went down.</description>
+    </item>
+    <item>
+      <title>Web client is down</title>
+      <link>https://status.spicylyrics.org/incident/1017935</link>
+      <pubDate>Mon, 17 Aug 2026 20:07:42 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1017935#c58c3b0357e1a43bc6e20a3dfd874ccb72c65c8db77a85e020d2010a656b4591</guid>
+      <category>Incident</category>
+      <description>Web client recovered.</description>
+    </item>
+    <item>
+      <title>Web client is down</title>
+      <link>https://status.spicylyrics.org/incident/1017935</link>
+      <pubDate>Mon, 17 Aug 2026 20:07:15 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/1017935#cc431f633dddbca725d8abbdc033762f107a1e42f11ee02fa246d9d27a2be7d0</guid>
+      <category>Incident</category>
+      <description>Web client went down.</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/996804</link>
+      <pubDate>Wed, 05 Aug 2026 11:49:22 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/996804#1ed0305c4818df6714a7df040dc6997f8c46a4f3484505887a4f583e17f24a90</guid>
+      <category>Maintenance</category>
+      <description>Generic Server Maintenance</description>
+    </item>
+    <item>
+      <title>Service-wide outage</title>
+      <link>https://status.spicylyrics.org/incident/973524</link>
+      <pubDate>Wed, 22 Jul 2026 13:16:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/973524#eea625e426f9c2ecfe25b21260ff9682b8c74bfb9d7bd55840bd69f8bc882512</guid>
+      <category>Incident</category>
+      <description>This incident has been resolved. All users now have full access restored.
+If Spicy Lyrics hasn't loaded for you – restart Spotify, that should make it load again. Thanks for your patience.</description>
+    </item>
+    <item>
+      <title>Service-wide outage</title>
+      <link>https://status.spicylyrics.org/incident/973524</link>
+      <pubDate>Wed, 22 Jul 2026 13:05:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/973524#3c73fcffb75b90040cab2dd22e661f7714a76cf31c9360a6edc14f0c70fe7dbc</guid>
+      <category>Incident</category>
+      <description>Multiple regions have had their access restored. We are closely monitoring system resource usage as we restore access to the remaining regions.</description>
+    </item>
+    <item>
+      <title>Service-wide outage</title>
+      <link>https://status.spicylyrics.org/incident/973524</link>
+      <pubDate>Wed, 22 Jul 2026 12:55:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/973524#edc4284695232bbebced222ade0cb5c0a0f3c26f4680299ba462c457335faf02</guid>
+      <category>Incident</category>
+      <description>Fixes have been deployed and we are gradually restoring access. We are monitoring the rollout closely and will continue expanding availability as stability is confirmed.
+
+Access to our webclient at www.spicylyrics.org has been restored for everyone.</description>
+    </item>
+    <item>
+      <title>Service-wide outage</title>
+      <link>https://status.spicylyrics.org/incident/973524</link>
+      <pubDate>Wed, 22 Jul 2026 12:18:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/973524#1387a2e3bc536aa87d678020af1cda4005d5cbca5d1af8fe17441daab41bfa90</guid>
+      <category>Incident</category>
+      <description>We have acknowledged and identified the issue and are working on a fix.</description>
+    </item>
+    <item>
+      <title>Service-wide outage</title>
+      <link>https://status.spicylyrics.org/incident/973524</link>
+      <pubDate>Wed, 22 Jul 2026 12:13:55 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/973524#9a729c74e0c78c6a5c78b7a295353e9ef563c9074741c6fa929a0dd2b32aa4e5</guid>
+      <category>Incident</category>
+      <description>API went down.</description>
+    </item>
+    <item>
+      <title>Service-wide outage</title>
+      <link>https://status.spicylyrics.org/incident/973524</link>
+      <pubDate>Wed, 22 Jul 2026 12:11:15 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/973524#b11dacf717d158aaa67bda71260e8750b7c7cbe282d70e3d3f50726c37cd0f67</guid>
+      <category>Incident</category>
+      <description>Web client went down.</description>
+    </item>
+    <item>
+      <title>Web client is down</title>
+      <link>https://status.spicylyrics.org/incident/968177</link>
+      <pubDate>Sat, 18 Jul 2026 16:51:18 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/968177#b24ab1ab7faf00c2ea7cc5b14d4b133646254a9195bf2f70d50251da5462195e</guid>
+      <category>Incident</category>
+      <description>Web client recovered.</description>
+    </item>
+    <item>
+      <title>Web client is down</title>
+      <link>https://status.spicylyrics.org/incident/968177</link>
+      <pubDate>Sat, 18 Jul 2026 16:46:04 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/968177#cec99896b5d4509287a56be4b68b9433b3e2ea3b043719da2a59cb0ff0aabdb9</guid>
+      <category>Incident</category>
+      <description>Web client went down.</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/944290</link>
+      <pubDate>Sun, 05 Jul 2026 22:59:55 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/944290#611cb7c0e74f4af7a428972464b82bcafe46c71f4fc11f2646f36fec12c168a8</guid>
+      <category>Maintenance</category>
+      <description>Generic Server Maintenance</description>
+    </item>
+    <item>
+      <title>API &amp; Web client &amp; other services are down</title>
+      <link>https://status.spicylyrics.org/incident/934210</link>
+      <pubDate>Wed, 24 Jun 2026 23:30:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/934210#41654a1dfb5427ad2261a70dfdde72be3dd465056da969c8cd64ee7722e53bd8</guid>
+      <category>Incident</category>
+      <description>Issue fully resolved.</description>
+    </item>
+    <item>
+      <title>API &amp; Web client &amp; other services are down</title>
+      <link>https://status.spicylyrics.org/incident/934210</link>
+      <pubDate>Wed, 24 Jun 2026 23:19:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/934210#a42c00e1df4ec64d36163db51a13d4c0d734515212b692c4361c7a378cf477bf</guid>
+      <category>Incident</category>
+      <description>We have identified the root cause and have successfully recovered the API service.</description>
+    </item>
+    <item>
+      <title>API &amp; Web client &amp; other services are down</title>
+      <link>https://status.spicylyrics.org/incident/934210</link>
+      <pubDate>Wed, 24 Jun 2026 23:13:17 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/934210#e9f57b735fd2e1718eb230c6da2445283801d0107e0d4d4163b99a6f17cac7b3</guid>
+      <category>Incident</category>
+      <description>API and Web client went down.</description>
+    </item>
+    <item>
+      <title>Web Client is down</title>
+      <link>https://status.spicylyrics.org/incident/923684</link>
+      <pubDate>Sun, 14 Jun 2026 14:48:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/923684#193ea845fa711b7361534af5c3ed990382486a4d5ab1bfd178ebc260207e7a7c</guid>
+      <category>Incident</category>
+      <description>Issue Fully Resolved</description>
+    </item>
+    <item>
+      <title>Web Client is down</title>
+      <link>https://status.spicylyrics.org/incident/923684</link>
+      <pubDate>Sun, 14 Jun 2026 14:41:00 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/923684#ab4c3e7d0c6b05758405100620e7ef48c0ce2dc0b0798a7823f31f8f25889056</guid>
+      <category>Incident</category>
+      <description>We are working on the issue</description>
+    </item>
+    <item>
+      <title>Maintenance: Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/923675</link>
+      <pubDate>Sun, 14 Jun 2026 14:19:06 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/923675#ebf0fea0fadbb9acd3ca0be2dbd18998780557deaa1b684670508fc83d31c6f5</guid>
+      <category>Maintenance</category>
+      <description>Update of allocated server resources.</description>
+    </item>
+    <item>
+      <title>Maintenance: Server Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/922425</link>
+      <pubDate>Fri, 12 Jun 2026 23:44:35 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/922425#311ab5981a622097887f797ad151122e8cc73860c9e64c42aa8b626d48f62f0a</guid>
+      <category>Maintenance</category>
+      <description>Generic Server Maintenance</description>
+    </item>
+    <item>
+      <title>API is down</title>
+      <link>https://status.spicylyrics.org/incident/908463</link>
+      <pubDate>Sat, 30 May 2026 00:19:03 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/908463#9c0e1aa976ddda910a1a39acf15f3c6c0c99a35963f3a144e9b0e16c3049fb2c</guid>
+      <category>Incident</category>
+      <description>API recovered.</description>
+    </item>
+    <item>
+      <title>API is down</title>
+      <link>https://status.spicylyrics.org/incident/908463</link>
+      <pubDate>Sat, 30 May 2026 00:16:16 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/908463#083b26c61b010fd319d44bbe31ab723b7239a13e6d6584dba56b67986525051d</guid>
+      <category>Incident</category>
+      <description>API went down.</description>
+    </item>
+    <item>
+      <title>Maintenance: General Server Maintenance</title>
+      <link>https://status.spicylyrics.org/maintenance/908449</link>
+      <pubDate>Sat, 30 May 2026 00:05:14 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/908449#923f77b48316d65e50a0c6467026b8808e58029bca9d3d3c72cc74217189e02f</guid>
+      <category>Maintenance</category>
+      <description>General Server Maintenance — Should take &lt;=5 min.</description>
+    </item>
+    <item>
+      <title>Maintenance: Required Server Maintenance done by VPS provider</title>
+      <link>https://status.spicylyrics.org/maintenance/897590</link>
+      <pubDate>Sat, 16 May 2026 21:27:01 -0000</pubDate>
+      <guid isPermaLink="false">https://status.spicylyrics.org/incident/897590#cde3c261af485be78197b927f24636e968092221cf396f5446a8e53bfee58582</guid>
+      <category>Maintenance</category>
+      <description>Required Server Maintenance provided by our VPS provider. We unfortunately don't have control over this.</description>
+    </item>
+  </channel>
+</rss>

@@ -283,9 +283,14 @@ object Spotify {
         val it = d?.optJSONObject("item")
         spxFrom(d)
         if (it == null) {
-            // playing, but nothing Spotify names: an ad, or the DJ talking between songs. What's on screen stays (the
-            // Spotify app's own song, when it's on this phone) instead of "Nothing playing" in between
-            if (d?.optBoolean("is_playing") == true && E.title.isNotEmpty()) { isPlaying = true; E.onSpUpdate(); return }
+            // playing, but nothing Spotify names: the DJ talking between songs (as Spicy Lyrics tells it: a track of an
+            // unknown kind, or the DJ's own playlist), which has no lyrics to show; or an ad, when what's on screen stays
+            // instead of "Nothing playing" in between
+            if (d?.optBoolean("is_playing") == true) {
+                val dj = d.optString("currently_playing_type") == "unknown" || d.optJSONObject("context")?.optString("uri") == DJ_CONTEXT
+                if (dj) { isPlaying = true; spState = null; spId = null; meta = null; E.onSpDj(); return }
+                if (E.title.isNotEmpty()) { isPlaying = true; E.onSpUpdate(); return }
+            }
             spState = null; isPlaying = false
             if (spId != null || E.title.isEmpty()) { spId = null; meta = null; E.spIdle() }
             return
@@ -313,6 +318,8 @@ object Spotify {
         if (appTiming()) SpotifyApp.webPosition(st.progress + if (st.playing) nowT - spFetched else 0.0)
         E.onSpUpdate()
     }
+
+    private const val DJ_CONTEXT = "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"   // Spotify's DJ
 
     /** The Spotify app on this phone plays the song the Web API reported: its timing is used. */
     fun appTiming(): Boolean {

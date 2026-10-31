@@ -173,6 +173,15 @@ object E {
                 listOf("Connect (below) and log in to Spotify.", "Its Client ID is in Settings → Music apps & Spotify.")))
             else if (sp && Spotify.errMsg.isNotEmpty()) out.add(Prob(70, "err", "spotify", "Spotify isn’t answering", Spotify.errMsg.substringBefore(". ").take(90), Act("Try again") { Spotify.poll() },
                 listOf("Spotify may be busy for a moment: the app asks again by itself.", "Try again (below), or check the internet.")))
+            // Spicy Lyrics down or under maintenance (its own status page says so), while it's one of your sources
+            SpicyStatus.now?.takeIf { SpicyStatus.used() }?.let { ev ->
+                val local = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                out.add(Prob(50, "wait", "spicy", if (ev.maint) "Spicy Lyrics is under maintenance" else "Spicy Lyrics is having trouble", ev.name + " · other sources are used meanwhile",
+                    Act("Status page") { runCatching { activity?.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ev.link))) } },
+                    listOfNotNull(ev.text.takeIf { it.isNotEmpty() }?.let { "Spicy Lyrics says: " + it.take(220) },
+                        "Lyrics come from your other sources meanwhile (LRCLIB, NetEase…); their order is in Settings → Lyrics → Sources.",
+                        "Nothing to do: this goes once Spicy Lyrics' status page says all is online again (checked every 10 minutes, last at " + local.format(java.util.Date(SpicyStatus.checkedAt)) + ").")))
+            }
             if (sp && wall() < Spotify.backoff) out.add(Prob(40, "wait", "wait", "Spotify paused requests", "Back in " + clockLeft((Spotify.backoff - wall()) / 1000.0) + (if (homeScreen) "" else " · the lyrics keep running"),
                 steps = listOf("Spotify asked the app to wait: it asks again by itself when the time's up.", "The lyrics keep running meanwhile.")))
         }
@@ -302,7 +311,20 @@ object E {
         Spotify.meta?.let { onSpTrack(it) }
     }
 
+    /** Spotify's DJ talking between songs: nothing to line lyrics up with, as Spicy Lyrics says; they're back with the
+     *  next song (onSpTrack). */
+    private var dj = false
+    fun onSpDj() {
+        if (dj) { updPlay(); return }
+        dj = true; ++coverTok; aheadId = ""; appShown = ""; earlyId = ""
+        Audio.dropBars(); CanvasVideo.clear(false); resetCover()
+        title = "DJ"; artist = "Spotify"; year = ""; status = "Spotify"; trackVer++
+        Lyr.clear("Lyrics aren’t available with the DJ", "The DJ talks between the songs and mixes them together, so there’s nothing to line lyrics up with. They’re back with the next song.", "none")
+        updPlay()
+    }
+
     fun onSpTrack(m: SongMeta) {
+        dj = false
         curArtistId = m.artistId
         Spotify.likeCheck(m)
         // already showing from the Spotify app: no second drop of the bars, no title animating in again, and the cover
@@ -592,6 +614,7 @@ object E {
     private fun uiTick(t: Double) {
         if (t - lastUi < 240) return
         lastUi = t
+        SpicyStatus.tick()
         updPlay()
         val d = curDur(); val c = curTime()
         val tt = fmtTime(c) + " / " + fmtTime(d)

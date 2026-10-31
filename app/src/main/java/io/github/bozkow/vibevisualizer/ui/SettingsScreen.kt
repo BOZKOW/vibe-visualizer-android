@@ -122,6 +122,7 @@ import io.github.bozkow.vibevisualizer.core.Server
 import io.github.bozkow.vibevisualizer.core.Vibe
 import io.github.bozkow.vibevisualizer.engine.Desync
 import io.github.bozkow.vibevisualizer.engine.E
+import io.github.bozkow.vibevisualizer.engine.SpicyStatus
 import io.github.bozkow.vibevisualizer.engine.FilePicker
 import io.github.bozkow.vibevisualizer.engine.Lyr
 import io.github.bozkow.vibevisualizer.engine.Ping
@@ -710,7 +711,16 @@ private fun SpicyStatus() {
     LaunchedEffect(Ping.health) { stat = if (!Server.set) "Needs your server (Help & about → Your server)." else Ping.health?.let { if (it.optBoolean("spicy_key")) "API key saved on your server. Press Test to check it." else "No API key on your server yet. LRCLIB is used meanwhile." } ?: "Your server could not be reached." }
     Column {
         Text(stat, fontSize = 13.5.sp, color = Color.White)
-        Buttons("Test connection" to { Lyr.testSpicy { stat = it } })
+        // Spicy Lyrics' own status page: online, down, under maintenance, and what's planned
+        LaunchedEffect(Unit) { SpicyStatus.fresh() }
+        val fmt = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT) }
+        val st = SpicyStatus.now; val pl = SpicyStatus.planned
+        Text(when { SpicyStatus.checkedAt == 0L -> "Spicy Lyrics’ status: not read yet"
+                st != null -> (if (st.maint) "Spicy Lyrics is under maintenance: " else "Spicy Lyrics is having trouble: ") + st.name
+                else -> "Spicy Lyrics’ status: all services are online" },
+            Modifier.padding(top = 6.dp), fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = if (st != null) Color(0xFFFFD27A) else Color.White.copy(alpha = .85f))
+        if (pl != null) Text("Planned: " + pl.name + if (pl.at > 0) ", " + fmt.format(java.util.Date(pl.at)) else "", fontSize = 13.sp, color = Color.White.copy(alpha = .7f))
+        Buttons("Test connection" to { Lyr.testSpicy { stat = it } }, "Status page" to { openUrl(SpicyStatus.PAGE) })
         Hint("Spicy Lyrics needs your own API key. Create an application in the Spicy Lyrics developer dashboard, copy its secret key (sl_sk_…, shown only once) and save it on your server as config/spicy_key (see the README). It stays there and never reaches the phone.")
         Hint("Every lyric shown credits its source, and community syncs credit their uploader and maker, as the Spicy Lyrics attribution rules require.")
         Row { TextButton(onClick = { openUrl("https://developers.spicylyrics.org/dashboard") }) { Text("Dashboard") }; TextButton(onClick = { openUrl("https://developers.spicylyrics.org/docs/attribution") }) { Text("Attribution rules") } }

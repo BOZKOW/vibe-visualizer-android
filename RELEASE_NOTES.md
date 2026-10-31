@@ -1,11 +1,23 @@
-Vibe Visualizer for Android 0.38.1 (beta). Android 12 or newer; it installs over 0.38.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.38.2 (beta). Android 12 or newer; it installs over 0.38.1 (Settings → Help & about → Update now).
 
-### Notices
+### New
+
+- **Spicy Lyrics' own status**: the app reads Spicy Lyrics' status page (status.spicylyrics.org) every 10 minutes while Spicy Lyrics is one of your sources, and at once when a lookup there fails. When it's down or under maintenance, a notice at the top says so, with its screen telling what's going on and that your other sources are used meanwhile, and a button to the status page. Settings → Server & connection → Spicy Lyrics shows its status and the next planned maintenance, in your time.
+- **Spotify's DJ**: while the DJ talks between songs, the app says "Lyrics aren't available with the DJ" (as Spicy Lyrics does) instead of looking for lyrics; they're back with the next song.
+
+### Changed
+
+- **No small cover beside the song's name** (0.38.0 put one there, and with the cover in a long break there were two).
+- **The notice over Settings has the new look**, the same frosted glass as the player's, words in the middle, tapped for its screen.
+
+## From 0.38.1
+
+#### Notices
 
 - **What's still wrong stays at the top after OK** (no internet, the server or Spotify not answering, a warm phone, lyrics that couldn't load): OK only closes its screen, and it goes once it's solved. A one-off notice still goes with OK.
 - **Animated**: a notice's screen grows out of the notice you tapped and shrinks back into it, its icon pops in and the words, the steps one by one and the buttons follow; the notice gives a little when pressed, and a new one springs in.
 
-### Also
+#### Also
 
 - **The line at the top can be turned off** (Settings → Player screen → The line at the top): where it plays from and on; what's wrong still shows.
 

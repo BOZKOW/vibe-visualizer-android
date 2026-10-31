@@ -479,6 +479,7 @@ object Lyr {
                         note(p, "failed: " + (g.e.message ?: g.e.javaClass.simpleName), g.ms)
                         errs.add(PROVS.getValue(p).name + ": " + (g.e.message ?: "error"))
                         if (p != "local") ladder(p).failure(wall())
+                        if (p == "spicy") SpicyStatus.failed()   // is it them? (their status page)
                     }
                     r != null && SourceParse.placeholder(r.lines) -> { ladder(p).success(); answered = true; note(p, "not found (only a “no lyrics” note)", g.ms) }
                     r != null && r.lines.any { !it.dots } -> {

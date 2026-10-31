@@ -203,7 +203,7 @@ fun SkeletonBar(modifier: Modifier, k: Int = 0, x: Float = rememberSkeletonX()) 
 /** The empty state where the lyrics go: an icon, a few words, and the one thing to do about it (as Android apps do). */
 @Composable
 fun ProblemState(p: E.Prob, modifier: Modifier = Modifier, compact: Boolean = false) {
-    val icon = when (p.id) { "offline" -> Icons.Rounded.CloudOff; "server" -> Icons.Rounded.Dns; "wait" -> Icons.Rounded.HourglassTop; else -> VIcons.spotify }
+    val icon = when (p.id) { "offline", "spicy" -> Icons.Rounded.CloudOff; "server" -> Icons.Rounded.Dns; "wait" -> Icons.Rounded.HourglassTop; else -> VIcons.spotify }
     Column(modifier) { EmptyLines(icon, p.t, p.s, p.act, null, compact, tint = if (p.k == "err") Color(0xFFFFB4AB) else Color(0xFFFFD27A)) }
 }
 

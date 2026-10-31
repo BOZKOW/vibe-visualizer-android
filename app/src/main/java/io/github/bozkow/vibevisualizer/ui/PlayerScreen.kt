@@ -236,7 +236,7 @@ private fun LyricsWithLyrics() {
             }
         }
         if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
-        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true, restCover = rest, thumb = true) }
+        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true, restCover = rest) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
         }
@@ -583,7 +583,7 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
 /** What's wrong, in red (broken) or yellow (waiting), or good news in white: words alone (OK, and what fixes it, are
  *  on its detail screen). In a row on its side, where height is short. */
 @Composable
-private fun NoticeLines(p: E.Prob, row: Boolean = false) {
+fun NoticeLines(p: E.Prob, row: Boolean = false) {
     val tint = when (p.k) { "err" -> Color(0xFFFFB4AB); "ok" -> Color.White; else -> Color(0xFFFFD27A) }   // red broken, white good news, yellow waiting
     val act: @Composable () -> Unit = {}
     if (row) Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
@@ -622,9 +622,9 @@ private fun AwayNote(modifier: Modifier) {
 /** The foot of every portrait screen: the song, the seek bar and where the lyrics are from. They stay when the
  *  controls slide away. */
 @Composable
-private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false, name: Boolean = true, restCover: Boolean = false, seek: Boolean = true, thumb: Boolean = false) {
+private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false, name: Boolean = true, restCover: Boolean = false, seek: Boolean = true) {
     Column(Modifier.fillMaxWidth()) {
-        if (name) TitleRow(big = big, toggles = toggles, thumb = thumb)
+        if (name) TitleRow(big = big, toggles = toggles)
         else if (toggles && (Lyr.needTr || Lyr.needRom)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
             if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
@@ -664,13 +664,11 @@ private fun MoreButton() {
 }
 
 @Composable
-private fun TitleRow(big: Boolean, center: Boolean = false, year: Boolean = false, toggles: Boolean = false, thumb: Boolean = false) {
+private fun TitleRow(big: Boolean, center: Boolean = false, year: Boolean = false, toggles: Boolean = false) {
     val ver = E.trackVer
     val a = remember { Animatable(1f) }
     LaunchedEffect(ver) { if (!S.low && !E.reduceMotion()) { a.snapTo(0f); a.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
     Row(Modifier.fillMaxWidth().graphicsLayer { alpha = a.value; translationY = (1 - a.value) * 10f * density }, verticalAlignment = Alignment.CenterVertically) {
-        // with the lyrics: the cover small beside the song (one screen has it all), unless a Canvas plays without it
-        if (thumb && !(CanvasVideo.cvmode && S.b("cvNoArt"))) { CoverArt(Modifier.size(52.dp), corner = 10.dp); Spacer(Modifier.width(12.dp)) }
         Column(Modifier.weight(1f), horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
             val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
             Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp)

@@ -2,6 +2,8 @@ package io.github.bozkow.vibevisualizer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.rounded.CloudOff
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.width
@@ -81,20 +83,16 @@ fun TopNotes(modifier: Modifier = Modifier) {
     val over = E.settingsPage != null || E.wizard || E.sheet != null
     AnimatedVisibility(cur != null && over && !E.inPip, modifier, enter = slideInVertically { -it } + fadeIn(), exit = slideOutVertically { -it } + fadeOut()) {
         val n = last[0] ?: return@AnimatedVisibility
-        val err = n.kind == "err"
-        // frosted glass: a dark pill that lets a little through (what's under it never shows through its words), lightly
-        // tinted by its kind (red for errors, amber for waits and warnings), lit from the top, with a thin light edge; in
-        // the middle, clear of the close button on either side, its words centred
-        val tint = when (n.kind) { "err" -> Color(0xFFFF6B6B); "warn" -> Color(0xFFFFC857); else -> Color.White }
-        Surface(Modifier.padding(horizontal = 60.dp).widthIn(max = 560.dp), shape = RoundedCornerShape(22.dp), color = Color(0xFF202027).copy(alpha = .9f),
-            contentColor = Color.White, shadowElevation = 8.dp, border = BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .38f), Color.White.copy(alpha = .08f))))) {
-            // words alone, in the middle of the glass; tapped: its detail screen, whose OK puts it away (they no longer
-            // go by themselves)
-            Column(Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = .2f), tint.copy(alpha = .06f))))
-                .clickable { E.haptic(); E.noticeOpen = E.notices().firstOrNull { it.id == "note" + n.id } }
-                .padding(horizontal = 16.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(n.msg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, color = if (err) Color(0xFFFFB4AB) else Color.White)
-            }
+        // the same glass as the player's notices: clear white with a light edge, its words in the middle (the kind's
+        // colour), clear of the close button on either side; tapped, its detail screen, whose OK puts it away
+        val q = E.notices().firstOrNull { it.id == "note" + n.id } ?: E.Prob(0, if (n.kind == "err") "err" else if (n.kind == "ok") "ok" else "wait", "note" + n.id, n.msg, n.sub)
+        val shape = RoundedCornerShape(18.dp)
+        val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        Box(Modifier.padding(horizontal = 60.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape)
+            // more shade than on the player: here it sits over Settings' own words, which mustn't show through
+            .background(Color(0xFF101018).copy(alpha = .8f)).background(GlassFill).border(1.dp, GlassEdge, shape)
+            .clickable(press, androidx.compose.material3.ripple()) { E.haptic(); E.noticeOpen = q }) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) { NoticeLines(q) }
         }
     }
 }
@@ -211,6 +209,7 @@ fun NoticeDetail() {
                 val tint = when (q.k) { "err" -> Color(0xFFFF5449); "ok" -> Color.White; else -> Color(0xFFFFD27A) }
                 val icon = when (q.id) {
                     "offline" -> androidx.compose.material.icons.Icons.Rounded.WifiOff
+                    "spicy" -> androidx.compose.material.icons.Icons.Rounded.CloudOff
                     "server" -> androidx.compose.material.icons.Icons.Rounded.Dns
                     "spotify" -> VIcons.spotify
                     "wait" -> androidx.compose.material.icons.Icons.Rounded.HourglassTop
