@@ -114,6 +114,8 @@ class Settings(ctx: Context) {
             sp.edit().putString("S", toJson().toString()).putInt("mig", 2).apply()
         }
         v.getValue("lstyle").value = style()   // from Simple lyrics mode and Focus mode as they are (older settings, a backup)
+        // the Lyrics and Visualizer buttons are gone with their screens (0.38.0): the bars and Lyrics timing instead
+        for (k in listOf("aBar1", "aBar2", "aBar3", "aBar4")) v.getValue(k).let { st -> when (st.value) { "lyrics" -> st.value = "bars"; "viz" -> st.value = "timing" } }
     }
 
     /** The lyrics' style as Simple lyrics mode and Focus mode make it (Focus wins when both were on). */

@@ -175,7 +175,7 @@ private fun pages(): List<Page> = listOf(
     ), sub = "Design, colours, background", group = 0),
     Page("player", "Player screen", Icons.Rounded.PlayCircle, listOf(
         Item.Sub("Controls"),
-        Item.Ch("uiHide", "Controls while music plays", listOf("idle" to "Hide after a few seconds", "never" to "Always visible"), "While music plays untouched, the controls slide away after a few seconds on every screen (the song and the seek bar stay on Now Playing); a tap brings them back."),
+        Item.Ch("uiHide", "Controls while music plays", listOf("idle" to "Hide after a few seconds", "never" to "Always visible"), "While music plays untouched, the controls slide away after a few seconds (the song, the seek bar and the lyrics stay); a tap brings them back."),
         Item.Ch("aHideSec", "Hide them after", listOf("2" to "2 seconds", "3" to "3 seconds", "5" to "5 seconds", "10" to "10 seconds"), "How long untouched while music plays."),
         Item.Sw("volshow", "Volume slider"),
         Item.Sw("aLike", "Like button", "The heart beside a Spotify song’s name, to save it to your Liked Songs."),
