@@ -84,10 +84,12 @@ object E {
     /* ---- notices: every error and warning at the top, where "Playing from …" goes (one-offs for a few seconds, problems
        until they're solved); good news in a snackbar at the bottom; a dialog only for a question you asked for ---- */
     class Act(val label: String, val pri: Boolean = false, val fn: (() -> Unit)? = null)
-    class Snack(val msg: String, val kind: String = "ok", val action: Act? = null, val long: Boolean = false, val onDismiss: (() -> Unit)? = null) { val id = ++noteSeq }
+    class Snack(val msg: String, val kind: String = "ok", val action: Act? = null, val long: Boolean = false, val onDismiss: (() -> Unit)? = null, val sub: String = "", val steps: List<String> = emptyList()) { val id = ++noteSeq }
     class Ask(val title: String, val msg: String, val actions: List<Act>)
     /** id: offline | server | spotify | wait (its icon); act: the one thing to do about it */
-    class Prob(val pr: Int, val k: String, val id: String, val t: String, val s: String, val act: Act? = null)
+    /** Something the top of the screen says. [steps]: what to do about it (its detail screen lists them); [ok]: what
+     *  OK does (null: it can't be put away, as an update downloading). */
+    class Prob(val pr: Int, val k: String, val id: String, val t: String, val s: String, val act: Act? = null, val steps: List<String> = emptyList(), val ok: (() -> Unit)? = null)
     private var noteSeq = 0L
     val snacks = mutableStateListOf<Snack>()       // the first one is on screen, the others wait their turn
     val notes = mutableStateListOf<Snack>()        // the same for errors and warnings, at the top
@@ -107,24 +109,40 @@ object E {
     }
 
     /** Everything the top of the screen says, most important first (the space under the top line shows them in turn):
-     *  a one-off error (it's gone in a few seconds; the next one waits its turn), what's wrong until it's solved, a warm
-     *  phone while it's warm, lyrics that couldn't load, and an update on its way. */
+     *  one-off notices (the next one waits its turn), what's wrong until it's solved, a warm phone while it's warm,
+     *  lyrics that couldn't load, and an update on its way. Nothing goes by itself: OK puts it away (a condition comes
+     *  back if it ends and starts again). Tapped, one opens its detail screen: what's wrong, what to do, OK. */
     fun notices(homeScreen: Boolean = false): List<Prob> {
+        noticeVer.intValue
         val out = ArrayList<Prob>()
         notes.firstOrNull()?.let { n ->
-            val hard = n.kind == "err"   // a hard error keeps its button; a notice is words alone
-            out.add(Prob(0, if (hard) "err" else if (n.kind == "ok") "ok" else "wait", "note" + n.id, n.msg, "", if (hard) Act(n.action?.label ?: "OK") { noteDone(n, n.action != null) } else null))
+            val k = when (n.kind) { "err" -> "err"; "ok" -> "ok"; else -> "wait" }
+            out.add(Prob(0, k, "note" + n.id, n.msg, n.sub, n.action?.let { a -> Act(a.label) { noteDone(n, true) } }, n.steps) { noteDone(n, false) })
         }
         out.addAll(problems(homeScreen))
         val h = Perf.hot
         if (h > 0 && S.b("perfAsk")) out.add(Prob(0, if (h >= 2) "err" else "wait", "heat", if (h >= 2) "Your phone is hot" else "Your phone is getting warm",
             listOfNotNull(Perf.cause.ifEmpty { null }, if (S.low) "Low performance mode is on" else null).joinToString(" · "),
-            if (S.low || h < 2) null else Act("Low performance mode") { S.set("low", true) }))   // warm is a notice (no button); hot is a hard one
+            if (S.low) null else Act("Turn on Low performance mode") { S.set("low", true) },
+            listOf("Low performance mode keeps it cooler: the moving background and the live blurs rest, and fewer frames are drawn.",
+                "Out of the sun or a tight case, and off the charger for a while, it cools faster.",
+                "This goes by itself once the phone has cooled down.")))
         val m = Lyr.msg
-        if (!homeScreen && m != null && m.err) out.add(Prob(0, "err", "lyrics", m.msg, m.sub, m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull()))
-        if (Updates.downloading) out.add(Prob(0, "wait", "update", "Downloading the update", (Updates.progress * 100).toInt().toString() + "%"))
-        return out
+        if (!homeScreen && m != null && m.err) out.add(Prob(0, "err", "lyrics", m.msg, m.sub, m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull(),
+            listOf("Try again, or another source: Settings → Help & about → Last lookup.", "Check which sources are on, and their order: Settings → Lyrics → Sources.")))
+        if (Updates.downloading) out.add(Prob(0, "wait", "update", "Downloading the update", (Updates.progress * 100).toInt().toString() + "%",
+            steps = listOf("When it's down, Android asks to install it over this version; your settings and saved lyrics stay.")))
+        // what's been put away stays away while it lasts; gone, it may come back next time
+        val keys = out.map { it.id + "|" + it.t }.toSet()
+        acked.retainAll(keys)
+        return out.filter { it.id.startsWith("note") || (it.id + "|" + it.t) !in acked }
+            .map { p -> if (p.ok != null || p.id == "update") p else Prob(p.pr, p.k, p.id, p.t, p.s, p.act, p.steps) { acked.add(p.id + "|" + p.t); noticeVer.intValue++ } }
     }
+    private val acked = HashSet<String>()   // conditions put away with OK (their id and title), while they last
+    private val noticeVer = mutableIntStateOf(0)
+
+    /** The notice whose detail screen is open (tapped at the top), or null. */
+    var noticeOpen by mutableStateOf<Prob?>(null)
 
     /** A short message: errors and warnings at the top, the rest at the bottom. Errors are saved in the error log on
      *  your server too. */
@@ -142,17 +160,24 @@ object E {
         sec.intValue   // re-read every second (countdowns)
         val out = ArrayList<Prob>()
         val sp = Spotify.connected && (homeScreen || src == "spotify")
-        if (!Net.online.value) out.add(Prob(100, "err", "offline", "No internet", "Lyrics and Spotify come back when you’re online."))
+        if (!Net.online.value) out.add(Prob(100, "err", "offline", "No internet", "Lyrics and Spotify come back when you’re online.",
+            steps = listOf("Check that Wi-Fi or mobile data is on, and Airplane mode is off.", "Your own files keep playing, with the lyrics already found; the rest comes back by itself once you're online.")))
         else {
             if (Server.set && Ping.serverDown) out.add(when {
                 Net.privateDns.value -> Prob(90, "err", "server", "Can’t reach your server", "Private DNS is on, and it hides Tailscale names.",
-                    Act("Turn it off") { runCatching { activity?.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) } })
-                !Net.vpn.value -> Prob(90, "err", "server", "Can’t reach your server", "Tailscale isn’t connected.", Act("Open Tailscale") { openTailscale() })
-                else -> Prob(90, "err", "server", "Can’t reach your server", "Check that it’s on.", Act("Try again") { Ping.kick() })
+                    Act("Turn it off") { runCatching { activity?.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) } },
+                    listOf("Open the network settings (Turn it off, below).", "Set Private DNS to Off or Automatic.", "Come back: the app finds your server by itself."))
+                !Net.vpn.value -> Prob(90, "err", "server", "Can’t reach your server", "Tailscale isn’t connected.", Act("Open Tailscale") { openTailscale() },
+                    listOf("Open Tailscale and connect it.", "Come back: the app finds your server by itself."))
+                else -> Prob(90, "err", "server", "Can’t reach your server", "Check that it’s on.", Act("Try again") { Ping.kick() },
+                    listOf("Check that the server is on and its Vibe Visualizer app runs.", "Check that Tailscale is connected on the phone and on the server.", "Try again (below), or Settings → Server & connection → Check the connection."))
             })
-            if (src == "spotify" && !Spotify.connected) out.add(Prob(80, "err", "spotify", "Spotify isn’t connected", "Log in again to follow what you play.", Act("Connect") { spLogin() }))
-            else if (sp && Spotify.errMsg.isNotEmpty()) out.add(Prob(70, "err", "spotify", "Spotify isn’t answering", Spotify.errMsg.substringBefore(". ").take(90), Act("Try again") { Spotify.poll() }))
-            if (sp && wall() < Spotify.backoff) out.add(Prob(40, "wait", "wait", "Spotify paused requests", "Back in " + clockLeft((Spotify.backoff - wall()) / 1000.0) + (if (homeScreen) "" else " · the lyrics keep running")))
+            if (src == "spotify" && !Spotify.connected) out.add(Prob(80, "err", "spotify", "Spotify isn’t connected", "Log in again to follow what you play.", Act("Connect") { spLogin() },
+                listOf("Connect (below) and log in to Spotify.", "Its Client ID is in Settings → Music apps & Spotify.")))
+            else if (sp && Spotify.errMsg.isNotEmpty()) out.add(Prob(70, "err", "spotify", "Spotify isn’t answering", Spotify.errMsg.substringBefore(". ").take(90), Act("Try again") { Spotify.poll() },
+                listOf("Spotify may be busy for a moment: the app asks again by itself.", "Try again (below), or check the internet.")))
+            if (sp && wall() < Spotify.backoff) out.add(Prob(40, "wait", "wait", "Spotify paused requests", "Back in " + clockLeft((Spotify.backoff - wall()) / 1000.0) + (if (homeScreen) "" else " · the lyrics keep running"),
+                steps = listOf("Spotify asked the app to wait: it asks again by itself when the time's up.", "The lyrics keep running meanwhile.")))
         }
         return out.sortedByDescending { it.pr }
     }

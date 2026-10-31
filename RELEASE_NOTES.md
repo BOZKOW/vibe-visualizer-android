@@ -1,9 +1,23 @@
-Vibe Visualizer for Android 0.36.3 (beta). Android 12 or newer; it installs over 0.36.0–0.36.2 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.37.0 (beta). Android 12 or newer; it installs over 0.36.3 (Settings → Help & about → Update now).
 
-### Fixed
+### Notices you can open
+
+- **Tap a notice at the top for its own screen**, as the heat warning has: what's wrong, what to do about it, step by step (no internet, the server or Spotify not answering, Spotify asking to wait, a warm phone, lyrics that couldn't load, an update downloading…), the button that fixes it when there is one, and OK. Tapping it doesn't bring the controls back.
+- **Notices no longer go by themselves**: they stay until you put them away with OK (on their screen). Errors stay in their place with an OK under them; what fixed them before is on their screen. Something that's still wrong after OK (no internet, a warm phone) comes back the next time it happens.
+- **The words sit in the middle of the glass**, with OK under them, at the top of the player and over Settings.
+
+### Also
+
+- **Loading lyrics looks the same everywhere**: under the big cover it showed "Looking for lyrics…" as a plain line; now it's the same as where the lyrics go, a small "Loading lyrics" and a faint line the light runs along (or the same spinner, with the loading skeleton off).
+- **"Playing from" and "Playing on" are in the middle of their sides** again.
+
+## From 0.36.3
+
+#### Fixed
 
 - **Updates found the wrong newest version**: the app took the release published last for the newest, and 0.36.1's finished building after 0.36.2's, so 0.36.2 was never offered. The newest is now the highest version, whenever it was published.
 
+## From 0.36.2
 ## From 0.36.2
 
 #### Changed

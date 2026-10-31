@@ -468,7 +468,7 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
 private object TopArea { var bottom by mutableFloatStateOf(0f) }
 private fun Modifier.reportTop() = onGloballyPositioned { TopArea.bottom = it.positionInWindow().y + it.size.height }
 
-/** Where it plays from at the left edge, the device at the right edge, as a status bar has them. Beside the camera:
+/** Where it plays from at the left, the device at the right, each in the middle of its side. Beside the camera:
  *  drawn up in the hidden status bar's place, level with the camera and clear of it at both sides. */
 @Composable
 private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: ImageVector?, modifier: Modifier, beside: Boolean = false) {
@@ -511,12 +511,12 @@ private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: Im
             layout(cs.maxWidth, 0) { pl.place(-ex, (cy - y0 - pl.height / 2f).roundToInt()) }
         } else Modifier.height(32.dp))
         .graphicsLayer { alpha = if (at == null) 0f else 1f }) {
-        // one at the outer edge of each side (centred in a side, they floated at odd places)
-        AnimatedContent(top to topIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw), contentAlignment = Alignment.CenterStart, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { (t, ic) ->
-            TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic, align = Alignment.CenterStart)
+        // each in the middle of its side
+        AnimatedContent(top to topIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { (t, ic) ->
+            TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic)
         }
-        AnimatedContent(dev to devIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(rx.roundToInt(), 0) }.width(rw), contentAlignment = Alignment.CenterEnd, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { (t, ic) ->
-            if (t.isNotEmpty()) TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic, align = Alignment.CenterEnd)
+        AnimatedContent(dev to devIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(rx.roundToInt(), 0) }.width(rw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { (t, ic) ->
+            if (t.isNotEmpty()) TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic)
         }
     }
 }
@@ -565,11 +565,15 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
             // on frosted glass, as the seek bar's track: a soft white pill with a light edge (no blur of its own: what's
             // under it is the blurred background already); it grows and shrinks to each notice
             val shape = RoundedCornerShape(if (row) 14.dp else 18.dp)
+            // tapped: its detail screen (what's wrong, what to do, OK)
             Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).clip(shape)
-                .background(Color.White.copy(alpha = .12f)).border(1.dp, Color.White.copy(alpha = .22f), shape).animateContentSize(tween(260))) {
+                .background(Color.White.copy(alpha = .12f)).border(1.dp, Color.White.copy(alpha = .22f), shape)
+                .quietTouch().clickable { last[0]?.let { E.haptic(); E.noticeOpen = it } }.animateContentSize(tween(260))) {
                 // a different one cross-fades in; a countdown in the same one just counts
                 AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
-                    Column(Modifier.padding(start = 16.dp, end = if (q?.act != null) 6.dp else 16.dp, top = if (row) 4.dp else 8.dp, bottom = if (row) 4.dp else if (q?.act != null) 2.dp else 8.dp),
+                    val ok = q != null && q.k == "err" && q.ok != null   // an error keeps an OK in its place; notices are words alone
+                    // the same room at both sides: the words in the middle of the glass (OK under them)
+                    Column(Modifier.padding(horizontal = 16.dp).padding(top = if (row) 4.dp else 8.dp, bottom = if (row) 4.dp else if (ok) 2.dp else 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
                 }
             }
@@ -583,13 +587,13 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     }
 }
 
-/** What's wrong, in red (broken) or yellow (waiting), and the one button that fixes it (or OK for a one-off). In a
- *  row on its side, where height is short. */
+/** What's wrong, in red (broken) or yellow (waiting), or good news in white; an error has OK, which puts it away (what
+ *  fixes it is on its detail screen). In a row on its side, where height is short. */
 @Composable
 private fun NoticeLines(p: E.Prob, row: Boolean = false) {
     val tint = when (p.k) { "err" -> Color(0xFFFFB4AB); "ok" -> Color.White; else -> Color(0xFFFFD27A) }   // red broken, white good news, yellow waiting
     val act: @Composable () -> Unit = {
-        p.act?.let { a -> TextButton(onClick = { E.haptic(); a.fn?.invoke() }, Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text(a.label, fontSize = 13.sp, color = tint) } }
+        if (p.k == "err") p.ok?.let { ok -> TextButton(onClick = { E.haptic(); ok() }, Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text("OK", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint) } }
     }
     if (row) Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
         // one text: the title whole first, the detail after it cut short if the row runs out
@@ -1094,6 +1098,18 @@ private fun soloWide() = noLyrics() && E.screen != "viz"
 @Composable
 private fun NoLyricsNote(modifier: Modifier = Modifier) {
     val m = Lyr.msg?.takeIf { !it.err } ?: return   // lyrics that couldn't load are an error: at the top
+    // still looking: as where the lyrics go (the skeleton's label and a line the light runs along, or the spinner)
+    if (m.kind == "load") return Row(modifier.padding(top = 2.dp).heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (S.b("xSkeleton")) {
+            Text("Loading lyrics", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = .5f))
+            Spacer(Modifier.width(12.dp))
+            SkeletonBar(Modifier.weight(1f).height(10.dp))
+        } else {
+            androidx.compose.material3.LoadingIndicator(Modifier.size(24.dp), color = Color.White.copy(alpha = .7f))
+            Spacer(Modifier.width(10.dp))
+            Text(m.msg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
     val act = m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull()
     Row(modifier.padding(top = 2.dp).heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(VIcons.lyrics, null, Modifier.size(16.dp), tint = dim)

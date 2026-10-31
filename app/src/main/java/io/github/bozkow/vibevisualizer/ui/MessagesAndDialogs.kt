@@ -2,6 +2,14 @@ package io.github.bozkow.vibevisualizer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.CheckCircleOutline
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.HourglassTop
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,8 +73,7 @@ private class SnackLook(val s: E.Snack) : SnackbarVisuals {
  *  guide they come down from the top here. */
 @Composable
 fun TopNotes(modifier: Modifier = Modifier) {
-    val cur = E.notes.firstOrNull()
-    LaunchedEffect(cur?.id) { val n = cur ?: return@LaunchedEffect; delay(if (n.kind == "err" && n.action != null) 20000L else if (n.long) 20000L else 15000L); E.noteDone(n, false) }   // long enough to read, also while they take turns
+    val cur = E.notes.firstOrNull()   // it stays until OK (or its detail screen's OK)
     val last = remember { arrayOfNulls<E.Snack>(1) }   // still shown while it slides away
     if (cur != null) last[0] = cur
     val over = E.settingsPage != null || E.wizard || E.sheet != null
@@ -79,12 +86,13 @@ fun TopNotes(modifier: Modifier = Modifier) {
         val tint = when (n.kind) { "err" -> Color(0xFFFF6B6B); "warn" -> Color(0xFFFFC857); else -> Color.White }
         Surface(Modifier.padding(horizontal = 60.dp).widthIn(max = 560.dp), shape = RoundedCornerShape(22.dp), color = Color(0xFF202027).copy(alpha = .9f),
             contentColor = Color.White, shadowElevation = 8.dp, border = BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .38f), Color.White.copy(alpha = .08f))))) {
-            Row(Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = .2f), tint.copy(alpha = .06f)))).heightIn(min = 44.dp)
-                .padding(start = 16.dp, end = if (err) 4.dp else 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(n.msg, Modifier.weight(1f, fill = false).padding(vertical = 8.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-                if (err) TextButton(onClick = { E.haptic(); E.noteDone(n, n.action != null) }) {   // notices have nothing to press
-                    Text(n.action?.label ?: "OK", fontWeight = FontWeight.Bold, color = Color(0xFFFFB4AB))
-                }
+            // tapped: its detail screen; OK puts it away (they no longer go by themselves). The words in the middle of
+            // the glass, OK under them
+            Column(Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = .2f), tint.copy(alpha = .06f))))
+                .clickable { E.haptic(); E.noticeOpen = E.notices().firstOrNull { it.id == "note" + n.id } }
+                .padding(horizontal = 16.dp).padding(top = 10.dp, bottom = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(n.msg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                TextButton(onClick = { E.haptic(); E.noteDone(n, false) }, Modifier.heightIn(min = 36.dp)) { Text("OK", fontWeight = FontWeight.Bold, color = if (err) Color(0xFFFFB4AB) else Color.White) }
             }
         }
     }
@@ -160,6 +168,60 @@ fun HeatWarning() {
         }
     }
 }
+
+/** A notice tapped at the top: over the whole screen, as the heat warning, what it says, what to do about it (its
+ *  steps), the button that fixes it (when there is one) and OK, which puts it away. Back closes it as it is. */
+@Composable
+fun NoticeDetail() {
+    val p = E.noticeOpen
+    val vis = androidx.compose.runtime.remember { androidx.compose.animation.core.MutableTransitionState(false) }; vis.targetState = p != null
+    val last = androidx.compose.runtime.remember { arrayOfNulls<E.Prob>(1) }; if (p != null) last[0] = p
+    if (p != null) androidx.activity.compose.BackHandler { E.noticeOpen = null }
+    if (!vis.currentState && !vis.targetState) return
+    val q = last[0] ?: return
+    val close = { E.noticeOpen = null }
+    androidx.compose.animation.AnimatedVisibility(vis, enter = androidx.compose.animation.EnterTransition.None, exit = androidx.compose.animation.ExitTransition.None) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().animateEnterExit(enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)), exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(220)))
+                .background(Color.Black.copy(alpha = if (E.wizard || E.settingsPage != null) .86f else .62f)).clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) { close() })
+            val short = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 520
+            Column(Modifier.animateEnterExit(enter = popIn(androidx.compose.ui.graphics.TransformOrigin.Center, .6f), exit = popOut(androidx.compose.ui.graphics.TransformOrigin.Center, .8f))
+                .statusBarsSpace().navBarsSpace().verticalScroll(rememberScrollState()).padding(if (short) 16.dp else 32.dp).widthIn(max = if (short) 560.dp else 420.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                val tint = when (q.k) { "err" -> Color(0xFFFF5449); "ok" -> Color.White; else -> Color(0xFFFFD27A) }
+                val icon = when (q.id) {
+                    "offline" -> androidx.compose.material.icons.Icons.Rounded.WifiOff
+                    "server" -> androidx.compose.material.icons.Icons.Rounded.Dns
+                    "spotify" -> VIcons.spotify
+                    "wait" -> androidx.compose.material.icons.Icons.Rounded.HourglassTop
+                    "heat" -> androidx.compose.material.icons.Icons.Rounded.DeviceThermostat
+                    "lyrics" -> VIcons.lyrics
+                    "update" -> androidx.compose.material.icons.Icons.Rounded.Download
+                    else -> if (q.k == "err") androidx.compose.material.icons.Icons.Rounded.ErrorOutline else if (q.k == "ok") androidx.compose.material.icons.Icons.Rounded.CheckCircleOutline else androidx.compose.material.icons.Icons.Rounded.Info
+                }
+                Box(Modifier.size(if (short) 56.dp else 96.dp).clip(CircleShape).background(tint.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, Modifier.size(if (short) 32.dp else 52.dp), tint = tint)
+                }
+                Text(q.t, Modifier.padding(top = if (short) 10.dp else 24.dp), fontSize = if (short) 22.sp else 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
+                if (q.s.isNotEmpty()) Text(q.s, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint, textAlign = TextAlign.Center)
+                if (q.steps.isNotEmpty()) Column(Modifier.padding(top = if (short) 10.dp else 18.dp).fillMaxWidth().glassCard().padding(16.dp)) {
+                    Text("What to do", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = .6f), letterSpacing = 1.sp)
+                    q.steps.forEachIndexed { i, st ->
+                        Row(Modifier.padding(top = 8.dp)) {
+                            Text("${i + 1}", Modifier.width(22.dp), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = tint)
+                            Text(st, fontSize = 15.sp, lineHeight = 21.sp, color = Color.White.copy(alpha = .85f))
+                        }
+                    }
+                }
+                q.act?.let { a -> VButton(onClick = { E.haptic(); close(); a.fn?.invoke() }, Modifier.padding(top = if (short) 14.dp else 24.dp).fillMaxWidth().height(if (short) 46.dp else 54.dp)) { Text(a.label, fontSize = 16.sp) } }
+                VTonalButton(onClick = { E.haptic(); close(); q.ok?.invoke() }, Modifier.padding(top = if (q.act != null) 8.dp else if (short) 14.dp else 24.dp).fillMaxWidth().height(if (short) 44.dp else 50.dp)) { Text("OK", fontSize = 16.sp) }
+            }
+        }
+    }
+}
+
+/** A card of frosted glass (the steps on a notice's detail screen). */
+@Composable
+private fun Modifier.glassCard(): Modifier = this.glass(RoundedCornerShape(20.dp))
 
 /** The heat warning in the picture-in-picture window: taps there reach only the window's own buttons, which offer
  *  Low performance mode, play / pause and "Not now" while it shows. */

@@ -170,14 +170,10 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
 private fun LyricsMessage(m: Lyr.Msg, modifier: Modifier, compact: Boolean) {
     Column(modifier, verticalArrangement = if (m.kind == "load" && S.b("xSkeleton")) Arrangement.Top else Arrangement.Center) {
         if (m.kind == "load" && S.b("xSkeleton")) {   // loading skeleton (Spicy Lyrics 6.4.0): faint placeholder lines and a small label
-            val tr = rememberInfiniteTransition(label = "skel")
-            val x by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(1600), RepeatMode.Restart), label = "skx")
+            val x = rememberSkeletonX()
             Box(Modifier.height(if (compact) 8.dp else 40.dp))
             Text("Loading lyrics", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = .5f), modifier = Modifier.padding(bottom = 8.dp))
-            listOf(.78f, .62f, .88f, .54f, .7f).forEachIndexed { k, w ->
-                Box(Modifier.fillMaxWidth(w).padding(vertical = 7.dp).height(if (compact) 12.dp else 22.dp).clip(RoundedCornerShape(10.dp))
-                    .background(Brush.horizontalGradient(listOf(Color.White.copy(alpha = .07f), Color.White.copy(alpha = .14f), Color.White.copy(alpha = .07f)), startX = (x * 2 - 1 - k * .12f) * 900f, endX = (x * 2 - k * .12f) * 900f)))
-            }
+            listOf(.78f, .62f, .88f, .54f, .7f).forEachIndexed { k, w -> SkeletonBar(Modifier.fillMaxWidth(w).padding(vertical = 7.dp).height(if (compact) 12.dp else 22.dp), k, x) }
         } else if (m.kind == "load") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LoadingIndicator(Modifier.size(36.dp), color = Color.White.copy(alpha = .7f))
@@ -186,6 +182,22 @@ private fun LyricsMessage(m: Lyr.Msg, modifier: Modifier, compact: Boolean) {
             }
         } else EmptyLines(VIcons.lyrics, m.msg, m.sub, m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull(), m.actions.drop(1).firstOrNull()?.takeIf { m.actions.size > 1 }, compact)
     }
+}
+
+/** Where the light running along the loading skeleton's lines is (0-1), one for lines drawn together. */
+@Composable
+fun rememberSkeletonX(): Float {
+    val tr = rememberInfiniteTransition(label = "skel")
+    val x by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(1600), RepeatMode.Restart), label = "skx")
+    return x
+}
+
+/** One faint placeholder line of the loading skeleton, with the light running along it; [k] lets it follow the line
+ *  above a little later. Where the lyrics go and under the big cover alike, so loading looks the same everywhere. */
+@Composable
+fun SkeletonBar(modifier: Modifier, k: Int = 0, x: Float = rememberSkeletonX()) {
+    Box(modifier.clip(RoundedCornerShape(10.dp))
+        .background(Brush.horizontalGradient(listOf(Color.White.copy(alpha = .07f), Color.White.copy(alpha = .14f), Color.White.copy(alpha = .07f)), startX = (x * 2 - 1 - k * .12f) * 900f, endX = (x * 2 - k * .12f) * 900f)))
 }
 
 /** The empty state where the lyrics go: an icon, a few words, and the one thing to do about it (as Android apps do). */
