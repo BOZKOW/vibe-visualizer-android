@@ -86,13 +86,12 @@ fun TopNotes(modifier: Modifier = Modifier) {
         val tint = when (n.kind) { "err" -> Color(0xFFFF6B6B); "warn" -> Color(0xFFFFC857); else -> Color.White }
         Surface(Modifier.padding(horizontal = 60.dp).widthIn(max = 560.dp), shape = RoundedCornerShape(22.dp), color = Color(0xFF202027).copy(alpha = .9f),
             contentColor = Color.White, shadowElevation = 8.dp, border = BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .38f), Color.White.copy(alpha = .08f))))) {
-            // tapped: its detail screen; OK puts it away (they no longer go by themselves). The words in the middle of
-            // the glass, OK under them
+            // words alone, in the middle of the glass; tapped: its detail screen, whose OK puts it away (they no longer
+            // go by themselves)
             Column(Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = .2f), tint.copy(alpha = .06f))))
                 .clickable { E.haptic(); E.noticeOpen = E.notices().firstOrNull { it.id == "note" + n.id } }
-                .padding(horizontal = 16.dp).padding(top = 10.dp, bottom = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(n.msg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-                TextButton(onClick = { E.haptic(); E.noteDone(n, false) }, Modifier.heightIn(min = 36.dp)) { Text("OK", fontWeight = FontWeight.Bold, color = if (err) Color(0xFFFFB4AB) else Color.White) }
+                .padding(horizontal = 16.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(n.msg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, color = if (err) Color(0xFFFFB4AB) else Color.White)
             }
         }
     }

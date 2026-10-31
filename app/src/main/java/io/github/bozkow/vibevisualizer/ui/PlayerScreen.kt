@@ -571,9 +571,8 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
                 .quietTouch().clickable { last[0]?.let { E.haptic(); E.noticeOpen = it } }.animateContentSize(tween(260))) {
                 // a different one cross-fades in; a countdown in the same one just counts
                 AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "notice") { q ->
-                    val ok = q != null && q.k == "err" && q.ok != null   // an error keeps an OK in its place; notices are words alone
-                    // the same room at both sides: the words in the middle of the glass (OK under them)
-                    Column(Modifier.padding(horizontal = 16.dp).padding(top = if (row) 4.dp else 8.dp, bottom = if (row) 4.dp else if (ok) 2.dp else 8.dp),
+                    // words alone, in the middle of the glass: OK and what fixes it are on the screen tapping opens
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = if (row) 4.dp else 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
                 }
             }
@@ -587,14 +586,12 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     }
 }
 
-/** What's wrong, in red (broken) or yellow (waiting), or good news in white; an error has OK, which puts it away (what
- *  fixes it is on its detail screen). In a row on its side, where height is short. */
+/** What's wrong, in red (broken) or yellow (waiting), or good news in white: words alone (OK, and what fixes it, are
+ *  on its detail screen). In a row on its side, where height is short. */
 @Composable
 private fun NoticeLines(p: E.Prob, row: Boolean = false) {
     val tint = when (p.k) { "err" -> Color(0xFFFFB4AB); "ok" -> Color.White; else -> Color(0xFFFFD27A) }   // red broken, white good news, yellow waiting
-    val act: @Composable () -> Unit = {
-        if (p.k == "err") p.ok?.let { ok -> TextButton(onClick = { E.haptic(); ok() }, Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 12.dp)) { Text("OK", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint) } }
-    }
+    val act: @Composable () -> Unit = {}
     if (row) Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
         // one text: the title whole first, the detail after it cut short if the row runs out
         Text(androidx.compose.ui.text.buildAnnotatedString {
