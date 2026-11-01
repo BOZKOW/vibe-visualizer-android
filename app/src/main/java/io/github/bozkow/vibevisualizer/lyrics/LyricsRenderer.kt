@@ -40,8 +40,12 @@ import kotlin.math.sin
  *  translation under them), with its classes (active, sung, distance, Focus mode) as states that glide like its CSS
  *  transitions, and the Spicy Lyrics word animation. Each line is drawn into its own GPU layer, so lines that don't
  *  change cost nothing but moving and blurring that layer. */
-/** A break this long (s) has no dots: the cover takes its place with the Focus style (restAt's 10 s). */
+/** A break this long (s) has no dots (as in Spicy Lyrics). */
 const val LONG_BREAK = 10.0
+/** With the Focus style and Cover in long breaks: the cover takes a break's place from this long (s). */
+const val COVER_BREAK = 5.0
+/** From how long a break has no dots: sooner when the cover takes their place. */
+fun breakLimit() = if (S.xFocus && S.b("aRestCover")) COVER_BREAK else LONG_BREAK
 
 class LyricsRenderer {
     /* ================= model ================= */
@@ -68,8 +72,8 @@ class LyricsRenderer {
     }
     inner class LV(val i: Int, val l: Line) {
         val dots = l.dots
-        /** A break of 10 s or more: no dots (as Spicy Lyrics), the cover in its place with the Focus style. */
-        val longBreak = l.dots && (l.end ?: 0.0) - (l.t ?: 0.0) >= LONG_BREAK
+        /** A break too long for dots (breakLimit): the cover in its place with the Focus style. */
+        val longBreak get() = l.dots && (l.end ?: 0.0) - (l.t ?: 0.0) >= breakLimit()
         val opp = l.opp
         val rows = ArrayList<Row>()
         var mainTs: List<TS>? = null
@@ -120,7 +124,7 @@ class LyricsRenderer {
     // scrolling
     private val lyY = Tween(0f)
     var lyFree by mutableStateOf(false); private set
-    /** A long break: nothing sung for 10 s or more around now, and the next line over 2 s away (the cover shows). */
+    /** A long break: nothing sung for breakLimit() or more around now, and the next line not due yet (the cover shows). */
     var rest by mutableStateOf(false); private set
     private var restAt = 0.0
     var covered = false   // the break's cover is fully over the lyrics on screen (set by the Lyrics screen)
@@ -355,8 +359,8 @@ class LyricsRenderer {
 
     /* ================= every frame ================= */
 
-    /** Nothing is sung for 10 s or more around now (the intro, a break between lines, the end) and the next line is
-     *  more than 2 s away. A line without its end known counts as sung until the next one, unless a break follows it. */
+    /** Nothing is sung for breakLimit() or more around now (the intro, a break between lines, the end) and the next line
+     *  is more than 2 s away. A line without its end known counts as sung until the next one, unless a break follows it. */
     private fun restAt(pos: Double): Boolean {
         val a = findIdx(lines, pos)
         var p = a; while (p >= 0 && lines[p].dots) p--
@@ -367,7 +371,7 @@ class LyricsRenderer {
         if (pos >= next - (if (S.xFocus) .6 else 2.0)) return false
         var end = if (p < 0) 0.0 else lineEnd(lines[p]) ?: lines.getOrNull(p + 1)?.takeIf { it.dots }?.t ?: return false
         for (k in max(0, p - 6) until max(p, 0)) if (!lines[k].dots) lineEnd(lines[k])?.let { if (it > end) end = it }   // a duet's line still going
-        return pos >= end && next - end >= LONG_BREAK
+        return pos >= end && next - end >= breakLimit()
     }
 
     fun frame(t: Double, pos: Double, viewOn: Boolean) {
@@ -396,7 +400,7 @@ class LyricsRenderer {
                 if (l.dots) return nx?.t?.minus(.2) ?: (l.t ?: 0.0)
                 val end = lineEnd(l) ?: nx?.t ?: Double.POSITIVE_INFINITY
                 // a long break after it, without the cover to take its place: the line stays until the next one
-                val longNext = nx != null && nx.dots && (nx.end ?: 0.0) - (nx.t ?: 0.0) >= LONG_BREAK && !S.b("aRestCover")
+                val longNext = nx != null && nx.dots && (nx.end ?: 0.0) - (nx.t ?: 0.0) >= breakLimit() && !S.b("aRestCover")
                 val after = if (longNext) lines.getOrNull(k + 2) else nx
                 return if (after != null && !after.dots && after.t != null) max(end, after.t!! - .2) else end
             }

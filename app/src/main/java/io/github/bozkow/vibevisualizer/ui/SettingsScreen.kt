@@ -279,7 +279,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("lduet", "Duet line padding", "Indent each singer’s lines toward their side, so duets read as two columns."),
         Item.Sw("lbgBr", "Background vocals in brackets", "Show background vocals as (like this), as Spicy Lyrics Mobile can."),
         Item.Sub("With the Focus style"),
-        Item.Sw("aRestCover", "Cover in long breaks", "When nothing is sung for 10 s or more, the cover takes the lyrics’ place, until 2 s before the next line."),
+        Item.Sw("aRestCover", "Cover in long breaks", "When nothing is sung for 5 s or more, the cover takes the lyrics’ place, until the next line comes in."),
         Item.Sub("Scrolling"),
         Item.Sw("lsmooth", "Smooth scrolling", "Glide from line to line instead of jumping."),
         Item.Sw("learly", "Early scroll", "Start scrolling to the next line just before it’s sung."),
