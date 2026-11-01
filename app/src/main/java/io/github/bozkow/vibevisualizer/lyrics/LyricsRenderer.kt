@@ -288,7 +288,8 @@ class LyricsRenderer {
         val avail = W - padL - padR
         for (d in lv) {
             if (d.dots) { d.hText = F * 1.18f + 2 * F * .2f; continue }
-            val maxW = avail - if (duet && S.lduet) avail * .14f else 0f
+            // the Focus style's duets stay on their own side, so two voices read as two columns even when they overlap
+            val maxW = avail - if (duet && S.xFocus) avail * .22f else if (duet && S.lduet) avail * .14f else 0f
             var y = 0f; var bg = 0f
             for (r in d.rows) {
                 val ps = r.pieces
@@ -391,12 +392,11 @@ class LyricsRenderer {
         if (S.xFocus) {   // a line is due on screen 200 ms before it's sung, but the line before holds until it's sung to the end
             // a break (its dots) holds until the next line is due, as a line holds until it's sung (it went at once,
             // and the intro and short breaks were an empty screen)
-            // and a line sung to the end stays until the next one comes in (a short gap with no dots was empty)
+            // a line sung to the end leaves at once and flies up, as on the desktop; the middle stays empty until the next is due
             fun en(k: Int): Double {
                 val l = lines[k]; val nx = lines.getOrNull(k + 1)
                 if (l.dots) return nx?.t?.minus(.2) ?: (l.t ?: 0.0)
-                val end = lineEnd(l) ?: nx?.t ?: Double.POSITIVE_INFINITY
-                return if (nx != null && !nx.dots && nx.t != null) max(end, nx.t!! - .2) else end
+                return lineEnd(l) ?: nx?.t ?: Double.POSITIVE_INFINITY
             }
             var f = findIdx(lines, pos + .2); while (f > 0 && en(f - 1) > pos) f--
             fi = f; fo = f >= 0 && pos >= en(f); si = max(f, 0)
@@ -458,10 +458,11 @@ class LyricsRenderer {
         if (focus) {
             dO = 500.0; eO = Ease.ease; dB = 600.0; eB = Ease.ease
             if (d.fv) { op = 1f; bl = 0f }
-            else if (d.fu) { op = 0f; bl = .35f; y = -.34f * screenH; dO = 450.0; dB = 450.0; dT = 600.0; eT = Ease.fuMove }
+            else if (d.fu) { op = 0f; bl = .35f; y = -.34f * screenH; if (duet) x = if (d.opp) .06f * screenW else -.06f * screenW; dO = 450.0; dB = 450.0; dT = 600.0; eT = Ease.fuMove }   // each singer's leave on their own side
             else if (d.fn) { op = if (d.fs) 1f else .5f; bl = if (d.fs) 0f else .125f }
             else { op = 0f; bl = .35f; y = .6f * screenH; if (duet) x = if (d.opp) .06f * screenW else -.06f * screenW }
             if (d.dots && (!d.fv || d.longBreak)) op = 0f   // a break's dots only while it's the one in focus (a long one has none)
+            if (S.low) bl = 0f   // Low performance mode: they move and fade, never blur
         }
         if (d.dots && !focus) op = if (d.a && !d.longBreak) 1f else 0f
         if (free) { bl = 0f; if (!d.a && !d.fv) op = .55f; y = 0f; x = 0f; dO = 300.0 }

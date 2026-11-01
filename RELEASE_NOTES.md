@@ -1,5 +1,7 @@
-Vibe Visualizer for Android 0.41.2 (beta). Android 12 or newer; it installs over 0.41.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.41.3 (beta). Android 12 or newer; it installs over 0.41.2 (Settings → Help & about → Update now).
 
-### Changed
+### The Focus style, as on the desktop
 
-- **The dots stay however long the pause is** in the Spicy Lyrics and Spicy Lyrics Simple styles, and in Focus with Cover in long breaks off (they went at 10 seconds, leaving nothing). In Focus with the cover on, the cover still takes their place from 5 seconds.
+- **A line sung to the end leaves at once and flies up**: it stayed fully lit until the next line came. In a short gap with no dots, the middle stays empty until the next line is due.
+- **In a duet, each singer's lines leave on their own side and keep a clear column**: they drift sideways as they fly up, and leave 22% of the width free on the other singer's side, so two voices read as two columns even when they overlap.
+- **In Low performance mode they move and fade without blurring.**
