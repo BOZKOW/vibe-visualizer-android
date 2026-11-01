@@ -56,8 +56,8 @@ private fun evenPace(grp: List<Word>, rt: List<TS>): Boolean {
     return rt.withIndex().all { (k, x) -> val tsr = (x.end - x.t) / du; val cs = grp[k].text.length.toDouble() / ch; tsr >= cs / 3 && tsr <= cs * 3 }
 }
 
-/** A pause this long (s) gets its "• • •", as in Spicy Lyrics (its getLyricsBetweenShow); too long for them
- *  (LyricsRenderer's breakLimit: 10 s, with the Focus style's cover 5 s) it has none. */
+/** A pause this long (s) gets its "• • •", as in Spicy Lyrics (its getLyricsBetweenShow), however long it is; only the
+ *  Focus style's cover takes their place (LyricsRenderer's COVER_BREAK). */
 const val DOTS_FROM = 3.0
 
 /** "• • •" lines for the intro and for instrumental gaps of [DOTS_FROM] seconds or more; shorter or trailing ones are
