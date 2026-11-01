@@ -92,7 +92,7 @@ fun AmbientScreen(modifier: Modifier = Modifier) {
                 if (cover && song) Spacer(Modifier.width(14.dp))
                 if (song) Column(Modifier.weight(1f, fill = false), horizontalAlignment = if (center && !cover) Alignment.CenterHorizontally else Alignment.Start) {
                     Text(E.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (E.artist.isNotEmpty()) Text(E.artist, fontSize = 15.sp, color = Color.White.copy(alpha = .65f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (E.artist.isNotEmpty()) Text(E.byLine(), fontSize = 15.sp, color = Color.White.copy(alpha = .65f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

@@ -109,7 +109,7 @@ private fun PipScreen() {
         else Box(Modifier.fillMaxWidth().weight(1f).padding(12.dp), contentAlignment = Alignment.CenterStart) {
             Column {
                 Text(E.title, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(E.artist, fontSize = 13.sp, color = Color.White.copy(alpha = .8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(E.byLine(), fontSize = 13.sp, color = Color.White.copy(alpha = .8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         BarsView(Modifier.fillMaxWidth().fillMaxHeight(.22f).padding(horizontal = 6.dp))

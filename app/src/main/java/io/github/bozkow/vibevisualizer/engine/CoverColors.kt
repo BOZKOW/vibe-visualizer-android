@@ -237,5 +237,13 @@ object Visuals {
     fun fadeProgress(t: Double): Float = if (bakedPrev == null || fadeAt == 0.0) 1f else min(1.0, (t - fadeAt) / 900).toFloat().also { if (it >= 1f) { bakedPrev = null; spritesPrev = arrayOfNulls(3) } }
 
     /** For Settings → Background → Color: the cover's main color, darker. */
-    fun plainColor(): Color { val c = rawCols.firstOrNull() ?: intArrayOf(40, 40, 60); return Color((c[0] * .55f) / 255f, (c[1] * .55f) / 255f, (c[2] * .55f) / 255f) }
+    /** The Color background: yours (Settings → Look), or from the cover. */
+    fun plainColor(): Color { parseHexColor(S.str("aBgHex"))?.let { return Color(it) }; val c = rawCols.firstOrNull() ?: intArrayOf(40, 40, 60); return Color((c[0] * .55f) / 255f, (c[1] * .55f) / 255f, (c[2] * .55f) / 255f) }
+}
+
+/** `RRGGBB`, with or without a leading `#`, as an opaque color; null for anything else (Spicy Lyrics Mobile 0.18). */
+fun parseHexColor(text: String): Int? {
+    val hex = text.trim().removePrefix("#")
+    if (hex.length != 6 || !hex.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) return null
+    return (0xFF000000 or hex.toLong(16)).toInt()
 }

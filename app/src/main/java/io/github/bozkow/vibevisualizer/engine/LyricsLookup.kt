@@ -658,10 +658,13 @@ object Lyr {
             L.forEach { it.tr = null; it.rom = null }
             val wantRom = S.romMode != "off" && ls.any { nonLatin(it.text) }; val wantTr = S.tr
             if (ls.isEmpty() || (!wantRom && !wantTr)) { if (L.isNotEmpty() && !fresh) render(null, true); return@launch }
-            // romanization/translation that came with the lyrics is used first; Google fills the gaps. The API's
-            // translations are assumed to be English, so they're only used when translating into English
+            // romanization/translation that came with the lyrics is used first; Google fills the gaps. Translations that
+            // don't say their language (the Spicy Lyrics API's, a doubled LRC's) are told by the phone; when it can't
+            // tell, they're taken for English
             val skip0 = skipLangs()
-            fun trOk(l: Line) = l.apiTr != null && S.trTo.split('-')[0] == (l.apiTrLang ?: "en")
+            val ownL = if (wantTr) ownLang(ls.filter { it.apiTr != null && it.apiTrLang == null }.joinToString("\n") { it.apiTr!! })?.split('-')?.get(0) else null
+            if (tok != trTok) return@launch
+            fun trOk(l: Line) = l.apiTr != null && S.trTo.split('-')[0] == (l.apiTrLang ?: ownL ?: "en")
             if (wantRom && !romDone) {
                 val job = romJob ?: Vibe.scope.async { runCatching { Romanizer.romanizeLyrics(ls) }; romDone = true }.also { romJob = it }
                 render(null, true)   // show the lyrics right away; the romanization follows
@@ -690,7 +693,7 @@ object Lyr {
                     val rom = if (needRom) runCatching { Google.all(ls.map { it.text }, S.trTo).rom }.getOrDefault(emptyList()) else emptyList()
                     Google.Res(o.tr, rom, o.lang)
                 }).also { trCache[key] = it }
-            } catch (e: Exception) { if (tok == trTok) E.toast("Translation isn’t available: " + (e.message ?: "try again later"), "warn"); render(null, true); return@launch }
+            } catch (e: Exception) { if (tok == trTok && Net.online.value) E.toast("Translation isn’t available: " + (e.message ?: "try again later"), "warn"); render(null, true); return@launch }   // (offline: "No internet" says it already)
             if (tok != trTok) return@launch
             val skip = skipLangs()
             ls.forEachIndexed { i, l ->
@@ -700,6 +703,25 @@ object Lyr {
             }
             render(null, true)
         }
+    }
+
+    /** The language of [text], by the phone's own language identification (nothing is sent anywhere; Spicy Lyrics Mobile
+     *  0.18's SystemLanguageDetector); null when it isn't sure. */
+    private val ownLangs = LinkedHashMap<String, String?>()
+    private suspend fun ownLang(text: String): String? {
+        if (text.isBlank()) return null
+        if (ownLangs.containsKey(text)) return ownLangs[text]
+        val lang = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching {
+                val tc = Vibe.app.getSystemService(android.view.textclassifier.TextClassificationManager::class.java)?.textClassifier ?: return@runCatching null
+                val a = tc.detectLanguage(android.view.textclassifier.TextLanguage.Request.Builder(text.take(2000)).build())
+                if (a.localeHypothesisCount == 0) return@runCatching null
+                val top = a.getLocale(0)
+                top.toLanguageTag().takeIf { a.getConfidenceScore(top) >= .8f }
+            }.getOrNull()
+        }
+        ownLangs[text] = lang; while (ownLangs.size > 20) ownLangs.remove(ownLangs.keys.first())
+        return lang
     }
 
     fun restyle() { if (L.isNotEmpty()) render(null, true) else view.restyle() }
@@ -765,7 +787,9 @@ object Lyr {
         Vibe.scope.launch { LyricsCache.del(c.key); refreshCounts(); E.toast("Cleared · fetching again", "ok"); load(c.m, E.coverTok) }
     }
     fun resetSong() { val c = cur ?: run { E.toast("No song is playing", "warn"); return }; lcache.remove(c.key); load(c.m, E.coverTok) }
-    fun clearStored() { Vibe.scope.launch { LyricsCache.clear(); lcache.clear(); trCache.clear(); refreshCounts(); E.toast("Stored lyrics cleared", "ok") } }
+    /** Every saved lyric and translation, and what this session still holds of them; then the song that's playing is
+     *  looked up again (Spicy Lyrics Mobile 0.18). */
+    fun clearStored() { Vibe.scope.launch { LyricsCache.clear(); lcache.clear(); soft.clear(); trCache.clear(); refreshCounts(); E.toast("Stored lyrics cleared", "ok"); reloadCurrent() } }
     fun clearFiles() { Vibe.scope.launch { MyLyrics.clear(); refreshCounts(); E.toast("Your lyrics files were removed", "ok") } }
     fun reloadCurrent() { cur?.let { load(it.m, E.coverTok) } }
 

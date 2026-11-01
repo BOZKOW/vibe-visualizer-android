@@ -74,7 +74,10 @@ fun BackgroundLayer(modifier: Modifier = Modifier) {
                 style == "dynamic" && !S.low -> if (Build.VERSION.SDK_INT >= 33) LiquidBackground() else LayersBackground()
                 style == "dynamic" -> BakedBackground()
                 style == "artist" || style == "cover" -> StillBackground()
-                style == "color" -> Box(Modifier.fillMaxSize().background(Visuals.plainColor()))
+                style == "color" -> {   // a new pick fades in
+                    val c by androidx.compose.animation.animateColorAsState(Visuals.plainColor(), tween(400), label = "bgcolor")
+                    Box(Modifier.fillMaxSize().background(c))
+                }
                 else -> {}
             }
         }

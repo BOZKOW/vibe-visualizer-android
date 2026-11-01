@@ -85,6 +85,19 @@ class ParseTest {
         assertTrue(interludes(listOf(Line(1.0, 20.0, "long"), Line(2.0, 3.0, "short"), Line(21.0, 23.0, "next"))).none { it.dots })
     }
 
+    @Test fun keepSyllablePace() {
+        // "per" 0-2.6 s, "fect" 2.6-3.25 s; the letters' window ends .25 s early, which comes off both alike
+        val ws = listOf(Word(0.0, 2.6, "per", false), Word(2.6, 3.25, "fect", true))
+        val (_, jt) = joinWords(ws, ws.map { TS(it.t, it.end!!) })
+        val tm = jt[0]; assertEquals(2, tm.syl?.size); val end0 = tm.end; tm.end = end0 - .25
+        val ls = sylLetterTimes(tm, listOf(3, 4), end0)
+        assertEquals(7, ls.size)
+        assertEquals("the first syllable's three letters share 2.4 s", .8, ls[0].end - ls[0].t, .001)
+        assertEquals("the second's four share .6 s", .15, ls[6].end - ls[6].t, .001)
+        assertEquals("they meet", ls[2].end, ls[3].t, .001)
+        assertEquals("the last ends with the window", 3.0, ls[6].end, .001)
+    }
+
     @Test fun joins() {
         val ws = listOf(Word(0.0, .2, "beau", false), Word(.2, .4, "ti", false), Word(.4, .6, "ful", true))
         val ts = ws.map { TS(it.t, it.end!!) }

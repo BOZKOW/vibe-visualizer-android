@@ -667,7 +667,7 @@ private fun MoreButton() {
 }
 
 @Composable
-private fun TitleRow(big: Boolean, center: Boolean = false, year: Boolean = false, toggles: Boolean = false) {
+private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false) {
     val ver = E.trackVer
     val a = remember { Animatable(1f) }
     LaunchedEffect(ver) { if (!S.low && !E.reduceMotion()) { a.snapTo(0f); a.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
@@ -675,7 +675,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, year: Boolean = fals
         Column(Modifier.weight(1f), horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
             val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
             Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp)
-            val by = if (year && E.year.isNotEmpty()) listOf(E.artist, E.year).filter { it.isNotEmpty() }.joinToString(" · ") else E.artist
+            val by = E.byLine()
             if (by.isNotEmpty()) Scrolling(by, (if (big) 19f else 15f).times(k).sp, FontWeight.Medium, dim)
         }
         if (toggles) {   // the Lyrics screen: translate and romanize, when the lyrics need them

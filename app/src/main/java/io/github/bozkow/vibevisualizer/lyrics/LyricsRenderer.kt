@@ -252,9 +252,14 @@ class LyricsRenderer {
             val tm = pc.ts; val core = pc.text.trimEnd()
             val lets = graphemes(core)
             if (tm.end - tm.t < SL.MinLetterCapableDuration || lets.isEmpty() || RTL.containsMatchIn(core)) continue
+            val end0 = tm.end
             tm.end = max(tm.t + .05, tm.end - SL.EmphasisEndTrim)
             val per = (tm.end - tm.t) / lets.size
-            pc.letters = lets.mapIndexed { i, ch -> Lt(ch, TS(tm.t + i * per, tm.t + (i + 1) * per)) }
+            // Keep syllable pace: a joined word's syllables at their own speed (unless they don't split into these letters)
+            val paced = tm.syl?.takeIf { it.size > 1 && S.b("ljoinPace") }?.let { ps ->
+                ps.mapIndexed { i, p -> graphemes(if (i == ps.lastIndex) p.first.trimEnd() else p.first).size }.takeIf { it.sum() == lets.size }?.let { sylLetterTimes(tm, it, end0) }
+            }
+            pc.letters = lets.mapIndexed { i, ch -> Lt(ch, paced?.get(i) ?: TS(tm.t + i * per, tm.t + (i + 1) * per)) }
         }
     }
 

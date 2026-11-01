@@ -1,7 +1,19 @@
-Vibe Visualizer for Android 0.39.2 (beta). Android 12 or newer; it installs over 0.39.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.40.0 (beta). Android 12 or newer; it installs over 0.39.2 (Settings → Help & about → Update now).
+
+From Spicy Lyrics Mobile 0.18.0:
+
+### New
+
+- **Your own background color** (Settings → Look → Background → Color): the cover's color as before, a dark preset, or any hex code. Pure black for OLED screens is one tap.
+- **Keep syllable pace** (Settings → Lyrics, with Join split words on): a joined held word still reads as one word, but each syllable's letters fill at that syllable's own speed.
+- **The release year beside the artist**, wherever the artist shows, when the year is known. Settings → Player screen → Release year turns it off.
+
+### Changed
+
+- **Clear stored lyrics** also clears translations and what's held in memory, and looks up the song that's playing again.
+- **Poweramp no longer lists Vibe Visualizer as its lyrics app**: that link only works for apps that also supply Poweramp's lyrics, which this one doesn't. The app still follows Poweramp as before.
 
 ### Fixed
 
-- **The dots start when a line ends, for every lyrics source and style**: they only came for a pause of over 5 seconds, so at a pause of 3 to 5 seconds nothing started, and with the Focus style the finished line stayed fully lit until the next one. They now come from 3 seconds, as in Spicy Lyrics.
-- **A pause only starts once nobody's singing**: with overlapping lines or background vocals still going, the dots could come in over them.
-- **"No internet" while the phone is online**: when the app was started in the background (by the song following or the widget), it could read as offline, and with errors now staying until solved the message never went. It only shows when there's really no connection.
+- **Translations that come with the lyrics are used when they don't say their language** (as the Spicy Lyrics API's don't): the phone tells which language they're in, on the phone itself. They were taken for English, so with another language they were never used and got a machine translation instead.
+- **Offline, a failed translation no longer adds its own notice** beside "No internet".

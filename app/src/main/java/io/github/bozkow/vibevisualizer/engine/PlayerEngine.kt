@@ -208,6 +208,9 @@ object E {
     }
     fun curDur(): Double = when (src) { "spotify" -> Spotify.durationMs() / 1000; "file" -> Local.durationMs() / 1000; "media" -> MediaApps.durMs / 1000.0; else -> 0.0 }
 
+    /** The artist, with the release year beside it (Settings → Player screen → Release year; Spicy Lyrics Mobile 0.18). */
+    fun byLine() = if (S.b("aYear") && year.isNotEmpty()) listOf(artist, year).filter { it.isNotEmpty() }.joinToString(" · ") else artist
+
     fun reduceMotion(): Boolean = S.str("anim") == "off" || (S.str("anim") != "on" && systemAnimOff())
     private fun systemAnimOff() = runCatching { Settings.Global.getFloat(Vibe.app.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
 
@@ -683,7 +686,7 @@ object E {
             "bridge", "aCap" -> Audio.applyCapture()
             "aSession" -> SpotifyApp.refresh(Vibe.app)
             "volume" -> Local.applyVolume()
-            "ljoin", "lbgBr", "lsimple", "xRefSimple", "romMode", "lfont" -> Lyr.restyle()
+            "ljoin", "ljoinPace", "lbgBr", "lsimple", "xRefSimple", "romMode", "lfont" -> Lyr.restyle()
             "lprov" -> Lyr.cacheClear()
             "tr", "trTo", "trSkip", "aTrSvc" -> Lyr.decorate()
             "lnotice" -> Lyr.noticeChanged()

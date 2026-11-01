@@ -111,6 +111,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bozkow.vibevisualizer.audio.Audio
@@ -122,6 +124,7 @@ import io.github.bozkow.vibevisualizer.core.Server
 import io.github.bozkow.vibevisualizer.core.Vibe
 import io.github.bozkow.vibevisualizer.engine.Desync
 import io.github.bozkow.vibevisualizer.engine.E
+import io.github.bozkow.vibevisualizer.engine.parseHexColor
 import io.github.bozkow.vibevisualizer.engine.SpicyStatus
 import io.github.bozkow.vibevisualizer.engine.FilePicker
 import io.github.bozkow.vibevisualizer.engine.Lyr
@@ -167,7 +170,8 @@ private fun pages(): List<Page> = listOf(
         Item.Ch("theme", "Theme", listOf("cover" to "Cover colors", "aurora" to "Aurora", "sunset" to "Sunset", "neon" to "Neon", "ice" to "Ice", "mono" to "Mono", "custom" to "Custom")),
         Item.Custom("Custom colors") { CustomColors() },
         Item.Sub("Background"),
-        Item.Ch("bgStyle", "Background", listOf("dynamic" to "Dynamic (animated cover)", "artist" to "Artist image", "cover" to "Cover art", "color" to "Color", "none" to "None"), "Artist image needs Spotify; other songs use the cover art."),
+        Item.Ch("bgStyle", "Background", listOf("dynamic" to "Dynamic (animated cover)", "artist" to "Artist image", "cover" to "Cover art", "color" to "Color", "none" to "None"), "Artist image needs Spotify; other songs use the cover art. Color: the cover’s, or one you pick (pure black for OLED screens)."),
+        Item.Custom("background color your own hex code pure black amoled oled") { BgColor() },
         Item.Sl("bgblur", "Blur", 0, 100),
         Item.Sl("bri", "Brightness", 20, 140),
         Item.Sl("sat", "Saturation", 0, 300),
@@ -189,6 +193,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("aTopLine", "Where it plays from and on", "The line at the top: Spotify (or the music app, or this phone) and the device it plays on. Off, nothing's there; what's wrong still shows."),
         Item.Sub("Song name and seek bar"),
         Item.Ch("aTitle", "Song name size", listOf("s" to "Small", "m" to "Medium", "l" to "Large")),
+        Item.Sw("aYear", "Release year", "Beside the artist, when the song’s year is known. From Spicy Lyrics Mobile 0.18."),
         Item.Sw("aMarquee", "Scroll long names", "A song name too long for its row scrolls through, fading at the sides. Off, it ends in “…”."),
         Item.Ch("aSeek", "Seek bar", listOf("thin" to "Thin", "normal" to "Normal", "thick" to "Thick")),
         Item.Sub("Cover"),
@@ -265,6 +270,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("xRefSimple", "Refreshed simple lyrics mode", "In Simple lyrics mode, the sung part fades in behind one soft edge, words float up as they’re sung, and the letters of a short held word swell, spread, lift and glow. From Spicy Lyrics 6.4.50."),
         Item.Sw("xBgPop", "Background vocal pop-out", "Background vocals stay tucked under their line until it’s sung, then slide out while the lines below make room. Only with Simple lyrics and Refreshed simple lyrics on. From Spicy Lyrics 6.4.70."),
         Item.Sw("ljoin", "Join split words", "Show a word sung in syllables as one word, when its parts line up evenly. From Spicy Lyrics 6.4.50."),
+        Item.Sw("ljoinPace", "Keep syllable pace", "A joined held word still reads as one word, but each syllable’s letters fill at that syllable’s own speed, so a long “per” and a quick “fect” keep their timing. From Spicy Lyrics Mobile 0.18."),
         Item.Sw("lminimal", "Minimal lyrics mode", "Hide lines that have already been sung."),
         Item.Sw("xKeep", "Keep overlapping lines", "In Minimal lyrics mode, a line that ends while one above it is still being sung stays on screen, dimmed. From Spicy Lyrics 6.4.50."),
         Item.Sw("lblur", "Blur inactive lines"),
@@ -511,6 +517,7 @@ private fun needs(k: String): String? = when (k) {
     "credPos" -> if (!S.b("xRefCred")) "Turn on Refined credits first (above)" else null
     "lcredLast" -> if (!S.b("xRefCred") || S.credPos != "lyrics") "Needs Refined credits under the lyrics" else null
     "xRefSimple" -> if (!S.lsimple) "Pick the Spicy Lyrics Simple style first" else null
+    "ljoinPace" -> if (!S.b("ljoin")) "Turn on Join split words first" else null
     "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
     "cvLyrA" -> if (!S.canvasOn) "Turn on Canvas first" else null
     "aLike" -> if (!Spotify.connected) "Needs Spotify connected" else null
@@ -635,6 +642,27 @@ private fun YourMusic() {
 @Composable
 fun Buttons(vararg b: Pair<String, () -> Unit>) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { b.forEach { (l, f) -> VTonalButton(onClick = { E.haptic(); f() }) { Text(l) } } }
+}
+
+/** The Color background's color: the cover's, a dark preset that keeps white lyrics readable (black first, for OLED
+ *  screens) or any hex code (Spicy Lyrics Mobile 0.18). Only a whole code is kept, so a half-typed one doesn't flash. */
+@Composable
+private fun BgColor() {
+    if (S.bgStyle != "color") return
+    val cur = S.str("aBgHex"); var text by remember { mutableStateOf(cur) }
+    Column {
+        Text("The color", fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+        FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+            FilterChip(cur.isEmpty(), { E.haptic(); text = ""; S.set("aBgHex", "") }, label = { Text("From the cover") })
+            listOf("#000000", "#121212", "#0B1426", "#1E0E24", "#0D1F17", "#2A0B12", "#2B2118").forEach { h ->
+                val on = cur.equals(h, true)
+                Box(Modifier.size(34.dp).clip(CircleShape).background(Color(parseHexColor(h)!!)).border(if (on) 2.dp else 1.dp, if (on) Color.White else GlassEdge, CircleShape)
+                    .clickable { E.haptic(); text = h; S.set("aBgHex", h) }.semantics { contentDescription = h })
+            }
+        }
+        OutlinedTextField(text, { t -> text = t; if (t.isBlank()) S.set("aBgHex", "") else parseHexColor(t)?.let { S.set("aBgHex", "#" + t.trim().removePrefix("#").uppercase()) } },
+            Modifier.fillMaxWidth().padding(top = 8.dp), label = { Text("Or a hex code") }, placeholder = { Text("#000000") }, singleLine = true)
+    }
 }
 
 @Composable
@@ -771,7 +799,7 @@ private fun CacheButtons() {
             }
         }
         row("Clear this song’s cache", "Remove everything saved for the song that’s playing (lyrics, romanization, translation) and fetch it again.", "Clear") { Lyr.clearSong() }
-        row("Clear stored lyrics", "Delete all lyrics saved on this phone. They’re normally kept for up to 7 days.", "Clear") { Lyr.clearStored() }
+        row("Clear stored lyrics", "Delete all lyrics and translations saved on this phone (normally kept for up to 7 days), and look up the song that’s playing again.", "Clear") { Lyr.clearStored() }
         row("Reset this song’s lyrics", "Drop the playing song’s lyrics from memory only, so they load again.", "Reset") { Lyr.resetSong() }
     }
 }

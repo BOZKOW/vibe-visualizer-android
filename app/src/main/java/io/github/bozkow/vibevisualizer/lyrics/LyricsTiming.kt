@@ -3,7 +3,25 @@ package io.github.bozkow.vibevisualizer.lyrics
 import kotlin.math.max
 
 /** The time a piece of text is sung over, in seconds. */
-class TS(var t: Double, var end: Double)
+class TS(var t: Double, var end: Double) {
+    /** A word joined from syllables (joinWords): each one's text and start, for Keep syllable pace. */
+    var syl: List<Pair<String, Double>>? = null
+}
+
+/** Keep syllable pace (Spicy Lyrics Mobile 0.18): the letters of a joined word [tm], each syllable's ([counts] of them)
+ *  spread over that syllable's own share of the word's time, so a long "per" and a quick "fect" keep their pace inside
+ *  one word. [end0]: the word's end before its letters' trim, which comes off every syllable alike. */
+fun sylLetterTimes(tm: TS, counts: List<Int>, end0: Double): List<TS> {
+    val parts = tm.syl!!; val k = (tm.end - tm.t) / max(end0 - tm.t, .001)
+    val out = ArrayList<TS>(counts.sum()); var at = tm.t
+    parts.indices.forEach { i ->
+        val to = if (i == parts.lastIndex) tm.end else (tm.t + (parts[i + 1].second - tm.t) * k).coerceIn(at, tm.end)
+        val per = if (counts[i] > 0) (to - at) / counts[i] else 0.0
+        repeat(counts[i]) { n -> out.add(TS(at + n * per, at + (n + 1) * per)) }
+        at = to
+    }
+    return out
+}
 
 val UNSPACED = Regex("[\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}\\p{IsThai}\\p{IsLao}\\p{IsKhmer}\\p{IsMyanmar}]")
 val RTL = Regex("[\\u0590-\\u08FF\\uFB1D-\\uFDFF\\uFE70-\\uFEFF]")
@@ -25,7 +43,7 @@ fun joinWords(ws: List<Word>, ts: List<TS>): Pair<List<Word>, List<TS>> {
             rt.withIndex().all { (k, x) -> k == 0 || x.t - rt[k - 1].end <= .1 } && evenPace(grp, rt)
         if (ok) {
             out.add(Word(rt[0].t, null, grp.joinToString("") { it.text }, grp.last().sp, if (grp.any { it.rom != null }) grp.joinToString("") { it.rom ?: it.text } else null))
-            tout.add(TS(rt[0].t, rt.maxOf { it.end }))
+            tout.add(TS(rt[0].t, rt.maxOf { it.end }).also { x -> x.syl = grp.mapIndexed { k, w -> w.text to rt[k].t } })
         } else grp.forEachIndexed { k, w -> out.add(w); tout.add(rt[k]) }
         i = e + 1
     }
