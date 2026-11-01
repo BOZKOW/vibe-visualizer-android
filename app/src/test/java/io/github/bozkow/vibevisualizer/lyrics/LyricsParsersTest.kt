@@ -66,6 +66,25 @@ class ParseTest {
         assertTrue(songKeys(SongMeta(title = "Test Song", artist = "Vibe Tester", file = "Vibe Tester - Test Song.wav")).contains("n:vibe tester|test song"))
     }
 
+    @Test fun dotsFromThreeSeconds() {
+        fun song(intro: Double, gap: Double) = listOf(Line(intro, intro + 2, "a"), Line(intro + 2 + gap, intro + 4 + gap, "b"))
+        assertTrue("a 3 s intro has them", interludes(song(3.0, 1.0))[0].dots)
+        assertTrue("a shorter one hasn't", !interludes(song(2.9, 1.0))[0].dots)
+        val i = interludes(song(1.0, 3.5))
+        assertEquals("a 3.5 s pause has them, between its two lines", listOf(false, true, false), i.map { it.dots })
+        assertEquals("they last until the next line", 6.5, i[1].end ?: 0.0, .001)
+        assertTrue("a 2.9 s pause hasn't", interludes(song(1.0, 2.9)).none { it.dots })
+    }
+
+    @Test fun aPauseStartsOnceNobodySings() {
+        // a long line (1-20), a short one over it (2-3), the next at 25: the pause is from 20, not from 3
+        val i = interludes(listOf(Line(1.0, 20.0, "long"), Line(2.0, 3.0, "short"), Line(25.0, 27.0, "next")))
+        assertEquals(listOf(false, false, true, false), i.map { it.dots })
+        assertEquals(20.0, i[2].t ?: 0.0, .001)
+        // the next at 21: only 1 s after the long line ends, so no pause at all
+        assertTrue(interludes(listOf(Line(1.0, 20.0, "long"), Line(2.0, 3.0, "short"), Line(21.0, 23.0, "next"))).none { it.dots })
+    }
+
     @Test fun joins() {
         val ws = listOf(Word(0.0, .2, "beau", false), Word(.2, .4, "ti", false), Word(.4, .6, "ful", true))
         val ts = ws.map { TS(it.t, it.end!!) }

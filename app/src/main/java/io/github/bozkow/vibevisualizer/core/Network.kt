@@ -53,23 +53,33 @@ object Net {
             .cache(Cache(File(ctx.cacheDir, "http"), 30L * 1024 * 1024))
             .build()
         cm = ctx.getSystemService(ConnectivityManager::class.java)
-        refreshNet()
+        firstLook()
+        // what the callback is told, not cm.activeNetwork read again: for an app started in the background (the
+        // notification listener, the widget) that says "none" while its access is blocked, and nothing asks again when
+        // it opens, so "No internet" stayed on screen while the phone was online. (Android warns against reading it in
+        // these callbacks anyway.) A new default network always comes with its capabilities and link right after.
         cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) = refreshNet()
-            override fun onLost(network: Network) = refreshNet()
-            override fun onCapabilitiesChanged(network: Network, nc: NetworkCapabilities) = refreshNet()
-            override fun onLinkPropertiesChanged(network: Network, lp: android.net.LinkProperties) = refreshNet()
+            override fun onLost(network: Network) { online.value = false; vpn.value = false; privateDns.value = false }
+            override fun onCapabilitiesChanged(network: Network, nc: NetworkCapabilities) = caps(nc)
+            override fun onLinkPropertiesChanged(network: Network, lp: android.net.LinkProperties) = link(lp)
         })
     }
 
-    private fun refreshNet() {
+    /** Before the callback's first word. No default network may only mean this app is blocked for now: any network with
+     *  internet counts then. (With none at all the callback says nothing, so this is what stays.) */
+    private fun firstLook() {
         val n = cm.activeNetwork
-        val nc = n?.let { cm.getNetworkCapabilities(it) }
-        val lp = n?.let { cm.getLinkProperties(it) }
-        online.value = nc?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-        vpn.value = nc?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-        privateDns.value = lp?.isPrivateDnsActive == true && lp.privateDnsServerName != null
+        if (n != null) { cm.getNetworkCapabilities(n)?.let(::caps); cm.getLinkProperties(n)?.let(::link); return }
+        @Suppress("DEPRECATION")
+        online.value = cm.allNetworks.any { cm.getNetworkCapabilities(it)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true }
     }
+
+    private fun caps(nc: NetworkCapabilities) {
+        online.value = nc.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        vpn.value = nc.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+    }
+
+    private fun link(lp: android.net.LinkProperties) { privateDns.value = lp.isPrivateDnsActive && lp.privateDnsServerName != null }
 
     fun mark(name: String, ms: Long?, status: Int?) { stats[name] = NetStat(ms, status, System.currentTimeMillis()) }
 

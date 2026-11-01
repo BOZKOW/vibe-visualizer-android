@@ -38,25 +38,32 @@ private fun evenPace(grp: List<Word>, rt: List<TS>): Boolean {
     return rt.withIndex().all { (k, x) -> val tsr = (x.end - x.t) / du; val cs = grp[k].text.length.toDouble() / ch; tsr >= cs / 3 && tsr <= cs * 3 }
 }
 
-/** "• • •" lines for the intro and for long instrumental gaps; short or trailing ones are dropped. */
+/** A pause this long (s) gets its "• • •", as in Spicy Lyrics (its getLyricsBetweenShow); 10 s or more has none,
+ *  the cover takes its place with the Focus style (LyricsRenderer's LONG_BREAK). */
+const val DOTS_FROM = 3.0
+
+/** "• • •" lines for the intro and for instrumental gaps of [DOTS_FROM] seconds or more; shorter or trailing ones are
+ *  dropped. (Up to 0.39.1 only from 5 s: a local file's 3–5 s pauses had none.) */
 fun interludes(ls: List<Line>): List<Line> {
     val real = ls.filter { !it.dots }
     if (real.isEmpty()) return real
     val out = ArrayList<Line>()
-    if ((real[0].t ?: 0.0) > 4) out.add(Line(0.0, null, "", dots = true))
+    if ((real[0].t ?: 0.0) >= DOTS_FROM) out.add(Line(0.0, null, "", dots = true))
+    var sungTo = 0.0   // a pause starts once nobody sings: a longer line before this one, or its background vocals, may go on
     ls.forEachIndexed { i, l ->
         out.add(l)
         if (!l.dots && (l.words != null || (l.end != null && l.end != 0.0))) {
-            val end = l.end ?: (l.words!!.last().t + 1.2)
+            val own = lineEnd(l)!!.let { if (l.end == null && l.words!!.last().end == null) it + 1.2 else it }
+            val end = maxOf(own, sungTo); sungTo = end
             val nx = ls.subList(i + 1, ls.size).find { !it.dots }
-            if (nx != null && (nx.t ?: 0.0) - end > 5) out.add(Line(end, null, "", dots = true))
+            if (nx != null && (nx.t ?: 0.0) - end >= DOTS_FROM) out.add(Line(end, null, "", dots = true))
         }
     }
     val res = ArrayList<Line>()
     out.forEachIndexed { i, l ->
         if (!l.dots) { res.add(l); return@forEachIndexed }
         val nx = out.subList(i + 1, out.size).find { !it.dots }
-        if (nx == null || (nx.t ?: 0.0) - (l.t ?: 0.0) < 4 || (res.isNotEmpty() && res.last().dots)) return@forEachIndexed
+        if (nx == null || (nx.t ?: 0.0) - (l.t ?: 0.0) < DOTS_FROM || (res.isNotEmpty() && res.last().dots)) return@forEachIndexed
         res.add(Line(l.t, nx.t, "", dots = true))
     }
     return res
