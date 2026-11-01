@@ -1,19 +1,10 @@
-Vibe Visualizer for Android 0.40.0 (beta). Android 12 or newer; it installs over 0.39.2 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.41.0 (beta). Android 12 or newer; it installs over 0.40.0 (Settings → Help & about → Update now).
 
-From Spicy Lyrics Mobile 0.18.0:
+### Animated covers
 
-### New
-
-- **Your own background color** (Settings → Look → Background → Color): the cover's color as before, a dark preset, or any hex code. Pure black for OLED screens is one tap.
-- **Keep syllable pace** (Settings → Lyrics, with Join split words on): a joined held word still reads as one word, but each syllable's letters fill at that syllable's own speed.
-- **The release year beside the artist**, wherever the artist shows, when the year is known. Settings → Player screen → Release year turns it off.
-
-### Changed
-
-- **Clear stored lyrics** also clears translations and what's held in memory, and looks up the song that's playing again.
-- **Poweramp no longer lists Vibe Visualizer as its lyrics app**: that link only works for apps that also supply Poweramp's lyrics, which this one doesn't. The app still follows Poweramp as before.
-
-### Fixed
-
-- **Translations that come with the lyrics are used when they don't say their language** (as the Spicy Lyrics API's don't): the phone tells which language they're in, on the phone itself. They were taken for English, so with another language they were never used and got a machine translation instead.
-- **Offline, a failed translation no longer adds its own notice** beside "No internet".
+- **Where an album has an animated cover on Apple Music, the cover moves**: its looping video plays over the still cover, fading in on its first frame. It shows wherever the big cover does: for a song without lyrics, on its side, in the Focus style's long breaks, and on tablets. As in Spicy Lyrics Mobile, from which it's ported.
+- **Free, with no account or key**: the app finds it through Apple's public iTunes search and the album's public web page. Only the artist, album and song names go to Apple.
+- **Light on data and battery**: it's only looked up and streamed while a big cover is on screen, moves only while the music plays, and a loop (a few MB) is kept on the phone. Upright with lyrics on screen, where no cover shows, nothing is downloaded.
+- **One video at a time**: with a Canvas, the Canvas plays and the cover stays still. Most albums don't have an animated cover, and those keep the still one.
+- Settings → Player screen → Animated covers turns it off; it rests in Low performance mode.
+- It relies on how Apple's web page is built today, so if Apple changes that, the still cover simply stays.

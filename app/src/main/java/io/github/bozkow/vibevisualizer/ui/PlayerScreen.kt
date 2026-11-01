@@ -153,6 +153,7 @@ import io.github.bozkow.vibevisualizer.core.Server
 import io.github.bozkow.vibevisualizer.core.clockLeft
 import io.github.bozkow.vibevisualizer.core.fmtTime
 import io.github.bozkow.vibevisualizer.core.wall
+import io.github.bozkow.vibevisualizer.engine.AnimatedCover
 import io.github.bozkow.vibevisualizer.engine.CanvasVideo
 import io.github.bozkow.vibevisualizer.engine.E
 import io.github.bozkow.vibevisualizer.engine.FilePicker
@@ -948,7 +949,20 @@ fun CoverArt(modifier: Modifier, corner: Dp, small: Boolean = false) {
     Box(modifier.then(if (small) Modifier else Modifier.shadow(24.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)).clip(shape).background(Color.White.copy(alpha = .08f))
         .then(if (S.b("aCoverLine")) Modifier.border(1.dp, Color.White.copy(alpha = .22f), shape) else Modifier)) {   // Settings → Player screen → Cover outline
         Cover(Modifier.fillMaxSize())
+        if (!small) MotionCoverLayer()
     }
+}
+
+/** Over the still cover: the album's animated cover from Apple Music, where it has one (it fades in on its first frame;
+ *  none, or it fails, and the still cover is simply what shows). Never beside a Canvas: one video at a time. */
+@Composable
+private fun MotionCoverLayer() {
+    val on = S.b("aMotionCover") && !S.low && !CanvasVideo.active && !E.dj && E.src != "none" && E.title != "Nothing playing"
+    val artist = E.artist; val album = E.album; val title = E.title
+    val url by produceState<String?>(null, on, artist, album, title) { value = null; if (on) value = AnimatedCover.find(artist, album, title) }
+    val u = url ?: return
+    val a by animateFloatAsState(if (AnimatedCover.ready) 1f else 0f, tween(600), label = "motioncover")
+    AndroidView({ ctx -> TextureView(ctx) }, Modifier.fillMaxSize().graphicsLayer { alpha = a }, update = { AnimatedCover.attach(it, u) }, onRelease = { AnimatedCover.detach(it) })
 }
 
 /** The cover: a new one condenses out of a blur while the old one melts away (swells, sinks and blurs). */

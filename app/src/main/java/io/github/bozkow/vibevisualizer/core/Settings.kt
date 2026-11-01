@@ -74,6 +74,7 @@ object Defaults {
         "aCoverR" to 22,        //   the cover's corners (dp)
         "aTopLine" to true,     // the line at the top: where it plays from and on
         "aYear" to true,        // the release year beside the artist
+        "aMotionCover" to true, // Apple Music's animated covers, where an album has one
         "aBgHex" to "",         // the Color background: #RRGGBB, or empty for the cover's
         "ljoinPace" to false,   // Join split words: each syllable's letters at that syllable's own speed
         "cvLyrA" to 25,         // how much of the Canvas video shows behind the lyrics (%; 0: only its soft glow)

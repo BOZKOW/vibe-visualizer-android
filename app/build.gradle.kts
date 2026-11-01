@@ -84,6 +84,7 @@ dependencies {
     implementation("androidx.browser:browser:1.10.0")
 
     implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.11.1")   // Apple Music's animated covers are HLS streams
     implementation("androidx.media3:media3-session:1.11.1")
 
     implementation("com.squareup.okhttp3:okhttp:5.5.0")

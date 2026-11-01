@@ -198,6 +198,7 @@ private fun pages(): List<Page> = listOf(
         Item.Ch("aSeek", "Seek bar", listOf("thin" to "Thin", "normal" to "Normal", "thick" to "Thick")),
         Item.Sub("Cover"),
         Item.Sl("aCoverR", "Cover corners", 0, 40, 2, "How round the cover’s corners are (0: square).", fmt = { if (it == 0) "Square" else "$it" }),
+        Item.Sw("aMotionCover", "Animated covers", "Where an album has one on Apple Music, its looping video plays over the still cover (the big cover, on its side, in long breaks). No account or key is needed: the artist and album go to Apple to find it, and a loop is a few MB, kept on the phone. With a Canvas, the Canvas plays instead. From Spicy Lyrics Mobile."),
         Item.Sw("online", "Search cover online for your own files"),
         Item.Custom("Choose cover image") { Buttons("Choose cover image…" to { FilePicker.image?.invoke() }) },
         Item.Sub("Screen"),
@@ -517,6 +518,7 @@ private fun needs(k: String): String? = when (k) {
     "credPos" -> if (!S.b("xRefCred")) "Turn on Refined credits first (above)" else null
     "lcredLast" -> if (!S.b("xRefCred") || S.credPos != "lyrics") "Needs Refined credits under the lyrics" else null
     "xRefSimple" -> if (!S.lsimple) "Pick the Spicy Lyrics Simple style first" else null
+    "aMotionCover" -> if (S.low) "Off in Low performance mode" else null
     "ljoinPace" -> if (!S.b("ljoin")) "Turn on Join split words first" else null
     "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
     "cvLyrA" -> if (!S.canvasOn) "Turn on Canvas first" else null

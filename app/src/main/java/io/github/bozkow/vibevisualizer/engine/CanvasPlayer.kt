@@ -59,7 +59,8 @@ object CanvasVideo {
 
     // Canvas videos are kept on the phone (200 MB at most, the longest unplayed go first): a song played again, or the
     // next one found ahead, starts at once instead of downloading its video again
-    private val cache by lazy { SimpleCache(java.io.File(Vibe.app.cacheDir, "canvas"), LeastRecentlyUsedCacheEvictor(200L shl 20), StandaloneDatabaseProvider(Vibe.app)) }
+    val cacheDb by lazy { StandaloneDatabaseProvider(Vibe.app) }   // shared with the animated covers' cache
+    private val cache by lazy { SimpleCache(java.io.File(Vibe.app.cacheDir, "canvas"), LeastRecentlyUsedCacheEvictor(200L shl 20), cacheDb) }
     private val cached by lazy { CacheDataSource.Factory().setCache(cache).setUpstreamDataSourceFactory(DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)) }
     private val ahead = LinkedHashMap<String, Pair<String, Boolean>>()   // the next songs' Canvas, found ahead: song → (video, from Spicy's service)
     private var askAt = 0L
@@ -176,15 +177,16 @@ object CanvasVideo {
     }
 
     fun syncPlay() {
+        AnimatedCover.sync()
         val p = player ?: return
         if (url == null || !S.canvasOn) return
         if ((E.playing() || E.src == "none") && E.visible && !E.ambient) p.play() else p.pause()
     }
 
-    fun onBackground() { player?.pause() }
+    fun onBackground() { player?.pause(); AnimatedCover.sync() }
 
     /** How far the Canvas has faded in (0-1), for the layout change. */
     fun reveal(t: Double) = if (!hasVideo) 0f else ((t - revealAt) / 800).coerceIn(0.0, 1.0).toFloat()
 
-    fun release() { player?.release(); player = null }
+    fun release() { player?.release(); player = null; AnimatedCover.release() }
 }

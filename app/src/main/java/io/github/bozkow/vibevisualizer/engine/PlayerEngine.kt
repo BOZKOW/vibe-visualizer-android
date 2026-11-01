@@ -47,6 +47,7 @@ object E {
     var title by mutableStateOf("")
     var artist by mutableStateOf("")
     var year by mutableStateOf("")                 // when the song came out, if known
+    var album by mutableStateOf("")                // the album it's on, if known (what an animated cover is found by)
     var status by mutableStateOf("")               // where the cover came from, "Spotify", "Searching for cover…"
     var trackVer by mutableIntStateOf(0)           // bumps on every new song (the title animates in)
     var coverTok = 0
@@ -249,7 +250,7 @@ object E {
         curArtistId = ""
         val tok = ++coverTok
         CanvasVideo.clear(false); Audio.dropBars()
-        title = nt; artist = na; year = ""; status = ""; trackVer++
+        title = nt; artist = na; year = ""; album = MediaApps.album; status = ""; trackVer++
         val meta = SongMeta(title = nt, artist = na, album = MediaApps.album, duration = MediaApps.durMs / 1000.0)
         Lyr.load(meta, tok)
         Preload.songStarted()
@@ -287,7 +288,7 @@ object E {
         if (t.isEmpty() || t == title || src != "spotify" || aheadId.isNotEmpty()) return   // (a skip from here: shown already)
         val tok = ++coverTok
         Audio.dropBars(); CanvasVideo.clear(true); Lyr.loading()
-        title = t; artist = a; year = ""; status = "Spotify"; trackVer++
+        title = t; artist = a; year = ""; album = SpotifyApp.album; status = "Spotify"; trackVer++
         appShown = t; earlyId = ""
         appArt = art != null && setCoverBitmap(art, "From the Spotify app", tok)
         if (!appArt) resetCover()
@@ -303,7 +304,7 @@ object E {
         if (m.id.isEmpty() || m.title.isEmpty()) return
         val tok = ++coverTok
         Audio.dropBars(); CanvasVideo.clear(true)
-        title = m.title; artist = m.artist; year = m.year; status = "Spotify"; trackVer++
+        title = m.title; artist = m.artist; year = m.year; album = m.album; status = "Spotify"; trackVer++
         aheadId = m.id; appShown = ""; appArt = false; earlyId = ""
         Spotify.skippedTo(m)
         Vibe.scope.launch { if (!(m.cover.isNotEmpty() && setCover(m.cover, "", tok))) { if (tok == coverTok) resetCover() } }
@@ -319,12 +320,12 @@ object E {
 
     /** Spotify's DJ talking between songs: nothing to line lyrics up with, as Spicy Lyrics says; they're back with the
      *  next song (onSpTrack). */
-    private var dj = false
+    var dj = false; private set
     fun onSpDj() {
         if (dj) { updPlay(); return }
         dj = true; ++coverTok; aheadId = ""; appShown = ""; earlyId = ""
         Audio.dropBars(); CanvasVideo.clear(false); resetCover()
-        title = "DJ"; artist = "Spotify"; year = ""; status = "Spotify"; trackVer++
+        title = "DJ"; artist = "Spotify"; year = ""; album = ""; status = "Spotify"; trackVer++
         Lyr.clear("Lyrics aren’t available with the DJ", "The DJ talks between the songs and mixes them together, so there’s nothing to line lyrics up with. They’re back with the next song.", "none")
         updPlay()
     }
@@ -345,7 +346,7 @@ object E {
         if (!same) Audio.dropBars()   // the bars drop and grow back with the new song
         val tok = if (early) coverTok else ++coverTok
         if (!early) CanvasVideo.clear(true)
-        title = m.title; artist = m.artist; year = m.year; status = "Spotify"; if (!same) trackVer++
+        title = m.title; artist = m.artist; year = m.year; album = m.album; status = "Spotify"; if (!same) trackVer++
         Vibe.scope.launch {
             // Spotify's cover; once more past the cache if it doesn't load, then its smaller size
             var ok = m.cover.isNotEmpty() && setCover(m.cover, "", tok, quiet = quiet)
@@ -384,13 +385,13 @@ object E {
         val tok = ++coverTok
         CanvasVideo.clear(false); Audio.dropBars(); resetCover()
         val fn = fileSong(name, null)
-        title = fn.title; artist = fn.artist; year = ""; status = ""; trackVer++
+        title = fn.title; artist = fn.artist; year = ""; album = ""; status = ""; trackVer++
         Lyr.loading()
         Vibe.scope.launch {
             val tags = Files.tags(uri)
             if (tok != coverTok) return@launch
             val meta = fileSong(name, tags)
-            title = meta.title; artist = meta.artist; year = meta.year
+            title = meta.title; artist = meta.artist; year = meta.year; album = meta.album
             Lyr.load(meta, tok)
             Preload.songStarted()
             Local.setMeta(title, artist, tags.picture)
