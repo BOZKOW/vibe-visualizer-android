@@ -98,7 +98,7 @@ class ParseTest {
         assertEquals("the last ends with the window", 3.0, ls[6].end, .001)
     }
 
-    @Test fun theSmallWindowsScrollTakesTheGapBetweenTheLines() {
+    @Test fun theScrollTakesTheGapBetweenTheLines() {
         assertEquals("the gap it is", 1.2, gapScroll(10.0, 11.2)!!, 1e-9)
         assertEquals("a short gap: its quickest", .3, gapScroll(10.0, 10.05)!!, 1e-9)
         assertEquals("no gap at all", .3, gapScroll(10.0, 10.0)!!, 1e-9)

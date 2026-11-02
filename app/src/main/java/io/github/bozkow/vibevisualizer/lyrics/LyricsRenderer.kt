@@ -129,7 +129,7 @@ class LyricsRenderer {
     private var restAt = 0.0
     var covered = false   // the break's cover is fully over the lyrics on screen (set by the Lyrics screen)
     var lineAtTop: () -> Boolean = { false }   // the line being sung at the top, not the middle (the small window's setting)
-    var smallWindow: () -> Boolean = { false }  // picture-in-picture: the scroll to the next line goes at the pace of the gap
+    var gapPaced: () -> Boolean = { false }     // the small window and on its side: the scroll to the next line goes at the pace of the gap
     private var paceUntil = 0.0                 // when that scroll arrives
     private var lyFreeY = 0f; private var lyFreeAt = 0.0
     var dragged = false
@@ -393,9 +393,9 @@ class LyricsRenderer {
         val i = findIdx(lines, pos); val e = if (i >= 0) lineEnd(lines[i]) else null; val out = e != null && pos >= e
         val nx = lines.getOrNull(i + 1)
         var si = if (S.learly && nx?.t != null && pos >= nx.t!! - S.learlyMs / 1000.0) i + 1 else i
-        // the small window: off to the next line as soon as this one is sung, there as its first word is (the gap sets the
-        // pace). A break's dots keep their own timing, and the Focus style brings each line in its own way
-        val paced = smallWindow() && S.lsmooth && !S.xFocus
+        // the small window and on its side: off to the next line as soon as this one is sung, there as its first word is
+        // (the gap sets the pace). A break's dots keep their own timing, and the Focus style brings each line in its own way
+        val paced = gapPaced() && S.lsmooth && !S.xFocus
         if (paced && out && nx != null && !nx.dots && gapScroll(e, nx.t) != null) si = i + 1
         var fi = -2; var fo = false; var fn = ""; var fs = ""
         if (S.xFocus) {   // a line is due on screen 200 ms before it's sung, but the line before holds until it's sung to the end
@@ -568,7 +568,7 @@ class LyricsRenderer {
 
     private fun setLyY(y: Float, t: Double) {
         if (lyFree) return
-        val left = paceUntil - t   // the small window's scroll over a gap: spread over all of it (eOut is there in a moment)
+        val left = paceUntil - t   // a scroll over a gap: spread over all of it (eOut is there in a moment)
         if (left > 0) lyY.set(y, t, left, Ease.ease) else lyY.set(y, t, if (S.lsmooth) 550.0 else 0.0, Ease.eOut)
     }
 
