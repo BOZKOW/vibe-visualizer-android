@@ -40,6 +40,9 @@ import kotlin.math.sin
  *  translation under them), with its classes (active, sung, distance, Focus mode) as states that glide like its CSS
  *  transitions, and the Spicy Lyrics word animation. Each line is drawn into its own GPU layer, so lines that don't
  *  change cost nothing but moving and blurring that layer. */
+private val SPACES = Regex("\\s+")   // (kept: a new one for every lyric line added up)
+private val OPEN_BRACKET = Regex("^\\s*[(\\[]")
+
 /** With the Focus style and Cover in long breaks: the cover takes a break's place from this long (s). Every other break
  *  has its dots, however long. */
 const val COVER_BREAK = 5.0
@@ -198,7 +201,7 @@ class LyricsRenderer {
             if (ws != null && ws.isNotEmpty() && sync) {
                 val nt = lines.getOrNull(idx + 1)?.t ?: Double.POSITIVE_INFINITY
                 val ts = ws.mapIndexed { k, w -> TS(w.t, w.end ?: if (k + 1 < ws.size) ws[k + 1].t else min(w.t + 1.5, nt)) }
-                val rw = if (romOnly) l.rom!!.split(Regex("\\s+")) else null
+                val rw = if (romOnly) l.rom!!.split(SPACES) else null
                 when {
                     !romOnly -> { val (jw, jt) = if (join) joinWords(ws, ts) else ws to ts; main.pieces = jw.mapIndexed { k, w -> Pc(w.text + if (w.sp) " " else "", jt[k]) }; d.mainTs = jt }
                     l.romSyl && ws.any { it.rom != null } -> { val (jw, jt) = if (join) joinWords(ws, ts) else ws to ts; main.pieces = jw.mapIndexed { k, w -> Pc((w.rom ?: w.text) + if (w.sp) " " else "", jt[k]) }; d.mainTs = jt }   // per-syllable romanization
@@ -215,14 +218,14 @@ class LyricsRenderer {
                 val r = Row(1, .75f, 1.18f, .1f, 600)
                 if (sync && bwds != null && bwds.isNotEmpty() && !romB) {
                     val bts = bwds.mapIndexed { k, w -> TS(w.t, w.end ?: if (k + 1 < bwds.size) bwds[k + 1].t else w.t + 1) }
-                    val brk = br && !Regex("^\\s*[(\\[]").containsMatchIn(b.text); val n = bwds.size
+                    val brk = br && !OPEN_BRACKET.containsMatchIn(b.text); val n = bwds.size
                     r.pieces = bwds.mapIndexed { k, w ->
                         var t = if (romW && w.rom != null) w.rom!! else w.text
                         if (brk && k == 0) t = "($t"; if (brk && k == n - 1) t = t.trimEnd() + ")"
                         Pc(t + if (w.sp) " " else "", bts[k])
                     }
                     splitLetters(r.pieces!!)
-                } else { val t = if (romB) b.rom!! else b.text; r.text = if (br && !Regex("^\\s*[(\\[]").containsMatchIn(t)) "($t)" else t }
+                } else { val t = if (romB) b.rom!! else b.text; r.text = if (br && !OPEN_BRACKET.containsMatchIn(t)) "($t)" else t }
                 d.rows.add(r)
             }
             // romanization and translation under the line fill in time with it: word by word when the romanized words
@@ -240,7 +243,7 @@ class LyricsRenderer {
             val rom = l.rom
             if (rom != null && romMode == "below") {
                 val lw = l.words
-                timed(2, rom, if (l.romSyl && lw != null) lw.map { (it.rom ?: it.text) to it.sp } else rom.split(Regex("\\s+")).filter { it.isNotEmpty() }.let { p -> p.mapIndexed { k, x -> x to (k < p.size - 1) } })
+                timed(2, rom, if (l.romSyl && lw != null) lw.map { (it.rom ?: it.text) to it.sp } else rom.split(SPACES).filter { it.isNotEmpty() }.let { p -> p.mapIndexed { k, x -> x to (k < p.size - 1) } })
             }
             l.tr?.let { timed(3, it, null) }
         }

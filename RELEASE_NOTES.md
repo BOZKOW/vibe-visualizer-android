@@ -1,7 +1,6 @@
-Vibe Visualizer for Android 0.41.3 (beta). Android 12 or newer; it installs over 0.41.2 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.41.4 (beta). Android 12 or newer; it installs over 0.41.3 (Settings → Help & about → Update now).
 
-### The Focus style, as on the desktop
+### Smoother
 
-- **A line sung to the end leaves at once and flies up**: it stayed fully lit until the next line came. In a short gap with no dots, the middle stays empty until the next line is due.
-- **In a duet, each singer's lines leave on their own side and keep a clear column**: they drift sideways as they fly up, and leave 22% of the width free on the other singer's side, so two voices read as two columns even when they overlap.
-- **In Low performance mode they move and fade without blurring.**
+- **The desync check no longer holds up the lyrics**: while it listens, every 5 seconds it worked out on the app's main thread whether the singing lines up, which could cause a small stutter each time. That now happens in the background; it answers the same way.
+- **A little less work all the time**: the check of Spicy Lyrics' status no longer reads your lyrics sources 4 times a second, and laying out lyrics no longer rebuilds the same text patterns for every line.

@@ -31,7 +31,12 @@ object SpicyStatus {
     fun used() = Server.set && Lyr.provList().any { it.k == "spicy" && it.on }
 
     /** Every few frames: read again when it's been 10 minutes. */
-    fun tick() { if (E.visible && used() && wall() - askedAt > 10 * 60_000) check() }
+    fun tick() {
+        if (wall() - askedAt <= 10 * 60_000 || wall() - lookedAt < 30_000) return   // (called 4 times a second: not the source list each time)
+        lookedAt = wall()
+        if (E.visible && used()) check()
+    }
+    private var lookedAt = 0L
 
     /** A lookup at Spicy Lyrics failed: is it them? (At most once a minute.) */
     fun failed() { if (used() && wall() - askedAt > 60_000) check() }
