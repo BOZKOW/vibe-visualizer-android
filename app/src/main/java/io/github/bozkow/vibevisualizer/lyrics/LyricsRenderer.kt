@@ -129,6 +129,8 @@ class LyricsRenderer {
     private var restAt = 0.0
     var covered = false   // the break's cover is fully over the lyrics on screen (set by the Lyrics screen)
     var lineAtTop: () -> Boolean = { false }   // the line being sung at the top, not the middle (the small window's setting)
+    var smallWindow: () -> Boolean = { false }  // picture-in-picture: the scroll to the next line goes at the pace of the gap
+    private var paceUntil = 0.0                 // when that scroll arrives
     private var lyFreeY = 0f; private var lyFreeAt = 0.0
     var dragged = false
     private var lyTall = false; private var lyTallAt = 0.0
@@ -169,7 +171,7 @@ class LyricsRenderer {
         lines = ls; sync = isSync
         duet = ls.any { it.opp }
         li = -2; lsi = -2; lfi = -2; lfo = false; lfn = ""; lfs = ""; lfnSet = emptySet(); lfsSet = emptySet(); lAct = emptySet(); lActKey = ""; lOut = false
-        moving.clear(); lyTall = false; bandT.snap(-1f); bandB.snap(-1f); stPos = null
+        moving.clear(); lyTall = false; bandT.snap(-1f); bandB.snap(-1f); stPos = null; paceUntil = 0.0
         if (!quiet) { stScroll = 0f; lyFree = false }
         lv = ls.mapIndexed { i, l -> LV(i, l) }
         built = false; laidOut = false
@@ -391,6 +393,10 @@ class LyricsRenderer {
         val i = findIdx(lines, pos); val e = if (i >= 0) lineEnd(lines[i]) else null; val out = e != null && pos >= e
         val nx = lines.getOrNull(i + 1)
         var si = if (S.learly && nx?.t != null && pos >= nx.t!! - S.learlyMs / 1000.0) i + 1 else i
+        // the small window: off to the next line as soon as this one is sung, there as its first word is (the gap sets the
+        // pace). A break's dots keep their own timing, and the Focus style brings each line in its own way
+        val paced = smallWindow() && S.lsmooth && !S.xFocus
+        if (paced && out && nx != null && !nx.dots && gapScroll(e, nx.t) != null) si = i + 1
         var fi = -2; var fo = false; var fn = ""; var fs = ""
         if (S.xFocus) {   // a line is due on screen 200 ms before it's sung, but the line before holds until it's sung to the end
             // a break (its dots) holds until the next line is due, as a line holds until it's sung (it went at once,
@@ -416,6 +422,10 @@ class LyricsRenderer {
         while (k >= 0 && k >= i - 6) { val l = lines[k]; if (!l.dots) { val ek = lineEnd(l); if (ek != null && pos >= l.t!! && pos < ek) ak.append(k).append(',') }; k-- }
         val aks = ak.toString()
         run { var n = lines.size - 1; while (n >= 0 && lines[n].dots) n--; val all = i > n || (i == n && (out || (e == null && pos >= (lines[n].t ?: 0.0) + 4))); if (all != allsung) allsung = all }
+        if (si != lsi) {   // only one line on (a seek goes at the usual pace)
+            val dest = lines.getOrNull(si)
+            paceUntil = if (paced && si == lsi + 1 && dest != null && !dest.dots) gapScroll(lineEnd(lines.getOrNull(si - 1)), dest.t)?.let { t + it * 1000 } ?: 0.0 else 0.0
+        }
         if (i != li || out != lOut || fi != lfi || fo != lfo || fn != lfn || fs != lfs || aks != lActKey) {
             lOut = out; lsi = si; lfi = fi; lfo = fo; lfn = fn; lfs = fs
             lAct = aks.split(',').filter { it.isNotEmpty() }.map { it.toInt() }.toSet(); lActKey = aks
@@ -556,7 +566,11 @@ class LyricsRenderer {
 
     private fun band(a: Float, b: Float) { val n = now(); bandT.set(a, n, 550.0, Ease.eOut); bandB.set(b, n, 550.0, Ease.eOut) }
 
-    private fun setLyY(y: Float, t: Double) { if (!lyFree) lyY.set(y, t, if (S.lsmooth) 550.0 else 0.0, Ease.eOut) }
+    private fun setLyY(y: Float, t: Double) {
+        if (lyFree) return
+        val left = paceUntil - t   // the small window's scroll over a gap: spread over all of it (eOut is there in a moment)
+        if (left > 0) lyY.set(y, t, left, Ease.ease) else lyY.set(y, t, if (S.lsmooth) 550.0 else 0.0, Ease.eOut)
+    }
 
     /* ---- scrolling through the lyrics by hand, as in Spicy Lyrics ---- */
     fun freeBy(dy: Float) {

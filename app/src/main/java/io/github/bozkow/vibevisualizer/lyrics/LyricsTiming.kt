@@ -74,6 +74,12 @@ fun tallLineTop(view: Float, m: Float, h: Float, sung: Float, last: Float, ended
  *  Focus style's cover takes their place (LyricsRenderer's COVER_BREAK). */
 const val DOTS_FROM = 3.0
 
+/** How long (s) the small window's scroll to the next line takes: the gap between this line's last word and that line's
+ *  first, so it arrives as that word is sung, quicker the shorter the gap. No gap, or lines that overlap: its quickest.
+ *  Never longer than a gap without dots can be. Null when the line's end isn't known (LRC, a break's dots). */
+fun gapScroll(end: Double?, next: Double?): Double? =
+    if (end == null || next == null) null else (next - end).coerceIn(.3, DOTS_FROM)
+
 /** "• • •" lines for the intro and for instrumental gaps of [DOTS_FROM] seconds or more; shorter or trailing ones are
  *  dropped. (Up to 0.39.1 only from 5 s: a local file's 3–5 s pauses had none.) */
 fun interludes(ls: List<Line>): List<Line> {

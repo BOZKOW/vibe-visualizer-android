@@ -98,6 +98,16 @@ class ParseTest {
         assertEquals("the last ends with the window", 3.0, ls[6].end, .001)
     }
 
+    @Test fun theSmallWindowsScrollTakesTheGapBetweenTheLines() {
+        assertEquals("the gap it is", 1.2, gapScroll(10.0, 11.2)!!, 1e-9)
+        assertEquals("a short gap: its quickest", .3, gapScroll(10.0, 10.05)!!, 1e-9)
+        assertEquals("no gap at all", .3, gapScroll(10.0, 10.0)!!, 1e-9)
+        assertEquals("lines that overlap", .3, gapScroll(10.0, 9.0)!!, 1e-9)
+        assertEquals("never slower than where the dots start", DOTS_FROM, gapScroll(10.0, 30.0)!!, 1e-9)
+        assertTrue("no end known: the usual scroll", gapScroll(null, 11.0) == null)
+        assertTrue("no next time known", gapScroll(10.0, null) == null)
+    }
+
     @Test fun aTallLineScrollsWithTheSinging() {
         val view = 300f; val m = 20f   // 260 of room, for a line of 600 with its last words at 500 and a translation under them
         fun top(sung: Float, ended: Boolean = false) = tallLineTop(view, m, 600f, sung, 500f, ended)
