@@ -130,8 +130,7 @@ class LyricsRenderer {
     private var restAt = 0.0
     var covered = false   // the break's cover is fully over the lyrics on screen (set by the Lyrics screen)
     var lineAtTop: () -> Boolean = { false }   // the line being sung at the top, not the middle (the small window's setting)
-    var gapPaced: () -> Boolean = { false }     // the small window and on its side: the scroll to the next line goes at the pace of the gap
-    private var paceUntil = 0.0                 // when that scroll arrives
+    var softScroll: () -> Boolean = { false }  // the small window and on its side: the scroll glides instead of snapping into place
     private var lyFreeY = 0f; private var lyFreeAt = 0.0
     var dragged = false
     private var lyTall = false; private var lyTallAt = 0.0
@@ -172,7 +171,7 @@ class LyricsRenderer {
         lines = ls; sync = isSync
         duet = ls.any { it.opp }
         li = -2; lsi = -2; lfi = -2; lfo = false; lfn = ""; lfs = ""; lfnSet = emptySet(); lfsSet = emptySet(); lAct = emptySet(); lActKey = ""; lOut = false
-        moving.clear(); lyTall = false; bandT.snap(-1f); bandB.snap(-1f); stPos = null; paceUntil = 0.0
+        moving.clear(); lyTall = false; bandT.snap(-1f); bandB.snap(-1f); stPos = null
         if (!quiet) { stScroll = 0f; lyFree = false }
         lv = ls.mapIndexed { i, l -> LV(i, l) }
         built = false; laidOut = false
@@ -394,10 +393,6 @@ class LyricsRenderer {
         val i = findIdx(lines, pos); val e = if (i >= 0) lineEnd(lines[i]) else null; val out = e != null && pos >= e
         val nx = lines.getOrNull(i + 1)
         var si = if (S.learly && nx?.t != null && pos >= nx.t!! - S.learlyMs / 1000.0) i + 1 else i
-        // the small window and on its side: off to the next line as soon as this one is sung, there as its first word is
-        // (the gap sets the pace). A break's dots keep their own timing, and the Focus style brings each line in its own way
-        val paced = gapPaced() && S.lsmooth && !S.xFocus
-        if (paced && out && nx != null && !nx.dots && gapScroll(e, nx.t) != null) si = i + 1
         var fi = -2; var fo = false; var fn = ""; var fs = ""
         if (S.xFocus) {   // a line is due on screen 200 ms before it's sung, but the line before holds until it's sung to the end
             // a break (its dots) holds until the next line is due, as a line holds until it's sung (it went at once,
@@ -423,10 +418,6 @@ class LyricsRenderer {
         while (k >= 0 && k >= i - 6) { val l = lines[k]; if (!l.dots) { val ek = lineEnd(l); if (ek != null && pos >= l.t!! && pos < ek) ak.append(k).append(',') }; k-- }
         val aks = ak.toString()
         run { var n = lines.size - 1; while (n >= 0 && lines[n].dots) n--; val all = i > n || (i == n && (out || (e == null && pos >= (lines[n].t ?: 0.0) + 4))); if (all != allsung) allsung = all }
-        if (si != lsi) {   // only one line on (a seek goes at the usual pace)
-            val dest = lines.getOrNull(si)
-            paceUntil = if (paced && si == lsi + 1 && dest != null && !dest.dots) gapScroll(lineEnd(lines.getOrNull(si - 1)), dest.t)?.let { t + it * 1000 } ?: 0.0 else 0.0
-        }
         if (i != li || out != lOut || fi != lfi || fo != lfo || fn != lfn || fs != lfs || aks != lActKey) {
             lOut = out; lsi = si; lfi = fi; lfo = fo; lfn = fn; lfs = fs
             lAct = aks.split(',').filter { it.isNotEmpty() }.map { it.toInt() }.toSet(); lActKey = aks
@@ -575,12 +566,12 @@ class LyricsRenderer {
 
     private fun setLyY(y: Float, t: Double) {
         if (lyFree) return
-        // the small window, on its side, and a tall line anywhere: they glide, keeping their speed when the target moves
-        // on (a line following the singing, the next scroll starting before this one's done)
-        if (S.lsmooth && (gapPaced() || lyTall)) {
+        // the small window, on its side, and a tall line anywhere: the same half second, but gliding instead of snapping
+        // into place, and keeping its speed when the target moves on (a line following the singing). A speed set by the
+        // gap between the lines was tried in 0.41.6: the owner wanted this timing back
+        if (S.lsmooth && (softScroll() || lyTall)) {
             if (!gliding) { lyG.snap(lyY.value(t)); gliding = true }
-            val left = paceUntil - t   // a scroll over a gap takes all of it
-            lyG.set(y, t, if (left > 0) max(left, 200.0) else 550.0)
+            lyG.set(y, t, 550.0)
             return
         }
         if (gliding) { lyY.snap(lyG.value(t)); gliding = false }

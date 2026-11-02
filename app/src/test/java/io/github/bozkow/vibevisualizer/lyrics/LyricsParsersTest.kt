@@ -98,16 +98,6 @@ class ParseTest {
         assertEquals("the last ends with the window", 3.0, ls[6].end, .001)
     }
 
-    @Test fun theScrollTakesTheGapBetweenTheLines() {
-        assertEquals("the gap it is", 1.2, gapScroll(10.0, 11.2)!!, 1e-9)
-        assertEquals("a short gap: its quickest", .3, gapScroll(10.0, 10.05)!!, 1e-9)
-        assertEquals("no gap at all", .3, gapScroll(10.0, 10.0)!!, 1e-9)
-        assertEquals("lines that overlap", .3, gapScroll(10.0, 9.0)!!, 1e-9)
-        assertEquals("never slower than where the dots start", DOTS_FROM, gapScroll(10.0, 30.0)!!, 1e-9)
-        assertTrue("no end known: the usual scroll", gapScroll(null, 11.0) == null)
-        assertTrue("no next time known", gapScroll(10.0, null) == null)
-    }
-
     @Test fun aGlideArrivesOnTimeAndKeepsItsSpeedWhenTheTargetMoves() {
         val g = Glide(0f); g.value(0.0); g.set(100f, 0.0, 1000.0)
         assertTrue("a soft start", g.value(50.0) < 10f)
