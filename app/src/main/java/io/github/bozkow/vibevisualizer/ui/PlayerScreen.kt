@@ -1123,7 +1123,8 @@ fun PipCanvas() {
 
 @Composable
 private fun CanvasView() {
-    AndroidView({ ctx -> TextureView(ctx).also { CanvasVideo.bindView(it) } }, Modifier.fillMaxSize(), update = { tv -> tv.post { coverFit(tv) } }, onRelease = { CanvasVideo.unbind(it) })
+    // fitted again whenever its size changes: turned on its side, it kept the upright size's numbers and the video stretched
+    AndroidView({ ctx -> TextureView(ctx).also { tv -> CanvasVideo.bindView(tv); tv.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> coverFit(tv) } } }, Modifier.fillMaxSize(), onRelease = { CanvasVideo.unbind(it) })
 }
 
 /** A long break on the upright Lyrics screen: the cover takes the lyrics' place (not while you scroll them, nor while a
