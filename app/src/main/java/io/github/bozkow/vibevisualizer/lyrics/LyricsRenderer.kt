@@ -489,9 +489,12 @@ class LyricsRenderer {
         var y = if (lineAtTop()) hh * .06f - el.top else hh * (if (S.xFocus) .44f else .38f) - (el.top + el.h / 2)   // Focus: in the middle
         // two lines sung at once (a duet, or lines whose times overlap, as some Spicy Lyrics syncs have): both in view,
         // the pair around the middle, or in the whole height when it's taller; taller than the view, the newer one whole
-        val first = lAct.minOrNull()?.takeIf { it < el.i && !S.xFocus && !lineAtTop() }?.let { k -> lv.firstOrNull { it.i == k } }
+        // (in the Focus style the line in focus is the older one and the newer waits under it: only when it wouldn't fit there)
+        val under = if (S.xFocus) lfnSet.maxOrNull()?.takeIf { it > el.i }?.let { k -> lv.firstOrNull { it.i == k } }?.takeIf { it.top + it.h + y > hh * .8f } else null
+        val first = when { lineAtTop() -> null; S.xFocus -> under?.let { el }; else -> lAct.minOrNull()?.takeIf { it < el.i }?.let { k -> lv.firstOrNull { it.i == k } } }
+        val lower = under ?: el
         if (first != null) {
-            val top0 = first.top; val bot = el.top + el.h
+            val top0 = first.top; val bot = lower.top + lower.h
             val span = bot - top0
             y = when {
                 span <= hh * .64f -> hh * .46f - (top0 + bot) / 2   // around the middle
@@ -500,7 +503,7 @@ class LyricsRenderer {
                 // even they're too far apart, the earlier one's near the top and the newer one below as far as there's
                 // room; followed as the singing moves on
                 else -> {
-                    val a = top0 + sungRow(first, pos); val b = el.top + sungRow(el, pos)
+                    val a = top0 + sungRow(first, pos); val b = lower.top + sungRow(lower, pos)
                     if (b - a <= hh * .84f) hh * .5f - (a + b) / 2 else min(hh * .07f - top0, hh * .14f - a)
                 }
             }
@@ -515,17 +518,38 @@ class LyricsRenderer {
         setLyY(fitLine(el, y, pos), t)
     }
 
-    private fun sungRow(d: LV, pos: Double): Float {   // how far down the line (px) the words being sung are
+    /** How far down the line (px) the words being sung are: its words and background vocals, not what's under them. A
+     *  line without word timing goes by its own time (it stayed at its top, so a tall one never moved). */
+    private fun sungRow(d: LV, pos: Double): Float {
         var best: Float? = null; var bt = Double.NEGATIVE_INFINITY
-        for (r in d.rows) r.pieces?.forEach { pc -> if (pc.ts.t <= pos && pc.ts.t > bt) { bt = pc.ts.t; best = F * linePad() + r.y + pc.y + F * r.fs * r.fit * r.lh / 2 } }
-        return best ?: 0f
+        for (r in d.rows) { if (r.kind > 1) continue; r.pieces?.forEach { pc -> if (pc.ts.t <= pos && pc.ts.t > bt) { bt = pc.ts.t; best = F * linePad() + r.y + pc.y + F * r.fs * r.fit * r.lh / 2 } } }
+        best?.let { return it }
+        val r = d.rows.firstOrNull { it.kind == 0 && it.pieces == null } ?: return 0f
+        val t0 = d.l.t ?: return 0f; val e = lineEnd(d.l) ?: lines.getOrNull(d.i + 1)?.t ?: return 0f
+        return if (e <= t0) 0f else F * linePad() + r.y + r.h * ((pos - t0) / (e - t0)).coerceIn(0.0, 1.0).toFloat()
+    }
+
+    /** Where the line's last words are (px down it): what comes after them (a translation) is what's left to show. */
+    private fun lastSung(d: LV): Float {
+        var best = 0f
+        for (r in d.rows) {
+            if (r.kind > 1) continue
+            val ps = r.pieces
+            if (ps != null) ps.forEach { pc -> best = max(best, F * linePad() + r.y + pc.y + F * r.fs * r.fit * r.lh / 2) }
+            else if (r.kind == 0) best = max(best, F * linePad() + r.y + r.h)
+        }
+        return best
     }
 
     private fun fitLine(el: LV, y: Float, pos: Double): Float {
         val h = el.h; val m = max(18 * dens, H * .05f); var t = el.top + y; lyTall = false
-        if (S.xFocus || lyFree || H <= 0 || (t >= H * .14f && t + h <= H * .8f)) { band(-1f, -1f); return y }   // it fits: the usual band
+        if (lyFree || H <= 0 || (t >= H * .14f && t + h <= H * .8f)) { band(-1f, -1f); return y }   // it fits: the usual band
         if (h <= H - 2 * m) t = max(m, min(t, H - m - h))   // the whole line in view, as high as it needs to go
-        else { lyTall = true; t = max(H - m - h, min(m, H * .4f - sungRow(el, pos))); band(m, H - m); return t - el.top }   // taller than everything: the words being sung stay in view
+        else {   // taller than everything: it scrolls with the singing, in the line's own timing (the small window, on its side)
+            lyTall = true; val e = lineEnd(el.l)
+            t = tallLineTop(H, m, h, sungRow(el, pos), lastSung(el), e != null && pos >= e)
+            band(m, H - m); return t - el.top
+        }
         band(max(0f, min(H * .14f, t - 2)), min(H, max(H * .8f, t + h + 2)))
         return t - el.top
     }

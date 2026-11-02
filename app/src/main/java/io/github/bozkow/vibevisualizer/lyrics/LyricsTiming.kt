@@ -56,6 +56,20 @@ private fun evenPace(grp: List<Word>, rt: List<TS>): Boolean {
     return rt.withIndex().all { (k, x) -> val tsr = (x.end - x.t) / du; val cs = grp[k].text.length.toDouble() / ch; tsr >= cs / 3 && tsr <= cs * 3 }
 }
 
+/** Where a line taller than the view sits (its top, px in the view): it scrolls with the singing, from its top as it
+ *  starts to its foot, with the translation under it, by the time its last words are sung. [view]: the view's height;
+ *  [m]: kept clear at both ends; [h]: the line's height; [sung]: how far down it the words being sung are; [last]: where
+ *  its last words are; [ended]: sung to the end. The words being sung stay in view, even under a translation taller than
+ *  the view. (minOf and maxOf: a window too small to have room mustn't throw.) */
+fun tallLineTop(view: Float, m: Float, h: Float, sung: Float, last: Float, ended: Boolean): Float {
+    val foot = view - m - h
+    if (ended) return foot
+    val k = if (last > 0f) minOf(sung / last, 1f) else 0f
+    val edge = maxOf(view - 2 * m, 0f) * .1f
+    val t = minOf(maxOf(m + (foot - m) * k, m + edge - sung), view - m - edge - sung)
+    return minOf(maxOf(t, foot), m)
+}
+
 /** A pause this long (s) gets its "• • •", as in Spicy Lyrics (its getLyricsBetweenShow), however long it is; only the
  *  Focus style's cover takes their place (LyricsRenderer's COVER_BREAK). */
 const val DOTS_FROM = 3.0

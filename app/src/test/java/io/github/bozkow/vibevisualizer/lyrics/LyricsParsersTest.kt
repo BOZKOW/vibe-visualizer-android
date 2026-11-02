@@ -98,6 +98,29 @@ class ParseTest {
         assertEquals("the last ends with the window", 3.0, ls[6].end, .001)
     }
 
+    @Test fun aTallLineScrollsWithTheSinging() {
+        val view = 300f; val m = 20f   // 260 of room, for a line of 600 with its last words at 500 and a translation under them
+        fun top(sung: Float, ended: Boolean = false) = tallLineTop(view, m, 600f, sung, 500f, ended)
+        assertEquals("it starts at its top", m, top(0f), .5f)
+        assertEquals("its foot is in view when the last words are sung", view - m - 600f, top(500f), .5f)
+        assertEquals("and stays once it's sung", view - m - 600f, top(500f, ended = true), .5f)
+        var was = m + 1
+        for (sung in 0..500 step 25) {
+            val t = top(sung.toFloat()); assertTrue("it only goes up", t <= was); was = t
+            val at = t + sung; assertTrue("the words being sung stay in view: $at", at >= m && at <= view - m)
+        }
+    }
+
+    @Test fun aTranslationTallerThanTheViewKeepsTheWordsInView() {
+        val view = 200f; val m = 20f
+        val at = tallLineTop(view, m, 900f, 400f, 400f, false) + 400f   // 500 of translation under the last words
+        assertTrue("$at", at >= m && at <= view - m)
+    }
+
+    @Test fun aWindowWithNoRoomDoesntThrow() {
+        tallLineTop(10f, 20f, 100f, 50f, 80f, false); tallLineTop(0f, 0f, 0f, 0f, 0f, false); tallLineTop(30f, 18f, 60f, 0f, 0f, false)
+    }
+
     @Test fun joins() {
         val ws = listOf(Word(0.0, .2, "beau", false), Word(.2, .4, "ti", false), Word(.4, .6, "ful", true))
         val ts = ws.map { TS(it.t, it.end!!) }
