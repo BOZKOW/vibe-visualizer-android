@@ -15,18 +15,29 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.translate
@@ -44,7 +55,11 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -202,15 +217,20 @@ private fun StillBackground() {
 /** The Canvas video, blurred, as the background behind everything: [vid] (the video as the player draws it, recorded)
  *  drawn a second time on the GPU, 96 px along the screen's longer side, blurred there and stretched over the screen,
  *  then shaded. Nothing comes back from the GPU: until 0.35.0 a small frame was copied back 12 times a second, and
- *  each copy held up the frame being drawn, so the lyrics stuttered (the more the video moved, the worse). */
+ *  each copy held up the frame being drawn, so the lyrics stuttered (the more the video moved, the worse). [vidSize]: how
+ *  big [vid]'s recording is, as state: it's recorded after this is drawn, so this draws again once it's there (coming back
+ *  from the small window it had nothing to draw and nothing asked again, so the background stayed dark). [wide]: on its
+ *  side, blurred more. */
 @Composable
-fun CanvasBlur(vid: GraphicsLayer) {
+fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false) {
     val cvA by animateFloatAsState(if (CanvasVideo.cvlive) 1f else 0f, tween(800), label = "cv")
     if (cvA <= 0f) return
+    val vs = vidSize()   // (read here, not as it draws: there it never asked again, seen in a log of each draw)
     val small = rememberGraphicsLayer()
+    DisposableEffect(small) { Frost.video = small; onDispose { if (Frost.video === small) Frost.video = null } }
     val cf = remember(S.bri, S.sat) { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) }) }
-    Canvas(Modifier.fillMaxSize()) {
-        val lw = vid.size.width; val lh = vid.size.height
+    Canvas(Modifier.fillMaxSize().onSizeChanged { Frost.screen = it }) {
+        val lw = vs.width; val lh = vs.height
         if (lw > 0 && lh > 0) {
             val k = 96f / maxOf(size.width, size.height)
             val sw = maxOf(1, (size.width * k).roundToInt()); val sh = maxOf(1, (size.height * k).roundToInt())
@@ -218,7 +238,7 @@ fun CanvasBlur(vid: GraphicsLayer) {
             // own softness, here in 96-px pixels (a blur radius r is a sigma of .577 r + .5)
             val rf = S.bgblur * .025
             val sigma = 2f * kotlin.math.sqrt(.36 + rf * (rf + 1)).toFloat()
-            val r = ((sigma - .5f) / .57735f).coerceAtLeast(.5f)
+            val r = (((if (wide) sigma * 2f else sigma) - .5f) / .57735f).coerceAtLeast(.5f)
             small.renderEffect = BlurEffect(r, r, TileMode.Clamp)
             small.colorFilter = cf
             small.alpha = cvA
@@ -230,5 +250,53 @@ fun CanvasBlur(vid: GraphicsLayer) {
             scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(small) }
         }
         drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = .15f * cvA), Color.Black.copy(alpha = .55f * cvA)), Offset(size.width * .7f, size.height * .5f), maxOf(size.width, size.height) * .8f))
+    }
+}
+
+/** On its side the seek bar and the buttons lie right on the cover or the video, so they're frosted instead of see-through
+ *  (upright only blur is behind them). No blur is run for them: they show part of a picture that's blurred already, the
+ *  Canvas's copy above or the cover's, made once a song. */
+val LocalFrost = staticCompositionLocalOf { false }
+
+object Frost {
+    var video by mutableStateOf<GraphicsLayer?>(null)   // the Canvas, blurred ([CanvasBlur])
+    var screen = IntSize.Zero                           // the size that's drawn at
+    var cover by mutableStateOf(Rect.Zero)              // where the cover is, in the window
+}
+
+/** Draws what a frosted thing at [at] (in the window) shows, as a DrawScope call. */
+@Composable
+fun frostPainter(): DrawScope.(Offset) -> Unit {
+    Visuals.bakeVer
+    val src = Visuals.kwSrc
+    val img = remember(src) { src?.asImageBitmap() }
+    return remember(img) { { at -> drawFrost(img, at) } }
+}
+
+private fun DrawScope.drawFrost(img: ImageBitmap?, at: Offset) {
+    drawRect(Color(0xFF18181E))   // never see-through, whatever's there yet
+    val v = Frost.video; val scr = Frost.screen
+    if (v != null && v.size.width > 0 && scr.width > 0) {
+        translate(-at.x, -at.y) { scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) } }
+    } else if (img != null) {
+        val c = Frost.cover; val iw = img.width; val ih = img.height
+        val k = iw / (if (c.width > 0f) c.width else maxOf(size.width, 1f))
+        val sw = (size.width * k).roundToInt().coerceIn(1, iw); val sh = (size.height * k).roundToInt().coerceIn(1, ih)
+        val sx = ((at.x - c.left) * k).roundToInt().coerceIn(0, iw - sw); val sy = ((at.y - c.top) * k).roundToInt().coerceIn(0, ih - sh)
+        drawImage(img, IntOffset(sx, sy), IntSize(sw, sh), IntOffset.Zero, IntSize(size.width.roundToInt() + 1, size.height.roundToInt() + 1), filterQuality = FilterQuality.Low)
+    }
+    drawRect(Color.Black.copy(alpha = .35f))   // the white on it keeps reading on a bright cover
+}
+
+/** A round button's frost, on its side only. [inset]: when the button is drawn smaller than it's laid out. */
+fun Modifier.frosted(inset: Dp = 0.dp): Modifier = composed {
+    if (!LocalFrost.current) return@composed Modifier
+    var at by remember { mutableStateOf(Offset.Zero) }
+    val paint = frostPainter()
+    val clip = remember { Path() }
+    Modifier.onGloballyPositioned { at = it.positionInWindow() }.drawBehind {
+        val i = inset.toPx()
+        clip.reset(); clip.addOval(Rect(i, i, size.width - i, size.height - i))
+        clipPath(clip) { paint(at) }
     }
 }

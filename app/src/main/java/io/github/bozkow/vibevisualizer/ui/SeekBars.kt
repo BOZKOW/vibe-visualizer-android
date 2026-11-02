@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
@@ -29,7 +30,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
@@ -94,8 +97,9 @@ fun WavySeek(frac: Float, wavy: Boolean, onDrag: (Float) -> Unit, onDone: (Float
 /** The seek bar as Spicy Lyrics Mobile draws it: a thick pill with a soft outline that fills from the left, no thumb.
  *  [frac] is read when it's drawn, so a playing song only repaints the bar (it rebuilt the whole row every frame). */
 @Composable
-fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Unit, enabled: Boolean, thick: androidx.compose.ui.unit.Dp = 12.dp, modifier: Modifier = Modifier) {
+fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Unit, enabled: Boolean, thick: androidx.compose.ui.unit.Dp = 12.dp, modifier: Modifier = Modifier, under: (DrawScope.() -> Unit)? = null) {
     val drag by rememberUpdatedState(onDrag); val done by rememberUpdatedState(onDone)
+    val clip = remember { Path() }   // [under]: what the track shows instead of what's behind it (Frost)
     var last by remember { mutableFloatStateOf(0f) }
     Canvas(modifier.fillMaxWidth().height(30.dp)
         .semantics {
@@ -110,6 +114,7 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
             }
         }) {
         val h = thick.toPx(); val y = (size.height - h) / 2; val r = CornerRadius(h / 2); val w = size.width
+        if (under != null) { clip.reset(); clip.addRoundRect(RoundRect(0f, y, w, y + h, r)); clipPath(clip) { under() } }
         drawRoundRect(Color.White.copy(alpha = if (enabled) .14f else .07f), Offset(0f, y), Size(w, h), r)
         drawRoundRect(Color.White.copy(alpha = .22f), Offset(.5f, y + .5f), Size(w - 1f, h - 1f), r, style = Stroke(1.dp.toPx()))
         val x = frac().coerceIn(0f, 1f) * w

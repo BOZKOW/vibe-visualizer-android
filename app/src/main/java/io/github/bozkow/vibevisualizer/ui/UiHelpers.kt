@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.WindowInsets
@@ -253,6 +254,25 @@ fun cutoutInsets(): androidx.compose.foundation.layout.WindowInsets {
         }
     }
     return androidx.compose.foundation.layout.WindowInsets(l, t, r, b)
+}
+
+/** Whether the top of the phone, with its camera, is on the left. Goes by how the phone is held, not what it reports about
+ *  the hole; turning it right over changes nothing else the app is told, so this listens to the display. */
+@Composable
+fun cameraOnLeft(): Boolean {
+    val v = androidx.compose.ui.platform.LocalView.current
+    var rot by remember { androidx.compose.runtime.mutableIntStateOf(v.display?.rotation ?: 0) }
+    androidx.compose.runtime.DisposableEffect(v) {
+        val dm = v.context.getSystemService(android.hardware.display.DisplayManager::class.java)
+        val l = object : android.hardware.display.DisplayManager.DisplayListener {
+            override fun onDisplayAdded(id: Int) {}
+            override fun onDisplayRemoved(id: Int) {}
+            override fun onDisplayChanged(id: Int) { v.display?.let { rot = it.rotation } }
+        }
+        dm.registerDisplayListener(l, android.os.Handler(android.os.Looper.getMainLooper()))
+        onDispose { dm.unregisterDisplayListener(l) }
+    }
+    return rot == android.view.Surface.ROTATION_90
 }
 
 /** The cutout as Android reports it and where it is, for the debug info. */

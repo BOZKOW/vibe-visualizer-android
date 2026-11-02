@@ -23,8 +23,12 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.SizeTransform
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
@@ -232,8 +236,8 @@ private fun LyricsWithLyrics() {
         val over = rk >= .99f
         androidx.compose.runtime.SideEffect { Lyr.view.covered = over }
         androidx.compose.runtime.DisposableEffect(Unit) { onDispose { Lyr.view.covered = false } }
-        Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
-            LyricsPane(Modifier.fillMaxSize().graphicsLayer { alpha = (1f - rk).coerceIn(0f, 1f) }, areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false)
+        Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }) {   // (under all the rest: the lyrics run behind it)
+            LyricsPane(Modifier.fillMaxSize().graphicsLayer { alpha = (1f - rk).coerceIn(0f, 1f) }, areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false, behind = true)
             if (rk > .01f) Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp).ambientOut()
                 .graphicsLayer { alpha = rk.coerceIn(0f, 1f); val s = .9f + .1f * rk; scaleX = s; scaleY = s }, contentAlignment = Alignment.Center) {
                 CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
@@ -296,7 +300,9 @@ private val hideCtl = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(
  *  the song centred over it, the lyrics on the right); otherwise the cover as tall as the screen on the left. */
 @Composable
 private fun LandscapeSplit() {
-    Crossfade(CanvasVideo.cvmode, label = "landcv") { cv -> if (cv) LandscapeCanvas() else LandscapeCover() }
+    androidx.compose.runtime.CompositionLocalProvider(LocalFrost provides true) {
+        Crossfade(CanvasVideo.cvmode, label = "landcv") { cv -> if (cv) LandscapeCanvas() else LandscapeCover() }
+    }
 }
 
 /** With a Canvas, the desktop's: the video fills the left half behind (the backdrop), and over it where it plays (and
@@ -334,8 +340,9 @@ private fun LandscapeCanvas() {
  *  cover. When the controls hide, the cover has its middle back. */
 @Composable
 private fun LandscapeCover() {
-    Row(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
-        Box(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true).ambientOut()) {
+    // further in on the camera's side: the owner's phone still had the cover in the hole with the room it reports
+    Row(Modifier.fillMaxSize().padding(start = if (cameraOnLeft()) 48.dp else 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp)) {
+        Box(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true).ambientOut().onGloballyPositioned { Frost.cover = it.boundsInWindow() }) {
             CoverArt(Modifier.fillMaxSize(), corner = 18.dp)
             var headH by remember { mutableFloatStateOf(0f) }
             var footH by remember { mutableFloatStateOf(0f) }
@@ -385,9 +392,9 @@ private fun SideColumn(modifier: Modifier) {
         val bars = barsInstead()
         if (bars && E.screen != "viz") NoLyricsNote(Modifier.fillMaxWidth())
         var areaH by remember { mutableFloatStateOf(0f) }
-        Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
+        Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }) {
             if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 8.dp)); AwayNote(Modifier.align(Alignment.Center)) }
-            else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false)
+            else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false, behind = true)
         }
         if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(34.dp))
         SongInfo(big = false, lyrics = !bars, name = false, seek = false)
@@ -686,7 +693,7 @@ private fun SmallToggle(icon: ImageVector?, desc: String, on: Boolean, text: Str
     val pop = remember { Animatable(1f) }
     LaunchedEffect(on) { if (!S.low && !E.reduceMotion() && pop.value == 1f) { pop.snapTo(.82f); pop.animateTo(1f, spring(.45f, Spring.StiffnessMedium)) } }
     // like the seek bar: tapped while the controls are hidden, it only does its job (they stay away)
-    IconButton(onClick = { E.haptic(); onClick() }, Modifier.quietTouch().graphicsLayer { scaleX = pop.value; scaleY = pop.value }
+    IconButton(onClick = { E.haptic(); onClick() }, Modifier.quietTouch().graphicsLayer { scaleX = pop.value; scaleY = pop.value }.frosted(inset = 4.dp)
         .semantics { contentDescription = desc; selected = on },
         colors = IconButtonDefaults.iconButtonColors(containerColor = bg, contentColor = fg)) {
         if (icon != null) Icon(icon, null, Modifier.size(20.dp)) else Text(text ?: "", fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -828,7 +835,7 @@ private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp
     // on: filled white with a dark icon, as the translate and romanize buttons, so on and off can't be mistaken
     val fg = androidx.compose.ui.graphics.lerp(Color.White, Color(0xFF111116), k)
     // off: frosted glass (GlassFill and GlassEdge, as the seek bar's track)
-    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).background(Color.White.copy(alpha = .12f + .8f * k))
+    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).frosted().background(Color.White.copy(alpha = .12f + .8f * k))
         .border(1.dp, Color.White.copy(alpha = .22f + .7f * k), CircleShape).clickable(src, androidx.compose.material3.ripple(), enabled = enabled) { E.haptic(); onClick() }
         .semantics { contentDescription = desc; selected = on }, contentAlignment = Alignment.Center) {
         if (icon != null) Icon(icon, null, Modifier.size(d * .42f), tint = fg)
@@ -894,9 +901,13 @@ private fun SeekRow(inline: Boolean = false) {
     // Scrub preview (Experiments): while you drag, a bubble above your finger with the time you'd jump to, and the
     // times say the same; off, they show where the song really is until you let go
     val scrub = S.b("xScrub")
+    // on its side, frosted: it lies right on the cover or the video
+    var at by remember { mutableStateOf(Offset.Zero) }
+    val paintFrost = if (LocalFrost.current) frostPainter() else null
+    val under: (androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit)? = if (paintFrost != null) ({ paintFrost(this, at) }) else null
     val bar = @Composable { m: Modifier ->
         Box(m) {
-            ThickSeek(frac, thick = thick, onDrag = { f -> drag = f; E.seekDrag(true) }, onDone = { f -> if (drag == null) E.seekDrag(true); drag = null; E.seekFraction(f); E.seekDrag(false) }, enabled = E.src != "none" && dur > 0, modifier = Modifier.quietTouch())
+            ThickSeek(frac, thick = thick, onDrag = { f -> drag = f; E.seekDrag(true) }, onDone = { f -> if (drag == null) E.seekDrag(true); drag = null; E.seekFraction(f); E.seekDrag(false) }, enabled = E.src != "none" && dur > 0, under = under, modifier = Modifier.quietTouch().then(if (under != null) Modifier.onGloballyPositioned { at = it.positionInWindow() } else Modifier))
             if (scrub) ScrubTip(d0 != null, d0 ?: 0f, fmtTime((d0 ?: 0f) * dur))
         }
     }
@@ -1050,7 +1061,12 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
 
     // the video, recorded as it's drawn, so the background can draw it again blurred (on the GPU, see CanvasBlur)
     val vid = rememberGraphicsLayer()
-    CanvasBlur(vid)
+    var vidSize by remember { mutableStateOf(IntSize.Zero) }
+    CanvasBlur(vid, { vidSize }, wide)
+    // on its side the sharp video first blurs where it is, then fades into the blurred background (straight from sharp to the
+    // blurred copy, which sits elsewhere, the two showed as an edge)
+    val sideR = with(d) { 28.dp.toPx() }
+    val soft = wide && !S.low && c <= 0f
     Box((if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f))
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.22f / .56f) * c }.drawWithContent {
             drawContent()
@@ -1062,7 +1078,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
                 // edge), over a long, eased fade into the blurred Canvas behind
                 // the desktop's: darker at the top and the foot, for the text over it
                 drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .4f), .22f to Color.Transparent, .52f to Color.Transparent, 1f to Color.Black.copy(alpha = .7f)))
-                val s = .4f + .3f * c   // where the fade starts (the desktop's 40 %): long beside the lyrics, short in the middle
+                val s = .3f + .4f * c   // where the fade starts: long beside the lyrics, short in the middle
                 drawRect(Brush.horizontalGradient(0f to Color.Black, *Array(6) { i -> (s + (1 - s) * EASE_AT[i]) to Color.Black.copy(alpha = EASE_A[i]) }), blendMode = BlendMode.DstIn)
                 // in the middle, the same fade on the left
                 if (c > 0f) drawRect(Brush.horizontalGradient(*Array(6) { k -> val j = 5 - k; .3f * (1 - EASE_AT[j]) to Color.Black.copy(alpha = 1 - c * (1 - EASE_A[j])) }, 1f to Color.Black), blendMode = BlendMode.DstIn)
@@ -1073,8 +1089,11 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
                 if (dark) drawRect(shade)
             }
         }) {
-        Box(Modifier.fillMaxSize().graphicsLayer { if (frost) renderEffect = if (size.height < 1f) null else frostBands(size.height, r, topPx / size.height, rampPx / size.height, from, topK) }
-            .drawWithContent { vid.record { this@drawWithContent.drawContent() }; drawLayer(vid) }) { CanvasVideoView() }
+        Box(Modifier.fillMaxSize().graphicsLayer { renderEffect = if (size.height < 1f || size.width < 1f) null else if (frost) frostBands(size.height, r, topPx / size.height, rampPx / size.height, from, topK) else if (soft) sideBlur(size.width, sideR) else null }
+            .drawWithContent {
+                vid.record { this@drawWithContent.drawContent() }; drawLayer(vid)
+                if (vid.size != vidSize) vidSize = vid.size
+            }) { CanvasVideoView() }
     }
 }
 
@@ -1091,6 +1110,15 @@ private fun frostBands(h: Float, r: Float, top0: Float, ramp0: Float, from: Floa
     val up = android.graphics.Color.argb((topK.coerceIn(0f, 1f) * 255).toInt(), 0, 0, 0)   // the top band, only while something's there
     val mask = android.graphics.RenderEffect.createShaderEffect(android.graphics.LinearGradient(0f, 0f, 0f, maxOf(h, 1f),
         intArrayOf(up, up, off, off, on, on), floatArrayOf(0f, top, top + ramp, from, minOf(from + .14f, .99f), 1f), android.graphics.Shader.TileMode.CLAMP))
+    val frosted = android.graphics.RenderEffect.createBlendModeEffect(blur, mask, android.graphics.BlendMode.DST_IN)
+    return android.graphics.RenderEffect.createBlendModeEffect(android.graphics.RenderEffect.createOffsetEffect(0f, 0f), frosted, android.graphics.BlendMode.SRC_OVER).asComposeRenderEffect()
+}
+
+/** On its side: the video, blurred more and more to the right, one blur pass on the GPU as [frostBands]. */
+private fun sideBlur(w: Float, r: Float): androidx.compose.ui.graphics.RenderEffect {
+    val blur = android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
+    val on = android.graphics.Color.BLACK; val off = android.graphics.Color.TRANSPARENT
+    val mask = android.graphics.RenderEffect.createShaderEffect(android.graphics.LinearGradient(0f, 0f, w, 0f, intArrayOf(off, off, on, on), floatArrayOf(0f, .25f, .75f, 1f), android.graphics.Shader.TileMode.CLAMP))
     val frosted = android.graphics.RenderEffect.createBlendModeEffect(blur, mask, android.graphics.BlendMode.DST_IN)
     return android.graphics.RenderEffect.createBlendModeEffect(android.graphics.RenderEffect.createOffsetEffect(0f, 0f), frosted, android.graphics.BlendMode.SRC_OVER).asComposeRenderEffect()
 }

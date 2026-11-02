@@ -106,6 +106,7 @@ class LyricsRenderer {
     /* ================= metrics ================= */
     var W = 0f; private set
     var H = 0f; private set
+    var bleedTop = 0f; var bleedBot = 0f   // how far above and under the area (H) they're drawn: to the screen's ends (LyricsPane's behind)
     private var areaH = 0f
     private var screenH = 0f; private var screenW = 0f
     private var dens = 1f
@@ -649,7 +650,7 @@ class LyricsRenderer {
     /** The line under a tap (y inside the view), or -1. */
     fun lineAt(y: Float): Int {
         if (isStatic) return -1
-        val yy = y - (if (gliding) lyG.v else lyY.v)
+        val yy = y - bleedTop - (if (gliding) lyG.v else lyY.v)
         for (d in lv) if (!d.dots && d.h > 0 && yy >= d.top && yy < d.top + d.h && d.opacity.v > .05f) return d.i
         return -1
     }
@@ -861,7 +862,7 @@ class LyricsRenderer {
         val t = now()
         val la = leaveA.value(t)
         val pad = ceil(F * .7f).toInt()
-        val baseY = if (isStatic) H * .09f - stScroll else if (gliding) lyG.value(t) else lyY.value(t)
+        val baseY = if (isStatic) (if (bleedTop > 0f) 12 * dens else H * .09f) - stScroll else if (gliding) lyG.value(t) else lyY.value(t)
         val st = isStatic
         // credits under the lyrics: right after the last line
         val lastBottom = lv.lastOrNull()?.let { it.top + it.h } ?: 0f
@@ -877,7 +878,7 @@ class LyricsRenderer {
             val inView = d.top + above + fy + (if (enterK < 1f) 26 * dens * (1 - enterK) else 0f)
             val y = baseY + inView
             val hh = max(d.h, d.hText)
-            if (y + hh + pad < -H * .1f || y - pad > H * 1.1f) continue
+            if (y + hh + pad < -H * .1f - bleedTop || y - pad > H * 1.1f + bleedBot) continue
             val avail = W - padL - padR
             val w = (avail + 2 * pad).toInt(); val h = (hh + 2 * pad).toInt().coerceAtLeast(1)
             val layer = d.layer ?: obtain().also { d.layer = it; d.dirty = true }
@@ -887,7 +888,7 @@ class LyricsRenderer {
             }
             // the scroll rounded once, for all of them: each line rounding its own sum stepped at its own moment, so the
             // lines shifted against each other by a pixel as they scrolled
-            layer.topLeft = IntOffset((padL + fx - pad).roundToInt(), baseY.roundToInt() + (inView - pad).roundToInt())
+            layer.topLeft = IntOffset((padL + fx - pad).roundToInt(), bleedTop.roundToInt() + baseY.roundToInt() + (inView - pad).roundToInt())
             layer.alpha = op.coerceIn(0f, 1f)
             val blurPx = if (st || lyFree) 0f else d.blur.value(t) * F
             val tapK = ((t - d.tapAt) / 260).coerceIn(0.0, 1.0).toFloat()

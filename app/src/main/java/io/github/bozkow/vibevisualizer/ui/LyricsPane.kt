@@ -50,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -58,16 +59,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalGraphicsContext
@@ -86,9 +99,11 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** The lyrics area: the lyrics themselves (scroll with a finger, tap a line to jump there), or a message where they go
- *  (looking for them, none, an error, problems). */
+ *  (looking for them, none, an error, problems). [behind]: they run from the top of the screen to its foot, behind what's
+ *  over and under this area (the sibling's zIndex puts them under it), blurred out there; this area stays where the lines are
+ *  placed and where they're touched. Not the Focus style's: its lines fly in and out by themselves. */
 @Composable
-fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact: Boolean = false, padStart: Float = 22f, padEnd: Float = 30f, problems: Boolean = true) {
+fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact: Boolean = false, padStart: Float = 22f, padEnd: Float = 30f, problems: Boolean = true, behind: Boolean = false) {
     val gc = LocalGraphicsContext.current
     val view = Lyr.view
     val dens = LocalDensity.current
@@ -97,19 +112,32 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
     val n = Lyr.lines
     // problems never sit on the lyrics: they're at the top of the screen; in picture-in-picture, without lyrics, here
     val prob = if (n == 0 && problems) E.problems(false).firstOrNull() else null
-    BoxWithConstraints(modifier) {
+    val full = behind && !compact && (!S.xFocus || view.isStatic)
+    var aboveArea by remember { mutableIntStateOf(0) }; var underArea by remember { mutableIntStateOf(0) }   // px of the screen
+    val bleedT = if (full) aboveArea else 0; val bleedB = if (full) underArea else 0
+    val lyr = rememberGraphicsLayer(); val soft = rememberGraphicsLayer()
+    val softFx = remember(dens) { val r = with(dens) { 14.dp.toPx() } / 8f; BlurEffect(r, r, TileMode.Decal) }
+    BoxWithConstraints(modifier.onGloballyPositioned { c ->
+        if (behind) { val y = c.positionInWindow().y.roundToInt().coerceAtLeast(0); aboveArea = y; underArea = (c.findRootCoordinates().size.height - y - c.size.height).coerceAtLeast(0) }
+    }) {
         val wDp = maxWidth.value
         // the lyrics' size: big and bold on a phone, as the web app sizes them on a computer (times Text size)
         val baseSp = when { compact -> 17f * S.i("aPipSize").coerceIn(60, 200) / 100f; wDp < 600 -> 30f; else -> (wDp * .033f).coerceIn(24f, 52f) }
         val fontPx = with(dens) { (baseSp * S.lsize / 100f).sp.toPx() }
         Box(
             Modifier.fillMaxSize()
-                .onSizeChanged { sz -> view.size(sz.width.toFloat(), sz.height.toFloat(), if (areaHeightPx > 0) areaHeightPx else sz.height.toFloat(),
+                .layout { m, c ->
+                    view.bleedTop = bleedT.toFloat(); view.bleedBot = bleedB.toFloat()
+                    val p = m.measure(Constraints.fixed(c.maxWidth, c.maxHeight + bleedT + bleedB))
+                    layout(c.maxWidth, c.maxHeight) { p.place(0, -bleedT) }
+                }
+                .onSizeChanged { sz -> view.size(sz.width.toFloat(), (sz.height - bleedT - bleedB).toFloat(), if (areaHeightPx > 0) areaHeightPx else sz.height.toFloat(),
                     conf.screenWidthDp * dens.density, conf.screenHeightDp * dens.density, dens.density, fontPx, padStart * dens.density, padEnd * dens.density) }
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
+                        if (down.position.y < view.bleedTop || down.position.y > size.height - view.bleedBot) return@awaitEachGesture   // the lyrics seen behind the rest
                         var dragged = false; var lastY = down.position.y; val slop = 8.dp.toPx()
                         val idx = view.lineAt(down.position.y); view.pressed = idx; view.dragged = false; view.bump()
                         while (true) {
@@ -128,10 +156,28 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
         ) {
             Canvas(Modifier.fillMaxSize()) {
                 view.tick.longValue
-                view.draw(this) { gc.createGraphicsLayer() }
-                // the clear band: sharp between two fades (wider for a line too tall for it)
                 val h = size.height
-                if (h > 0) {
+                if (full && h > 0) {
+                    // sharp in this area, blurred from there to the screen's ends, soft where one becomes the other (Low
+                    // performance mode: no blur, they only fade). The blur costs little: at an eighth of the size, one pass.
+                    if (S.low) view.draw(this) { gc.createGraphicsLayer() }
+                    else { lyr.record { view.draw(this) { gc.createGraphicsLayer() } }; drawLayer(lyr) }
+                    val a = bleedT / h; val b = 1f - bleedB / h; val rp = minOf(32.dp.toPx() / h, (b - a) / 2.01f)
+                    drawRect(Brush.verticalGradient(0f to Color.Transparent, a to Color.Transparent, a + rp * .5f to Color.Black.copy(alpha = .5f), a + rp to Color.Black, b - rp to Color.Black, b - rp * .5f to Color.Black.copy(alpha = .5f), b to Color.Transparent, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+                    if (!S.low) {
+                        val sw = maxOf(1, (size.width / 8f).roundToInt()); val sh = maxOf(1, (h / 8f).roundToInt()); val full0 = size
+                        soft.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+                        if (soft.renderEffect !== softFx) soft.renderEffect = softFx
+                        val dim = Color.Black.copy(alpha = .6f)   // what's over them stays easy to read
+                        soft.record(IntSize(sw, sh)) {
+                            scale(sw / full0.width, sh / full0.height, pivot = Offset.Zero) { drawLayer(lyr) }
+                            drawRect(Brush.verticalGradient(0f to dim, a to dim, a + rp to Color.Transparent, b - rp to Color.Transparent, b to dim, 1f to dim), blendMode = BlendMode.DstIn)
+                        }
+                        scale(full0.width / sw, full0.height / sh, pivot = Offset.Zero) { drawLayer(soft) }
+                    }
+                } else if (h > 0) {
+                    view.draw(this) { gc.createGraphicsLayer() }
+                    // the clear band: sharp between two fades (wider for a line too tall for it)
                     val t = (view.bandTop() / h).coerceIn(0.001f, .98f); val b = (view.bandBottom() / h).coerceIn(t + .001f, .999f)
                     drawRect(Brush.verticalGradient(0f to Color.Transparent, t to Color.Black, b to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
                 }
@@ -146,9 +192,12 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                     // they sat on the lines flying in there
                     val focus = S.xFocus && !view.isStatic
                     val a by animateFloatAsState(if (focus) (if (view.allsung) 1f else 0f) else if (view.allsung || view.isStatic) 1f else .55f, tween(600), label = "lcr")
-                    if (a > 0f) Box(Modifier.fillMaxWidth().then(if (focus) Modifier.align(Alignment.CenterStart) else Modifier.offset { IntOffset(0, view.creditsY.roundToInt()) })
-                        .padding(start = padStart.dp, end = padEnd.dp).alpha(a)) {
-                        RefinedCredits(c, view.lineCount() > 0 && Lyr.L.lastOrNull { !it.dots }?.opp == true && S.b("lcredLast"))
+                    // (in this area only: they're for reading, and out there they'd lie sharp behind the rest)
+                    if (a > 0f) Box(Modifier.fillMaxSize().padding(top = with(dens) { bleedT.toDp() }, bottom = with(dens) { bleedB.toDp() }).clipToBounds()) {
+                        Box(Modifier.fillMaxWidth().then(if (focus) Modifier.align(Alignment.CenterStart) else Modifier.offset { IntOffset(0, view.creditsY.roundToInt()) })
+                            .padding(start = padStart.dp, end = padEnd.dp).alpha(a)) {
+                            RefinedCredits(c, view.lineCount() > 0 && Lyr.L.lastOrNull { !it.dots }?.opp == true && S.b("lcredLast"))
+                        }
                     }
                 }
             }
