@@ -143,6 +143,22 @@ class ParseTest {
         }
     }
 
+    @Test fun aTallLineInTheSmallWindowGoesDownWithTheSinging() {
+        val view = 300f; val m = 20f   // 260 of room, for a line of 600 with its last words at 500 and a translation under them
+        fun top(sung: Float, ended: Boolean = false) = pipTallLineTop(view, m, 600f, sung, 500f, ended)
+        assertEquals("it starts at its top", m, top(0f), .5f)
+        assertEquals("its foot is in view when the last words are sung", view - m - 600f, top(500f), .5f)
+        assertEquals("and stays once it's sung", view - m - 600f, top(500f, ended = true), .5f)
+        var was = m + 1
+        for (sung in 0..500 step 25) {
+            val t = top(sung.toFloat()); assertTrue("it only goes up", t <= was); was = t
+            val at = t + sung; assertTrue("the words being sung stay in view: $at", at >= m && at <= view - m)
+        }
+        val at = pipTallLineTop(200f, m, 900f, 400f, 400f, false) + 400f   // 500 of translation under the last words
+        assertTrue("$at", at >= m && at <= 200f - m)
+        pipTallLineTop(10f, 20f, 100f, 50f, 80f, false); pipTallLineTop(0f, 0f, 0f, 0f, 0f, false)   // no room: it mustn't throw
+    }
+
     @Test fun aTranslationTallerThanTheViewKeepsTheWordsInView() {
         val view = 200f; val m = 20f
         val at = tallLineTop(view, m, 900f, 400f, 50f, false) + 400f   // 500 of translation under the last words

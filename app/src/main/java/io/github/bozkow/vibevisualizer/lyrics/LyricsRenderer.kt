@@ -131,7 +131,8 @@ class LyricsRenderer {
     private var restAt = 0.0
     var covered = false   // the break's cover is fully over the lyrics on screen (set by the Lyrics screen)
     var lineAtTop: () -> Boolean = { false }   // the line being sung at the top, not the middle (the small window's setting)
-    var softScroll: () -> Boolean = { false }  // the small window and on its side: the scroll glides, on the words' timing (scrollSecs)
+    var softScroll: () -> Boolean = { false }  // on its side: the scroll glides, on the words' timing (scrollSecs)
+    var pipScroll: () -> Boolean = { false }   // the small window: the scroll stays as it was up to 0.41.5, the owner's wish (pipSungRow, pipTallLineTop)
     private var stepMs = 550.0                 // how long the glide to where the lyrics are placed next takes
     private var lyFreeY = 0f; private var lyFreeAt = 0.0
     var dragged = false
@@ -391,7 +392,7 @@ class LyricsRenderer {
         if (!laidOut) layoutAll()
         val wasPlace = placeUntil > 0 && t < placeUntil
         if (wasPlace) place(t, pos)
-        else if (lyTall && !lyFree && t - lyTallAt > 40) { lyTallAt = t; place(t, pos) }   // (often: a row's move starts on time)
+        else if (lyTall && !lyFree && t - lyTallAt > (if (pipScroll()) 250 else 40)) { lyTallAt = t; place(t, pos) }   // (often: a row's move starts on time)
         if (!viewOn) return
         if (!sync) { rest = false; staticScroll(t, pos); tops(t); bump(); return }
         val r = S.b("aRestCover") && S.xFocus && restAt(pos)   // one of Focus mode's (Settings greys it without)
@@ -401,7 +402,7 @@ class LyricsRenderer {
         val i = findIdx(lines, pos); val e = if (i >= 0) lineEnd(lines[i]) else null; val out = e != null && pos >= e
         val nx = lines.getOrNull(i + 1)
         var si = if (S.learly && nx?.t != null && pos >= nx.t!! - S.learlyMs / 1000.0) i + 1 else i
-        // the small window and on its side: the last word on the line sets off the move to the next, its first word ends it
+        // on its side: the last word on the line sets off the move to the next, its first word ends it
         // (a break's dots keep their own timing, and the Focus style brings each line in its own way)
         val paced = softScroll() && S.lsmooth && !S.xFocus
         val lastWord = if (paced && i >= 0) lines[i].words?.lastOrNull()?.t else null
@@ -511,7 +512,7 @@ class LyricsRenderer {
         // the pair around the middle, or in the whole height when it's taller; taller than the view, the newer one whole
         // (in the Focus style the line in focus is the older one and the newer waits under it: only when it wouldn't fit there)
         val under = if (S.xFocus) lfnSet.maxOrNull()?.takeIf { it > el.i }?.let { k -> lv.firstOrNull { it.i == k } }?.takeIf { it.top + it.h + y > hh * .8f } else null
-        val first = when { lineAtTop() -> null; S.xFocus -> under?.let { el }; else -> lAct.minOrNull()?.takeIf { it < el.i && pos >= (el.l.t ?: 0.0) }?.let { k -> lv.firstOrNull { it.i == k } } }   // (a line on its way isn't sung yet: not two at once)
+        val first = when { lineAtTop() -> null; S.xFocus -> under?.let { el }; else -> lAct.minOrNull()?.takeIf { it < el.i && (pipScroll() || pos >= (el.l.t ?: 0.0)) }?.let { k -> lv.firstOrNull { it.i == k } } }   // (a line on its way isn't sung yet: not two at once)
         val lower = under ?: el
         if (first != null) {
             val top0 = first.top; val bot = lower.top + lower.h
@@ -559,14 +560,46 @@ class LyricsRenderer {
     }
 
     /** How far down the line (px) the row the scroll is on has its middle. */
-    private fun sungRow(d: LV, pos: Double): Float { val rows = wordRows(d); return rows.getOrNull(dueRow(rows, pos))?.y ?: 0f }
+    private fun sungRow(d: LV, pos: Double): Float {
+        if (pipScroll()) return pipSungRow(d, pos)
+        val rows = wordRows(d); return rows.getOrNull(dueRow(rows, pos))?.y ?: 0f
+    }
+
+    /** The small window's: how far down the line (px) the words being sung are: its words and background vocals, not what's
+     *  under them. A line without word timing goes by its own time. */
+    private fun pipSungRow(d: LV, pos: Double): Float {
+        var best: Float? = null; var bt = Double.NEGATIVE_INFINITY
+        for (r in d.rows) { if (r.kind > 1) continue; r.pieces?.forEach { pc -> if (pc.ts.t <= pos && pc.ts.t > bt) { bt = pc.ts.t; best = F * linePad() + r.y + pc.y + F * r.fs * r.fit * r.lh / 2 } } }
+        best?.let { return it }
+        val r = d.rows.firstOrNull { it.kind == 0 && it.pieces == null } ?: return 0f
+        val t0 = d.l.t ?: return 0f; val e = lineEnd(d.l) ?: lines.getOrNull(d.i + 1)?.t ?: return 0f
+        return if (e <= t0) 0f else F * linePad() + r.y + r.h * ((pos - t0) / (e - t0)).coerceIn(0.0, 1.0).toFloat()
+    }
+
+    /** Where the line's last words are (px down it): what comes after them (a translation) is what's left to show. */
+    private fun lastSung(d: LV): Float {
+        var best = 0f
+        for (r in d.rows) {
+            if (r.kind > 1) continue
+            val ps = r.pieces
+            if (ps != null) ps.forEach { pc -> best = max(best, F * linePad() + r.y + pc.y + F * r.fs * r.fit * r.lh / 2) }
+            else if (r.kind == 0) best = max(best, F * linePad() + r.y + r.h)
+        }
+        return best
+    }
 
     private fun fitLine(el: LV, y: Float, pos: Double): Float {
         // (in a short view the fades stay small: 18 dp at each end of the small window hid nearly half of it)
-        val h = el.h; val m = max(min(18 * dens, H * .07f), H * .05f); var t = el.top + y; lyTall = false
+        val pip = pipScroll()
+        val h = el.h; val m = if (pip) max(18 * dens, H * .05f) else max(min(18 * dens, H * .07f), H * .05f); var t = el.top + y; lyTall = false
         if (lyFree || H <= 0 || (t >= H * .14f && t + h <= H * .8f)) { band(-1f, -1f); return y }   // it fits: the usual band
         if (h <= H - 2 * m) t = max(m, min(t, H - m - h))   // the whole line in view, as high as it needs to go
-        else {   // taller than everything: it moves on a row at a time, on the words' timing (the small window, on its side)
+        else if (pip) {   // taller than everything, in the small window: it goes down with the singing
+            lyTall = true; val e = lineEnd(el.l)
+            t = pipTallLineTop(H, m, h, sungRow(el, pos), lastSung(el), e != null && pos >= e)
+            band(m, H - m); return t - el.top
+        }
+        else {   // taller than everything: it moves on a row at a time, on the words' timing (on its side, and upright)
             lyTall = true; val e = lineEnd(el.l); val ended = e != null && pos >= e
             val rows = wordRows(el); val k = dueRow(rows, pos); val r = rows.getOrNull(max(k, 0))
             t = tallLineTop(H, m, h, r?.let { it.y - it.h / 2 } ?: 0f, rows.getOrNull(k - 1)?.h ?: 0f, ended)
@@ -581,9 +614,9 @@ class LyricsRenderer {
 
     private fun setLyY(y: Float, t: Double) {
         if (lyFree) return
-        // the small window, on its side, and a tall line anywhere: they glide instead of snapping into place, on the words'
-        // timing (frame, fitLine); it keeps its speed when the target moves on
-        if (S.lsmooth && (softScroll() || lyTall)) {
+        // on its side, and a tall line anywhere but the small window: they glide instead of snapping into place, on the
+        // words' timing (frame, fitLine); it keeps its speed when the target moves on
+        if (S.lsmooth && !pipScroll() && (softScroll() || lyTall)) {
             if (!gliding) { lyG.snap(lyY.value(t)); gliding = true }
             lyG.set(y, t, stepMs)
             return

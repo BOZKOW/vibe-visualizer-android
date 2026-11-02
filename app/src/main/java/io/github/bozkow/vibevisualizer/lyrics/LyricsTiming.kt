@@ -68,6 +68,20 @@ fun tallLineTop(view: Float, m: Float, h: Float, rowTop: Float, above: Float, en
     return minOf(maxOf(m + above - rowTop, foot), m)
 }
 
+/** Where a line taller than the view sits in the small window (its top, px in the view): it goes down with the singing,
+ *  from its top as it starts to its foot, with the translation under it, by the time its last words are sung. [view]: the
+ *  view's height; [m]: kept clear at both ends; [h]: the line's height; [sung]: how far down it the words being sung are;
+ *  [last]: where its last words are; [ended]: sung to the end. The words being sung stay in view, even under a translation
+ *  taller than the view. (minOf and maxOf: a window too small to have room mustn't throw.) */
+fun pipTallLineTop(view: Float, m: Float, h: Float, sung: Float, last: Float, ended: Boolean): Float {
+    val foot = view - m - h
+    if (ended) return foot
+    val k = if (last > 0f) minOf(sung / last, 1f) else 0f
+    val edge = maxOf(view - 2 * m, 0f) * .1f
+    val t = minOf(maxOf(m + (foot - m) * k, m + edge - sung), view - m - edge - sung)
+    return minOf(maxOf(t, foot), m)
+}
+
 /** A row of a line's words as it's wrapped on screen: when its first word is sung, when the last word on the row before
  *  it starts (for the first row, its own start), and where its middle is and how tall it is (px down the line). */
 class WordRow(val at: Double, val lastWord: Double, val y: Float, val h: Float)
