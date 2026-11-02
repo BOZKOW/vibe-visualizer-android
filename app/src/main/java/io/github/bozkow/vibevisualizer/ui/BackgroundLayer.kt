@@ -225,6 +225,7 @@ private fun StillBackground() {
 fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false) {
     val cvA by animateFloatAsState(if (CanvasVideo.cvlive) 1f else 0f, tween(800), label = "cv")
     if (cvA <= 0f) return
+    val quiet = E.quiet
     val vs = vidSize()   // (read here, not as it draws: there it never asked again, seen in a log of each draw)
     val small = rememberGraphicsLayer()
     DisposableEffect(small) { Frost.video = small; onDispose { if (Frost.video === small) Frost.video = null } }
@@ -239,7 +240,7 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
             val rf = S.bgblur * .025
             val sigma = 2f * kotlin.math.sqrt(.36 + rf * (rf + 1)).toFloat()
             val r = (((if (wide) sigma * 2f else sigma) - .5f) / .57735f).coerceAtLeast(.5f)
-            small.renderEffect = BlurEffect(r, r, TileMode.Clamp)
+            small.renderEffect = if (quiet) null else BlurEffect(r, r, TileMode.Clamp)
             small.colorFilter = cf
             small.alpha = cvA
             small.record(IntSize(sw, sh)) {

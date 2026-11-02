@@ -134,6 +134,7 @@ class LyricsRenderer {
     var covered = false   // the break's cover is fully over the lyrics on screen (set by the Lyrics screen)
     var lineAtTop: () -> Boolean = { false }   // the line being sung at the top, not the middle (the small window's setting)
     var softScroll: () -> Boolean = { false }  // on its side: the scroll glides, on the words' timing (scrollSecs)
+    var quiet: () -> Boolean = { false }       // under Settings' blur: the lines' own blur and shadow rest (E.quiet)
     var pipScroll: () -> Boolean = { false }   // the small window: the scroll stays as it was up to 0.41.5, the owner's wish (pipSungRow, pipTallLineTop)
     private var stepMs = 550.0                 // how long the glide to where the lyrics are placed next takes
     private var lyFreeY = 0f; private var lyFreeAt = 0.0
@@ -879,6 +880,7 @@ class LyricsRenderer {
         val lastBottom = lv.lastOrNull()?.let { it.top + it.h } ?: 0f
         val cy = baseY + lastBottom + F * .5f; if (abs(cy - creditsY) > .5f) creditsY = cy
         var slide = 0f   // from the breaks above: their room coming or going (tops)
+        val hush = quiet()
         for (d in lv) {
             val above = slide; if (d.dots) slide += d.dotOff.value(t)
             val op0 = if (st) 1f else d.opacity.value(t)
@@ -901,12 +903,12 @@ class LyricsRenderer {
             // lines shifted against each other by a pixel as they scrolled
             layer.topLeft = IntOffset((bleedLeft + padL + fx - pad).roundToInt(), bleedTop.roundToInt() + baseY.roundToInt() + (inView - pad).roundToInt())
             layer.alpha = op.coerceIn(0f, 1f)
-            val blurPx = if (st || lyFree) 0f else d.blur.value(t) * F
+            val blurPx = if (st || lyFree || hush) 0f else d.blur.value(t) * F
             val tapK = ((t - d.tapAt) / 260).coerceIn(0.0, 1.0).toFloat()
             val sc = if (tapK < 1f) .97f + .03f * Ease.easeOut(tapK.toDouble()).toFloat() else 1f
             layer.scaleX = sc; layer.scaleY = sc
             layer.pivotOffset = androidx.compose.ui.geometry.Offset(if (d.opp) pad + avail else pad.toFloat(), h / 2f)
-            val fx2 = effect(blurPx, d.a && !S.low && !st); if (layer.renderEffect !== fx2) layer.renderEffect = fx2
+            val fx2 = effect(blurPx, d.a && !S.low && !st && !hush); if (layer.renderEffect !== fx2) layer.renderEffect = fx2
             ds.drawLayer(layer)
         }
         if (enterAt > 0 && t - enterAt > 1300) enterAt = -1e9

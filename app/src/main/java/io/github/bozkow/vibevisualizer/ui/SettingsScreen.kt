@@ -167,7 +167,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sub("Design"),
         Item.Ch("aDesign", "Design", listOf("android" to "Android", "glass" to "Glass"), "Android: Material You, with the colors of the cover. Glass: frosted glass over your cover: Settings, the panels and the sheets let the blurred cover show through."),
         Item.Sub("Colours"),
-        Item.Ch("theme", "Theme", listOf("cover" to "Cover colors", "aurora" to "Aurora", "sunset" to "Sunset", "neon" to "Neon", "ice" to "Ice", "mono" to "Mono", "custom" to "Custom")),
+        Item.Ch("theme", "Theme", listOf("cover" to "Cover colors", "aurora" to "Aurora", "sunset" to "Sunset", "neon" to "Neon", "ice" to "Ice", "mono" to "Mono", "custom" to "Custom"), "Cover colors: from the Canvas while one plays."),
         Item.Custom("Custom colors") { CustomColors() },
         Item.Sub("Background"),
         Item.Ch("bgStyle", "Background", listOf("dynamic" to "Dynamic (animated cover)", "artist" to "Artist image", "cover" to "Cover art", "color" to "Color", "none" to "None"), "Artist image needs Spotify; other songs use the cover art. Color: the cover’s, or one you pick (pure black for OLED screens)."),

@@ -1,5 +1,6 @@
 package io.github.bozkow.vibevisualizer.engine
 
+import android.graphics.Bitmap
 import android.net.Uri
 import android.view.TextureView
 import androidx.annotation.OptIn
@@ -17,6 +18,7 @@ import io.github.bozkow.vibevisualizer.core.Server
 import io.github.bozkow.vibevisualizer.core.Vibe
 import io.github.bozkow.vibevisualizer.core.now
 import io.github.bozkow.vibevisualizer.lyrics.SongMeta
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
@@ -49,7 +51,7 @@ object CanvasVideo {
     private var revealAt = 0.0
 
     private val listener = object : Player.Listener {
-        override fun onRenderedFirstFrame() { ready = true; revealAt = now(); applyMode(); syncPlay() }
+        override fun onRenderedFirstFrame() { ready = true; revealAt = now(); applyMode(); syncPlay(); lookAtColors() }
         override fun onPlayerError(error: PlaybackException) { if (url != null) {
             android.util.Log.w("VV-canvas", "can't play: ${error.errorCodeName}")
             spicyId?.let { id -> Vibe.scope.launch { SpicyCanvas.forget(id) } }   // remembered, but gone: looked up again next time
@@ -84,8 +86,35 @@ object CanvasVideo {
 
     val hasVideo get() = url != null && ready
 
+    /** The video's colors for the bars and the app's accent. A look at it now and then, never all the time: copying a frame back
+     *  from the GPU holds up the frame being drawn (0.35.0 did it 12 times a second, and the lyrics stuttered). Three looks over
+     *  a few seconds, as many videos fade in from black; black ones don't count. */
+    private var colorJob: Job? = null
+    private fun lookAtColors() {
+        colorJob?.cancel()
+        colorJob = Vibe.scope.launch {
+            val w = 48; val h = 85; val frames = ArrayList<Bitmap>()
+            for (wait in longArrayOf(800, 1700, 2500)) {
+                delay(wait)
+                val f = view?.get()?.takeIf { it.isAvailable }?.getBitmap(w, h) ?: continue
+                if (litEnough(f)) {
+                    frames.add(f)
+                    val all = Bitmap.createBitmap(w * frames.size, h, Bitmap.Config.ARGB_8888)
+                    android.graphics.Canvas(all).let { c -> frames.forEachIndexed { i, b -> c.drawBitmap(b, (i * w).toFloat(), 0f, null) } }
+                    Visuals.setCanvasColors(all)
+                }
+            }
+        }
+    }
+
+    private fun litEnough(b: Bitmap): Boolean {
+        val px = IntArray(b.width * b.height); b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
+        return px.sumOf { p -> ((p shr 16 and 255) + (p shr 8 and 255) + (p and 255)).toLong() } / (3.0 * 255 * px.size) > .04
+    }
+
     fun clear(keepLayout: Boolean) {
         url = null; ready = false; active = false; spicyId = null
+        colorJob?.cancel(); Visuals.setCanvasColors(null)
         player?.let { it.stop(); it.clearMediaItems() }
         cvlive = false
         if (!keepLayout) cvmode = false
@@ -173,7 +202,8 @@ object CanvasVideo {
         val has = hasVideo
         cvmode = S.canvasOn && has
         cvlive = S.canvasOn && has && !S.low
-        if (!S.canvasOn) player?.pause() else syncPlay()
+        if (!S.canvasOn) { player?.pause(); colorJob?.cancel(); Visuals.setCanvasColors(null) }
+        else { syncPlay(); if (has && !Visuals.hasCanvasColors && colorJob?.isActive != true) lookAtColors() }
     }
 
     fun syncPlay() {

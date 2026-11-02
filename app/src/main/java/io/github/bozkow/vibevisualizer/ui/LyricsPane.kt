@@ -98,6 +98,18 @@ import io.github.bozkow.vibevisualizer.lyrics.Person
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/** A mask down the screen for the lyrics' ends: [ends] alpha above [a] and under [b], [middle] between them, eased over [rp]
+ *  inside them, so the sharp lines melt into the blurred ones. */
+private fun bandStops(a: Float, b: Float, rp: Float, ends: Float, middle: Float): Array<Pair<Float, Color>> {
+    fun c(s: Float) = Color.Black.copy(alpha = ends + (middle - ends) * softStep(s))
+    val out = ArrayList<Pair<Float, Color>>(2 * SOFT_STEPS + 4)
+    out.add(0f to c(0f))
+    for (k in 0..SOFT_STEPS) { val s = k / SOFT_STEPS.toFloat(); out.add(a + rp * s to c(s)) }
+    for (k in SOFT_STEPS downTo 0) { val s = k / SOFT_STEPS.toFloat(); out.add(b - rp * s to c(s)) }
+    out.add(1f to c(0f))
+    return out.toTypedArray()
+}
+
 /** The lyrics area: the lyrics themselves (scroll with a finger, tap a line to jump there), or a message where they go
  *  (looking for them, none, an error, problems). [behind]: they run from the top of the screen to its foot, behind what's
  *  over and under this area (the sibling's zIndex puts them under it), blurred out there; this area stays where the lines are
@@ -120,6 +132,7 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
     val sideRoom = with(dens) { 40.dp.roundToPx() }
     val bleedL = if (full) minOf(leftOf, sideRoom) else 0; val bleedR = if (full) minOf(rightOf, sideRoom) else 0
     val lyr = rememberGraphicsLayer(); val soft = rememberGraphicsLayer()
+    val cheap = S.low || E.quiet   // (Low performance mode, and under Settings' blur: they only fade at the ends)
     val softFx = remember(dens) { val r = with(dens) { 14.dp.toPx() } / 8f; BlurEffect(r, r, TileMode.Decal) }
     BoxWithConstraints(modifier.onGloballyPositioned { c ->
         if (behind) {
@@ -149,18 +162,17 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                 if (full && h > 0) {
                     // sharp in this area, blurred from there to the screen's ends, soft where one becomes the other (Low
                     // performance mode: no blur, they only fade). The blur costs little: at an eighth of the size, one pass.
-                    if (S.low) view.draw(this) { gc.createGraphicsLayer() }
+                    if (cheap) view.draw(this) { gc.createGraphicsLayer() }
                     else { lyr.record { view.draw(this) { gc.createGraphicsLayer() } }; drawLayer(lyr) }
-                    val a = bleedT / h; val b = 1f - bleedB / h; val rp = minOf(32.dp.toPx() / h, (b - a) / 2.01f)
-                    drawRect(Brush.verticalGradient(0f to Color.Transparent, a to Color.Transparent, a + rp * .5f to Color.Black.copy(alpha = .5f), a + rp to Color.Black, b - rp to Color.Black, b - rp * .5f to Color.Black.copy(alpha = .5f), b to Color.Transparent, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
-                    if (!S.low) {
+                    val a = bleedT / h; val b = 1f - bleedB / h; val rp = minOf(80.dp.toPx() / h, (b - a) / 2.01f)
+                    drawRect(Brush.verticalGradient(*bandStops(a, b, rp, 0f, 1f)), blendMode = BlendMode.DstIn)
+                    if (!cheap) {
                         val sw = maxOf(1, (size.width / 8f).roundToInt()); val sh = maxOf(1, (h / 8f).roundToInt()); val full0 = size
                         soft.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
                         if (soft.renderEffect !== softFx) soft.renderEffect = softFx
-                        val dim = Color.Black.copy(alpha = .6f)   // what's over them stays easy to read
                         soft.record(IntSize(sw, sh)) {
                             scale(sw / full0.width, sh / full0.height, pivot = Offset.Zero) { drawLayer(lyr) }
-                            drawRect(Brush.verticalGradient(0f to dim, a to dim, a + rp to Color.Transparent, b - rp to Color.Transparent, b to dim, 1f to dim), blendMode = BlendMode.DstIn)
+                            drawRect(Brush.verticalGradient(*bandStops(a, b, rp, .6f, 0f)), blendMode = BlendMode.DstIn)   // (.6: what's over them stays easy to read)
                         }
                         scale(full0.width / sw, full0.height / sh, pivot = Offset.Zero) { drawLayer(soft) }
                     }

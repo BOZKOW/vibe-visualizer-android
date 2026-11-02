@@ -24,7 +24,7 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** Colors from the cover, the bars' palette, and the background baked from the cover (blur done once here, the GPU
+/** Colors from the cover (or the Canvas while one plays), the bars' palette, and the background baked from the cover (blur done once here, the GPU
  *  only moves it), as in the web app. */
 object Visuals {
     val DEF_COLS = listOf(intArrayOf(139, 124, 255), intArrayOf(255, 122, 200), intArrayOf(80, 200, 255))
@@ -106,6 +106,16 @@ object Visuals {
         return raw to bar
     }
 
+    /** The bars' colors and the app's accent while a Canvas plays: from the video, which is what's on screen, instead of the
+     *  cover. [img]: a frame or a few together; null when there's none (back to the cover's). */
+    private var canvasBars: List<IntArray>? = null
+    val hasCanvasColors get() = canvasBars != null
+    fun setCanvasColors(img: Bitmap?) {
+        val c = img?.let { i -> runCatching { extract(i).second }.getOrNull() }
+        if (c == null && canvasBars == null) return
+        canvasBars = c; palDirty = true
+    }
+
     var quietVer = -1; private set   // a cover that changes without its animation (the same picture, sharper)
 
     fun setCover(img: Bitmap?, quiet: Boolean = false) {
@@ -121,7 +131,7 @@ object Visuals {
     /* ---- palette + bands ---- */
     fun buildPal() {
         val n = Audio.N
-        val st: List<IntArray> = when (S.str("theme")) { "cover" -> barCols; "custom" -> listOf(hex(S.str("c1")), hex(S.str("c2"))); else -> (STOPS[S.str("theme")] ?: STOPS.getValue("aurora")).map(::hex) }
+        val st: List<IntArray> = when (S.str("theme")) { "cover" -> canvasBars ?: barCols; "custom" -> listOf(hex(S.str("c1")), hex(S.str("c2"))); else -> (STOPS[S.str("theme")] ?: STOPS.getValue("aurora")).map(::hex) }
         val to = Array(n) { i ->
             val t = if (n > 1) i.toDouble() / (n - 1) else 0.0; val f = t * (st.size - 1); val j = min(floor(f).toInt(), st.size - 2).coerceAtLeast(0); val u = f - j
             val a = st[j]; val b = st[min(j + 1, st.size - 1)]

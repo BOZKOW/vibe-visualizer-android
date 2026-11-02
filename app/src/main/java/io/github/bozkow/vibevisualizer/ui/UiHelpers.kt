@@ -281,6 +281,10 @@ fun cutoutNote(v: android.view.View?): String {
     return "safe L${c.safeInsetLeft} T${c.safeInsetTop} R${c.safeInsetRight} B${c.safeInsetBottom} · holes " + c.boundingRects.joinToString { "${it.left},${it.top}-${it.right},${it.bottom}" } + " · window ${v.width}×${v.height}"
 }
 
+/** An eased ramp 0..1 for a mask (smoothstep): it leaves and arrives flat, so its ends don't show as edges, in [SOFT_STEPS] stops. */
+const val SOFT_STEPS = 6
+fun softStep(s: Float): Float { val x = s.coerceIn(0f, 1f); return x * x * (3 - 2 * x) }
+
 /** A blur that costs little, for a layer over the whole screen: what's under it is drawn into a picture an eighth of
  *  the size, blurred there and stretched back up (a heavy blur looks the same, with ~60 times fewer pixels to blur;
  *  blurring the full screen every frame made Settings stutter). [k] 0..1 fades it in over the sharp picture, [dim]

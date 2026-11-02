@@ -181,6 +181,14 @@ class ParseTest {
         assertEquals("nothing", emptyList<IntRange>(), wordSpans(emptyList()))
     }
 
+    @Test fun aSoftRampLeavesAndArrivesFlat() {
+        assertEquals(0f, io.github.bozkow.vibevisualizer.ui.softStep(0f), 1e-6f)
+        assertEquals(1f, io.github.bozkow.vibevisualizer.ui.softStep(1f), 1e-6f)
+        assertEquals("halfway at the middle", .5f, io.github.bozkow.vibevisualizer.ui.softStep(.5f), 1e-6f)
+        assertTrue("it starts slower than a straight ramp", io.github.bozkow.vibevisualizer.ui.softStep(.1f) < .1f)
+        assertEquals("outside the ramp it stays put", 1f, io.github.bozkow.vibevisualizer.ui.softStep(1.5f), 1e-6f)
+    }
+
     @Test fun joins() {
         val ws = listOf(Word(0.0, .2, "beau", false), Word(.2, .4, "ti", false), Word(.4, .6, "ful", true))
         val ts = ws.map { TS(it.t, it.end!!) }

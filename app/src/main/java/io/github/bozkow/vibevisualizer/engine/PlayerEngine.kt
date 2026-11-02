@@ -65,6 +65,9 @@ object E {
     var screen by mutableStateOf("lyrics")
     var wide by mutableStateOf(false)               // side by side (landscape, tablets): the lyrics are always on screen
     var uiHidden by mutableStateOf(false)
+    // Settings fully over the player, under their heavy blur: its own blurs rest (the video's, the lines', the lyrics' ends), as
+    // nothing of them can be seen there, each is a full pass, and Settings were slow; it moves on at half the rate too
+    var quiet by mutableStateOf(false)
     var wakeTap = false                            // this touch only brought the controls back
     var ambient by mutableStateOf(false)           // Ambient mode: untouched while music plays, the lyrics and the song on black
         private set
@@ -597,11 +600,11 @@ object E {
         fAcc = min(fAcc - iv, iv)
         val dt = min(t - (if (last == 0.0) t else last), 50.0); last = t
         if (wall() - secAt >= 1000) { secAt = wall(); sec.intValue++ }
-        // Settings over the player: it goes on under their blur about 30 times a second, not at the screen's rate,
+        // Settings over the player: it goes on under their blur 15 to 30 times a second, not at the screen's rate,
         // so Settings get most of the phone
         val under = settingsPage != null
         slowDt += dt
-        val step = !under || t - slowAt >= 33
+        val step = !under || t - slowAt >= (if (quiet) 66 else 33)
         Audio.sample(dt, t); Audio.beatTick(t, dt)
         if (step) { slowAt = t; Background.tick(t, slowDt); slowDt = 0.0; Lyr.tick(t) }
         Desync.tick(t)

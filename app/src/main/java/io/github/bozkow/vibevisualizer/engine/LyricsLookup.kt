@@ -102,7 +102,7 @@ object Lyr {
 
     fun curSong(): SongMeta? = cur?.m
 
-    init { view.durFn = { E.curDur() }; view.reduceMotion = { E.reduceMotion() }; view.lineAtTop = { E.inPip && S.b("aPipTop") }; view.softScroll = { E.wide && !E.inPip }; view.pipScroll = { E.inPip } }
+    init { view.durFn = { E.curDur() }; view.reduceMotion = { E.reduceMotion() }; view.lineAtTop = { E.inPip && S.b("aPipTop") }; view.softScroll = { E.wide && !E.inPip }; view.pipScroll = { E.inPip }; view.quiet = { E.quiet } }
 
     /* ================= sources ================= */
 
