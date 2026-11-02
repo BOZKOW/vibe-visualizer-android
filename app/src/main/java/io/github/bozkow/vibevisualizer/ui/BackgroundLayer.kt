@@ -289,15 +289,19 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, at: Offset) {
     drawRect(Color.Black.copy(alpha = .35f))   // the white on it keeps reading on a bright cover
 }
 
-/** A round button's frost, on its side only. [inset]: when the button is drawn smaller than it's laid out. */
-fun Modifier.frosted(inset: Dp = 0.dp): Modifier = composed {
+/** Frost behind a round button or a notice, on its side only. [inset]: when the button is drawn smaller than it's laid out.
+ *  [oval] false: the thing is clipped to its own shape already. */
+fun Modifier.frosted(inset: Dp = 0.dp, oval: Boolean = true): Modifier = composed {
     if (!LocalFrost.current) return@composed Modifier
     var at by remember { mutableStateOf(Offset.Zero) }
     val paint = frostPainter()
     val clip = remember { Path() }
     Modifier.onGloballyPositioned { at = it.positionInWindow() }.drawBehind {
-        val i = inset.toPx()
-        clip.reset(); clip.addOval(Rect(i, i, size.width - i, size.height - i))
-        clipPath(clip) { paint(at) }
+        if (!oval) paint(at)
+        else {
+            val i = inset.toPx()
+            clip.reset(); clip.addOval(Rect(i, i, size.width - i, size.height - i))
+            clipPath(clip) { paint(at) }
+        }
     }
 }

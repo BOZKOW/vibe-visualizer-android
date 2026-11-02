@@ -183,6 +183,7 @@ class LyricsRenderer {
         built = false; laidOut = false
         leaving = false; leaveA.snap(1f)
         version++
+        if (S.xFocus && sync && W > 0f && lines.isNotEmpty()) frame(now(), posNow, true)   // (placed before they're drawn: see setActive)
         bump()
     }
 
@@ -477,13 +478,15 @@ class LyricsRenderer {
             val key = "$a$p$dp$sa${if (a) 0 else min(dist, 6)}$fv$fn$fs$fu"
             if (a && !d.a) { d.activeAt = t; moving.add(j) }
             d.a = a; d.p = p; d.dp = dp; d.sa = sa; d.dist = dist; d.fv = fv; d.fn = fn; d.fs = fs; d.fu = fu
-            if (key != d.key) { d.key = key; d.dirty = true; targets(d, t, focus) }
+            // a new line in the Focus style starts where it belongs: from the default look they all showed at half strength and
+            // flew off, whenever lyrics were set (a translation arriving, mid-song)
+            if (key != d.key) { val fresh = d.key.isEmpty() && focus; d.key = key; d.dirty = true; targets(d, t, focus, fresh) }
         }
         place(t, pos)
     }
 
     /** What each line's classes ask for (opacity, blur, Focus mode's flight), set as transitions. */
-    private fun targets(d: LV, t: Double, focus: Boolean) {
+    private fun targets(d: LV, t: Double, focus: Boolean, snap: Boolean = false) {
         val free = lyFree
         var op = when { d.a -> 1f; d.p -> .497f; else -> .51f }
         if (S.lminimal && d.p && !d.dp) op = if (S.xKeep && d.sa) .45f else 0f
@@ -506,6 +509,7 @@ class LyricsRenderer {
         d.opacity.set(op, t, if (d.dots) 140.0 else dO, eO)
         d.blur.set(bl, t, dB, eB)
         d.fy.set(y, t, dT, eT); d.fx.set(x, t, dT, eT)
+        if (snap) { d.opacity.snap(op); d.blur.snap(bl); d.fy.snap(y); d.fx.snap(x) }
         if (S.xBgPop) d.bgOpen.set(if (d.a) 1f else 0f, t, 500.0, Ease.eOut) else d.bgOpen.snap(1f)
         if (d.dots) d.dotOp.set(if (d.a && !d.longBreak) 1f else 0f, t, 140.0, Ease.linear)
     }
@@ -523,8 +527,9 @@ class LyricsRenderer {
         var y = if (lineAtTop()) hh * .06f - el.top else hh * (if (S.xFocus) .44f else .38f) - (el.top + el.h / 2)   // Focus: in the middle
         // two lines sung at once (a duet, or lines whose times overlap, as some Spicy Lyrics syncs have): both in view,
         // the pair around the middle, or in the whole height when it's taller; taller than the view, the newer one whole
-        // (in the Focus style the line in focus is the older one and the newer waits under it: only when it wouldn't fit there)
-        val under = if (S.xFocus) lfnSet.maxOrNull()?.takeIf { it > el.i }?.let { k -> lv.firstOrNull { it.i == k } }?.takeIf { it.top + it.h + y > hh * .8f } else null
+        // (in the Focus style the line in focus is the older one and the newer waits under it: only when it wouldn't fit there and
+        // it's being sung too: for one just due, on a phone on its side, the line being sung slid up .2 s before its end, then again)
+        val under = if (S.xFocus) lfsSet.maxOrNull()?.takeIf { it > el.i }?.let { k -> lv.firstOrNull { it.i == k } }?.takeIf { it.top + it.h + y > hh * .8f } else null
         val first = when { lineAtTop() -> null; S.xFocus -> under?.let { el }; else -> lAct.minOrNull()?.takeIf { it < el.i && (pipScroll() || pos >= (el.l.t ?: 0.0)) }?.let { k -> lv.firstOrNull { it.i == k } } }   // (a line on its way isn't sung yet: not two at once)
         val lower = under ?: el
         if (first != null) {
@@ -629,7 +634,7 @@ class LyricsRenderer {
         if (lyFree) return
         // on its side, and a tall line anywhere but the small window: they glide instead of snapping into place, on the
         // words' timing (frame, fitLine); it keeps its speed when the target moves on
-        if (S.lsmooth && !pipScroll() && (softScroll() || lyTall)) {
+        if (S.lsmooth && !pipScroll() && ((softScroll() && !S.xFocus) || lyTall)) {   // (the Focus style's as upright)
             if (!gliding) { lyG.snap(lyY.value(t)); gliding = true }
             lyG.set(y, t, stepMs)
             return

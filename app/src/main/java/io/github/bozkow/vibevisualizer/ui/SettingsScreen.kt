@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -392,6 +393,9 @@ fun SettingsScreen() {
     val open = { id: String -> q = ""; pageFrom = Pop.origin(paneBox); page = id }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
+        // a phone on its side: the title and the search over each other took most of the height, and a row and a half of the list
+        // was left; here the close button and the search share one row
+        val short = maxHeight < 480.dp
         BackHandler { if (q.isNotEmpty()) q = "" else if (!wide && page != null && E.settingsPage == null) page = null else if (!wide && page != null) { page = null } else E.settingsPage = null }
         if (S.glass && !SettingsUi.live) GlassBackdrop()   // Glass in Low performance mode: the blurred cover shows through
         // contentColor: on Glass's see-through surface the text and icons defaulted to black
@@ -401,26 +405,33 @@ fun SettingsScreen() {
             Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)).windowInsetsPadding(cutoutInsets().only(WindowInsetsSides.Horizontal))) {
                 @Composable fun ListPane(m: Modifier) {
                     Column(m) {
-                        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { E.settingsPage = null }) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) }
-                            Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp)
+                        val search = @Composable { sm: Modifier ->
+                            TextField(q, { q = it }, sm.then(if (S.glass) Modifier.glass(RoundedCornerShape(28.dp)) else Modifier.clip(RoundedCornerShape(28.dp))), singleLine = true,
+                                placeholder = { Text("Search settings", color = Color.White.copy(alpha = .55f)) }, leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = .7f)) },
+                                trailingIcon = { if (q.isNotEmpty()) IconButton(onClick = { q = "" }) { Icon(Icons.Rounded.Close, "Clear") } },
+                                colors = if (S.glass) TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
+                                    else TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent))
                         }
-                        TextField(q, { q = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).then(if (S.glass) Modifier.glass(RoundedCornerShape(28.dp)) else Modifier.clip(RoundedCornerShape(28.dp))), singleLine = true,
-                            placeholder = { Text("Search settings", color = Color.White.copy(alpha = .55f)) }, leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = .7f)) },
-                            trailingIcon = { if (q.isNotEmpty()) IconButton(onClick = { q = "" }) { Icon(Icons.Rounded.Close, "Clear") } },
-                            colors = if (S.glass) TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
-                                else TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent))
+                        val close = @Composable { IconButton(onClick = { E.settingsPage = null }) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
+                        if (short) Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 14.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) { close(); search(Modifier.weight(1f)) }
+                        else {
+                            Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                close()
+                                Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp)
+                            }
+                            search(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
+                        }
                         if (q.isNotEmpty() && !wide) SearchResults(all, q, Modifier.weight(1f))
-                        else LazyColumn(Modifier.weight(1f).navBarsSpace().fadeEdges(20.dp, 28.dp), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 28.dp)) {
+                        else LazyColumn(Modifier.weight(1f).navBarsSpace().fadeEdges(20.dp, 28.dp), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = if (short) 12.dp else 22.dp, bottom = 28.dp)) {
                             cardPages(all, page, wide) { open(it) }
                         }
                     }
                 }
                 @Composable fun PagePane(pg: Page) {
                     Column(Modifier.fillMaxSize()) {
-                        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 6.dp).then(if (short) Modifier.defaultMinSize(minHeight = 56.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {   // (level with the search)
                             if (!wide) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) } else Spacer(Modifier.width(16.dp))
-                            Text(pg.name, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(pg.name, fontSize = if (short) 24.sp else 28.sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, Modifier.weight(1f))
                     }

@@ -598,7 +598,7 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
             val shape = RoundedCornerShape(if (row) 14.dp else 18.dp)
             // tapped: its detail screen (what's wrong, what to do, OK), growing out of it; pressed, it gives a little
             val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-            Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape)
+            Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape).frosted(oval = false)
                 .background(Color.White.copy(alpha = .12f)).border(1.dp, Color.White.copy(alpha = .22f), shape)
                 .quietTouch().clickable(press, androidx.compose.material3.ripple()) { last[0]?.let { E.haptic(); E.noticeOpen = it } }
                 .animateContentSize(if (Pop.calm) tween(0) else spring(.8f, Spring.StiffnessMediumLow))) {
@@ -1078,7 +1078,9 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
                 // edge), over a long, eased fade into the blurred Canvas behind
                 // the desktop's: darker at the top and the foot, for the text over it
                 drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .4f), .22f to Color.Transparent, .52f to Color.Transparent, 1f to Color.Black.copy(alpha = .7f)))
-                val s = .3f + .4f * c   // where the fade starts: long beside the lyrics, short in the middle
+                // where the fade starts: the sharp video keeps most of its side (from .3 it took nearly half, the owner's complaint on
+                // 0.43.0), a little later in the middle
+                val s = .6f + .1f * c
                 drawRect(Brush.horizontalGradient(0f to Color.Black, *Array(6) { i -> (s + (1 - s) * EASE_AT[i]) to Color.Black.copy(alpha = EASE_A[i]) }), blendMode = BlendMode.DstIn)
                 // in the middle, the same fade on the left
                 if (c > 0f) drawRect(Brush.horizontalGradient(*Array(6) { k -> val j = 5 - k; .3f * (1 - EASE_AT[j]) to Color.Black.copy(alpha = 1 - c * (1 - EASE_A[j])) }, 1f to Color.Black), blendMode = BlendMode.DstIn)
@@ -1123,7 +1125,12 @@ private fun frostBands(h: Float, r: Float, top0: Float, ramp0: Float, from: Floa
 private fun sideBlur(w: Float, r: Float): androidx.compose.ui.graphics.RenderEffect {
     val blur = android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
     val on = android.graphics.Color.BLACK; val off = android.graphics.Color.TRANSPARENT
-    val mask = android.graphics.RenderEffect.createShaderEffect(android.graphics.LinearGradient(0f, 0f, w, 0f, intArrayOf(off, off, on, on), floatArrayOf(0f, .25f, .75f, 1f), android.graphics.Shader.TileMode.CLAMP))
+    val from = .58f; val to = .92f   // sharp up to [from], eased: the transition stays, in the last part of the video
+    val cols = IntArray(SOFT_STEPS + 3); val at = FloatArray(SOFT_STEPS + 3)
+    cols[0] = off; at[0] = 0f
+    for (k in 0..SOFT_STEPS) { val u = k / SOFT_STEPS.toFloat(); cols[k + 1] = android.graphics.Color.argb((softStep(u) * 255).toInt(), 0, 0, 0); at[k + 1] = from + (to - from) * u }
+    cols[SOFT_STEPS + 2] = on; at[SOFT_STEPS + 2] = 1f
+    val mask = android.graphics.RenderEffect.createShaderEffect(android.graphics.LinearGradient(0f, 0f, w, 0f, cols, at, android.graphics.Shader.TileMode.CLAMP))
     val frosted = android.graphics.RenderEffect.createBlendModeEffect(blur, mask, android.graphics.BlendMode.DST_IN)
     return android.graphics.RenderEffect.createBlendModeEffect(android.graphics.RenderEffect.createOffsetEffect(0f, 0f), frosted, android.graphics.BlendMode.SRC_OVER).asComposeRenderEffect()
 }
