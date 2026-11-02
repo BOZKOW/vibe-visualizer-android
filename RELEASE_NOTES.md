@@ -1,6 +1,10 @@
-Vibe Visualizer for Android 0.41.7 (beta). Android 12 or newer; it installs over 0.41.6 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.41.8 (beta). Android 12 or newer; it installs over 0.41.7 (Settings → Help & about → Update now).
 
-### Scrolling between lines
+### Breaks no longer make the lyrics jump
 
-- **The scroll is back to its old timing**: in the small window and on its side, it leaves when the next line starts and takes about half a second, for every line. The speed set by the gap between lines, new in 0.41.6, is gone.
-- **It no longer snaps into place**: it glides there softly in that same time. This needs *Smooth scrolling* on, as it is by default.
+- **The line after a break slides into place**: when a break's dots went, the next line jumped up in a single frame, and when they came, the lines below them jumped down. This happened in every layout.
+
+### On its side
+
+- **The shade over the cover fades in softly**: its edge showed as a line across a bright cover.
+- **The buttons under the controls stay round when the room runs short**: with the large song name and a two-line notice, they got squashed into ovals.

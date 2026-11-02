@@ -82,6 +82,7 @@ class LyricsRenderer {
         var fv = false; var fn = false; var fs = false; var fu = false
         val opacity = Tween(.51f); val blur = Tween(0f); val fy = Tween(0f); val fx = Tween(0f)
         val bgOpen = Tween(1f); val dotScale = Tween(0f); val dotOp = Tween(0f)
+        val dotOff = Tween(0f)   // a break's dots: how far the lines after them still have to slide, their room having come or gone (tops)
         var activeAt = -1e9; var tapAt = -1e9
         var lineGlow: Spring? = null; var lineGrad = -20.0; var lineGlowV = 0.0
         val dotSp = if (l.dots) Array(3) { DotSprings() } else null
@@ -350,7 +351,13 @@ class LyricsRenderer {
         var y = 0f
         for (d in lv) {
             d.h = when {
-                d.dots -> if (d.a && !d.longBreak) d.hText else 0f
+                d.dots -> {
+                    // its room comes and goes at once for where the lyrics are placed; on screen the lines after it slide
+                    // over (they jumped by its height in one frame: 133 px at a break's end on a phone on its side)
+                    val nh = if (d.a && !d.longBreak) d.hText else 0f
+                    if (nh != d.h && S.lsmooth) { d.dotOff.snap(d.dotOff.value(now) + d.h - nh); d.dotOff.set(0f, now, 550.0, Ease.ease) }
+                    nh
+                }
                 S.xBgPop && !isStatic && d.bgH > 0 -> d.hText - d.bgH * (1 - d.bgOpen.value(now))
                 else -> d.hText
             }
@@ -819,13 +826,15 @@ class LyricsRenderer {
         // credits under the lyrics: right after the last line
         val lastBottom = lv.lastOrNull()?.let { it.top + it.h } ?: 0f
         val cy = baseY + lastBottom + F * .5f; if (abs(cy - creditsY) > .5f) creditsY = cy
+        var slide = 0f   // from the breaks above: their room coming or going (tops)
         for (d in lv) {
+            val above = slide; if (d.dots) slide += d.dotOff.value(t)
             val op0 = if (st) 1f else d.opacity.value(t)
             val enterK = if (enterAt > 0 && !st) { val delay = min(abs(d.i - enterFrom), 12) * 45.0; Ease.eOut(((t - enterAt - delay) / 700).coerceIn(0.0, 1.0)).toFloat() } else 1f
             val op = op0 * la * (if (t - enterAt < 1300) enterK else 1f)
             if (op <= .004f || d.h <= 0f && !d.dots) continue
             val fy = if (st) 0f else d.fy.value(t); val fx = if (st) 0f else d.fx.value(t)
-            val inView = d.top + fy + (if (enterK < 1f) 26 * dens * (1 - enterK) else 0f)
+            val inView = d.top + above + fy + (if (enterK < 1f) 26 * dens * (1 - enterK) else 0f)
             val y = baseY + inView
             val hh = max(d.h, d.hText)
             if (y + hh + pad < -H * .1f || y - pad > H * 1.1f) continue

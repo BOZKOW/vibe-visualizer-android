@@ -342,11 +342,13 @@ private fun LandscapeCover() {
             // drawn behind both, reaching past them and fading out over the cover (nothing at the head: no shade there);
             // the same corners as the cover's (Settings → Player screen → Cover corners)
             Column(Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp * (S.i("aCoverR").coerceIn(0, 40) / 22f))).drawBehind {
-                val down = 22.dp.toPx(); val up = 44.dp.toPx()
-                if (headH > 0f) drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .6f), headH / (headH + down) to Color.Black.copy(alpha = .35f), 1f to Color.Transparent, endY = headH + down),
+                // (eased at their ends: from clear straight to dark, the edge showed as a line across a bright cover)
+                val down = 36.dp.toPx(); val up = 72.dp.toPx()
+                val h0 = headH / (headH + down); val f = up / (footH + up)
+                if (headH > 0f) drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .6f), h0 to Color.Black.copy(alpha = .35f), h0 + (1 - h0) * .5f to Color.Black.copy(alpha = .1f), 1f to Color.Transparent, endY = headH + down),
                     size = androidx.compose.ui.geometry.Size(size.width, headH + down))
                 val y = size.height - footH - up
-                drawRect(Brush.verticalGradient(0f to Color.Transparent, up / (footH + up) to Color.Black.copy(alpha = .38f), 1f to Color.Black.copy(alpha = .72f), startY = y, endY = size.height),
+                drawRect(Brush.verticalGradient(0f to Color.Transparent, f * .35f to Color.Black.copy(alpha = .06f), f * .7f to Color.Black.copy(alpha = .22f), f to Color.Black.copy(alpha = .38f), 1f to Color.Black.copy(alpha = .72f), startY = y, endY = size.height),
                     topLeft = Offset(0f, y), size = androidx.compose.ui.geometry.Size(size.width, footH + up))
             }) {
                 TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.padding(horizontal = 10.dp), side = true)
@@ -779,8 +781,9 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
 @Composable
 private fun BottomBar(big: Boolean = true, mid: Boolean = false) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-    // five that fit with room between them (a narrow phone, or the largest display size)
-    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 32.dp) / 5)
+    // five that fit with room between them (a narrow phone, or the largest display size), and round when the row gets less
+    // height than they'd like (on its side: the large song name, a notice of two lines and the controls together)
+    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 32.dp) / 5, (maxHeight - (if (big) 10.dp else 6.dp)).coerceAtLeast(0.dp))
     Row(Modifier.fillMaxWidth().padding(top = if (big) 6.dp else 2.dp, bottom = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         // (Lyrics and Visualizer were screens of their own until 0.38.0: a slot saved with Lyrics turns the bars on and
         // off now, one with the Visualizer opens Lyrics timing, so the old default row has no button twice)
