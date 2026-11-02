@@ -39,32 +39,39 @@ Android 12 or newer. The app is a beta.
    app's Redirect URIs. For exact timing with the Spotify app on the phone, give Vibe Visualizer notification access
    when it asks (it reads the player, never your notifications).
 
-Updates install from inside the app: *Settings → Help & about → Update now*. Versions before 0.24 came from the
-main repository's Releases page; 0.24 and later come from here.
+Updates install from inside the app: *Settings → Help & about → Update now*.
 
 ## What it does
 
 - **Lyrics**: Spicy Lyrics (through your server), Spotify's own, LRCLIB, AMLL, Unison, LRCMux, lrc.red, NetEase and,
   if you turn them on, KuGou, QQ Music and Kuwo, plus your own `.lrc` and `.ttml` files. The first source asks alone,
-  then the rest at once; better timing wins. Romanization (Japanese, Chinese, Korean, Cyrillic…) and translation
-  (Google, DeepL, LibreTranslate, any OpenAI-compatible AI, Gemini).
+  then the rest at once; better timing wins. Duets and background vocals get their own place, and a line too tall for
+  the screen scrolls with the singing.
+- **Romanization and translation**: romanization for Japanese, Chinese, Korean, Cyrillic and more; translation with
+  Google, DeepL, LibreTranslate, any OpenAI-compatible AI or Gemini.
+- **Three lyrics styles** (*Settings → Lyrics*): Spicy Lyrics, Spicy Lyrics Simple and Focus. In Focus, a line flies up
+  and away as soon as it's sung and the next one comes in from below; in breaks of 5 seconds or more, the cover can
+  take the lyrics' place.
 - **Following the music**: your files (with background playback and media controls), Spotify, the Spotify app on
   the phone and other music apps through their media sessions (with notification access; no notification is read).
   The lyrics stay in step through Spotify's crossfade, gapless playback, Automix and the DJ.
-- **The player**: the lyrics, the bars and the cover on one screen, a landscape layout, picture-in-picture, a home
-  screen widget, Ambient mode (an always-on display while music plays), Spotify Canvas, Apple Music's animated covers
-  (free, no account or key), two designs (Android and Glass), and the buttons under the controls are yours to pick.
-- **Focus mode**: the line being sung stays sharp in the middle until it's sung to the end, the next one flies in from
-  below and finished ones fly away; in long breaks the cover takes the lyrics' place.
+- **The player**: the lyrics, the bars and the cover on one screen; held sideways, the lyrics get the right side and
+  everything else the left. Picture-in-picture, a home screen widget, Ambient mode (an always-on display while music
+  plays), Spotify Canvas, Apple Music's animated covers (free, no account or key) and two designs (Android and Glass).
+- **Buttons you pick**: choose what goes under the controls, including one tap to add a lyrics file or play songs from
+  your phone.
 - **The bars** hear everything the phone plays (Android's Visualizer; it needs the microphone permission, and nothing
   is recorded or sent), the microphone, or [Vibe Bridge](https://github.com/BOZKOW/vibe-visualizer#vibe-bridge-bars-from-the-spotify-app)
   through your server.
 - **Ready before they play**: the next five songs in your Spotify queue (the next one in another music app's or your
   files') get their lyrics, Canvas and cover while the song before plays, so skipping shows them at once; Canvas
   videos are kept on the phone.
-- Lyrics timing per audio output and a desync check that listens to the music, a heat warning (from a 40 °C battery)
-  and Low performance mode with Power saving, keyboard shortcuts, and settings that can be copied to the web app and
-  back (*Settings → Help & about → Back up settings*).
+- **Says what's wrong**: problems and notices show at the top of the player; tap one to see what it means and what to
+  do. That includes Spicy Lyrics' service status and a heat warning (from a 40 °C battery, or when Android reports the
+  phone is hot).
+- **And also**: lyrics timing per audio output, a desync check that listens to the music, Low performance mode with
+  Power saving, keyboard shortcuts, and settings that can be copied to the web app and back (*Settings → Help & about →
+  Back up settings*).
 
 ## Building
 
