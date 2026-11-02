@@ -109,33 +109,43 @@ class ParseTest {
         m.snap(5f); assertEquals("a snap is at once", 5f, m.value(5000.0), .001f)
     }
 
-    @Test fun theSingingMovesOnBetweenATallLinesRows() {
-        val rows = listOf(10.0 to 0f, 12.0 to 100f, 16.0 to 200f)
-        assertTrue("not sung yet", sungAlong(rows, 9.0) == null)
-        assertEquals("the first row", 0f, sungAlong(rows, 10.0)!!, .01f)
-        assertEquals("halfway to the second", 50f, sungAlong(rows, 11.0)!!, .01f)
-        assertEquals("the second", 100f, sungAlong(rows, 12.0)!!, .01f)
-        assertEquals("a slower row takes longer", 150f, sungAlong(rows, 14.0)!!, .01f)
-        assertEquals("it stays on the last", 200f, sungAlong(rows, 20.0)!!, .01f)
-        assertTrue("no rows", sungAlong(emptyList(), 5.0) == null)
+    @Test fun theLastWordSetsOffTheScrollAndTheFirstWordEndsIt() {
+        assertEquals("from the last word to the first", .6, scrollSecs(11.4, 12.0), 1e-9)
+        assertEquals("a long held note or a pause doesn't make it crawl", .8, scrollSecs(10.0, 15.0), 1e-9)
+        assertEquals("words running together don't make it snap", .35, scrollSecs(11.95, 12.0), 1e-9)
+        assertEquals("lines that overlap neither", .35, scrollSecs(12.0, 11.0), 1e-9)
     }
 
-    @Test fun aTallLineScrollsWithTheSinging() {
-        val view = 300f; val m = 20f   // 260 of room, for a line of 600 with its last words at 500 and a translation under them
-        fun top(sung: Float, ended: Boolean = false) = tallLineTop(view, m, 600f, sung, 500f, ended)
-        assertEquals("it starts at its top", m, top(0f), .5f)
-        assertEquals("its foot is in view when the last words are sung", view - m - 600f, top(500f), .5f)
-        assertEquals("and stays once it's sung", view - m - 600f, top(500f, ended = true), .5f)
+    @Test fun eachRowIsDueInTimeForItsFirstWord() {
+        val rows = listOf(WordRow(10.0, 10.0, 25f, 50f), WordRow(12.0, 11.4, 75f, 50f), WordRow(16.0, 13.0, 125f, 50f))
+        assertEquals("not yet", -1, dueRow(rows, 9.9))
+        assertEquals("the first as it's sung", 0, dueRow(rows, 10.0))
+        assertEquals("it holds until the last word on the row", 0, dueRow(rows, 11.39))
+        assertEquals("which sets off the next", 1, dueRow(rows, 11.4))
+        assertEquals("it holds through a pause", 1, dueRow(rows, 15.19))
+        assertEquals("and moves only in time to end on the first word", 2, dueRow(rows, 15.2))
+        assertEquals("no rows", -1, dueRow(emptyList(), 5.0))
+    }
+
+    @Test fun aTallLineMovesAWholeRowAtATime() {
+        val view = 300f; val m = 20f; val h = 600f; val foot = view - m - h   // rows of 50, 260 of room
+        fun top(row: Int, ended: Boolean = false) = tallLineTop(view, m, h, row * 50f, if (row > 0) 50f else 0f, ended)
+        assertEquals("it starts at its top", m, top(0), .01f)
+        assertEquals("the second row needs no move: the first stays over it", m, top(1), .01f)
+        assertEquals("then a row", m - 50f, top(2), .01f)
+        assertEquals("and a row", m - 100f, top(3), .01f)
+        assertEquals("it stops with its foot in view", foot, top(11), .01f)
+        assertEquals("and stays there once it's sung", foot, top(3, ended = true), .01f)
         var was = m + 1
-        for (sung in 0..500 step 25) {
-            val t = top(sung.toFloat()); assertTrue("it only goes up", t <= was); was = t
-            val at = t + sung; assertTrue("the words being sung stay in view: $at", at >= m && at <= view - m)
+        for (row in 0..11) {
+            val t = top(row); assertTrue("it only goes up", t <= was); was = t
+            val at = t + row * 50f; assertTrue("the row being sung is whole in view: $at", at >= m && at + 50f <= view - m)
         }
     }
 
     @Test fun aTranslationTallerThanTheViewKeepsTheWordsInView() {
         val view = 200f; val m = 20f
-        val at = tallLineTop(view, m, 900f, 400f, 400f, false) + 400f   // 500 of translation under the last words
+        val at = tallLineTop(view, m, 900f, 400f, 50f, false) + 400f   // 500 of translation under the last words
         assertTrue("$at", at >= m && at <= view - m)
     }
 

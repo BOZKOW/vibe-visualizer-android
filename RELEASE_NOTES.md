@@ -1,10 +1,8 @@
-Vibe Visualizer for Android 0.41.8 (beta). Android 12 or newer; it installs over 0.41.7 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.41.9 (beta). Android 12 or newer; it installs over 0.41.8 (Settings → Help & about → Update now).
 
-### Breaks no longer make the lyrics jump
+### Scrolling in time with the words
 
-- **The line after a break slides into place**: when a break's dots went, the next line jumped up in a single frame, and when they came, the lines below them jumped down. This happened in every layout.
-
-### On its side
-
-- **The shade over the cover fades in softly**: its edge showed as a line across a bright cover.
-- **The buttons under the controls stay round when the room runs short**: with the large song name and a two-line notice, they got squashed into ovals.
+- **The last word sets off the scroll and the next first word ends it**: in the small window and on its side, the scroll to the next line now arrives as that line's first word is sung. It's a quick glide, never a slow crawl through a long note or a pause.
+- **A line too long for its space moves one whole row at a time**, the same way, instead of crawling along with the singing. Its rows rest whole, with the row before the one being sung still in view.
+- **The small window shows more**: the fades at its top and bottom are much smaller, and they used to hide nearly half of it.
+- After a break's dots, the next line still starts to move as its first word is sung. The Focus style keeps its own way of bringing lines in.

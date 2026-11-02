@@ -56,30 +56,33 @@ private fun evenPace(grp: List<Word>, rt: List<TS>): Boolean {
     return rt.withIndex().all { (k, x) -> val tsr = (x.end - x.t) / du; val cs = grp[k].text.length.toDouble() / ch; tsr >= cs / 3 && tsr <= cs * 3 }
 }
 
-/** Where a line taller than the view sits (its top, px in the view): it scrolls with the singing, from its top as it
- *  starts to its foot, with the translation under it, by the time its last words are sung. [view]: the view's height;
- *  [m]: kept clear at both ends; [h]: the line's height; [sung]: how far down it the words being sung are; [last]: where
- *  its last words are; [ended]: sung to the end. The words being sung stay in view, even under a translation taller than
- *  the view. (minOf and maxOf: a window too small to have room mustn't throw.) */
-fun tallLineTop(view: Float, m: Float, h: Float, sung: Float, last: Float, ended: Boolean): Float {
+/** Where a line taller than the view sits (its top, px in the view): it moves a whole row at a time, so its rows rest
+ *  whole, with the row being sung under the one before it (that one's last word is still being sung as the move starts)
+ *  and as many rows to come as fit. It stops with its foot in view, and goes there once it's sung, translation included.
+ *  The words being sung stay in view, even over a translation taller than the view. [view]: the view's height; [m]: kept
+ *  clear at both ends; [h]: the line's height; [rowTop]: how far down it that row starts; [above]: the height of the row
+ *  before; [ended]: sung to the end. (minOf and maxOf: a window too small to have room mustn't throw.) */
+fun tallLineTop(view: Float, m: Float, h: Float, rowTop: Float, above: Float, ended: Boolean): Float {
     val foot = view - m - h
     if (ended) return foot
-    val k = if (last > 0f) minOf(sung / last, 1f) else 0f
-    val edge = maxOf(view - 2 * m, 0f) * .1f
-    val t = minOf(maxOf(m + (foot - m) * k, m + edge - sung), view - m - edge - sung)
-    return minOf(maxOf(t, foot), m)
+    return minOf(maxOf(m + above - rowTop, foot), m)
 }
 
-/** How far down a tall line the singing is (px), moving on between its rows at the singing's pace, so the line scrolls
- *  without steps. [rows]: when each row's first word is sung and where the row's middle is, both ascending. Null before
- *  the first; after the last row starts, that row. */
-fun sungAlong(rows: List<Pair<Double, Float>>, pos: Double): Float? {
+/** A row of a line's words as it's wrapped on screen: when its first word is sung, when the last word on the row before
+ *  it starts (for the first row, its own start), and where its middle is and how tall it is (px down the line). */
+class WordRow(val at: Double, val lastWord: Double, val y: Float, val h: Float)
+
+/** How long (s) the scroll to the next row or line takes: the last word before it sets it off, the first word there ends
+ *  it. Kept from crawling through a long held note or a pause (a slow scroll leaves rows cut in half the whole time, the
+ *  owner's complaint on 0.41.6) and from snapping when the words run together. It still ends on the first word. */
+fun scrollSecs(lastWord: Double, first: Double): Double = (first - lastWord).coerceIn(.35, .8)
+
+/** The row the scroll should be on at [pos], -1 before the first: each is moved to in time to be there as its first word
+ *  is sung. */
+fun dueRow(rows: List<WordRow>, pos: Double): Int {
     var k = -1
-    for (i in rows.indices) if (rows[i].first <= pos) k = i else break
-    if (k < 0) return null
-    val (t0, y0) = rows[k]
-    val n = rows.getOrNull(k + 1) ?: return y0
-    return y0 + (n.second - y0) * ((pos - t0) / (n.first - t0)).toFloat()
+    for (i in rows.indices) { val r = rows[i]; if (pos >= (if (i == 0) r.at else r.at - scrollSecs(r.lastWord, r.at))) k = i else break }
+    return k
 }
 
 /** A pause this long (s) gets its "• • •", as in Spicy Lyrics (its getLyricsBetweenShow), however long it is; only the
