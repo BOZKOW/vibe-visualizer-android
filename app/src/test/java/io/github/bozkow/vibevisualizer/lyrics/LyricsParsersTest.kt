@@ -108,6 +108,28 @@ class ParseTest {
         assertTrue("no next time known", gapScroll(10.0, null) == null)
     }
 
+    @Test fun aGlideArrivesOnTimeAndKeepsItsSpeedWhenTheTargetMoves() {
+        val g = Glide(0f); g.value(0.0); g.set(100f, 0.0, 1000.0)
+        assertTrue("a soft start", g.value(50.0) < 10f)
+        assertTrue("about there when it's due", g.value(1000.0) > 97f)
+        assertEquals("it gets there", 100f, g.value(3000.0), .01f)
+        val m = Glide(0f); m.value(0.0); m.set(100f, 0.0, 1000.0)
+        val a = m.value(200.0); val b = m.value(216.0); m.set(200f, 216.0, 1000.0); val c = m.value(232.0)
+        assertTrue("no jolt when the target moves on", c - b >= (b - a) * .95f)
+        m.snap(5f); assertEquals("a snap is at once", 5f, m.value(5000.0), .001f)
+    }
+
+    @Test fun theSingingMovesOnBetweenATallLinesRows() {
+        val rows = listOf(10.0 to 0f, 12.0 to 100f, 16.0 to 200f)
+        assertTrue("not sung yet", sungAlong(rows, 9.0) == null)
+        assertEquals("the first row", 0f, sungAlong(rows, 10.0)!!, .01f)
+        assertEquals("halfway to the second", 50f, sungAlong(rows, 11.0)!!, .01f)
+        assertEquals("the second", 100f, sungAlong(rows, 12.0)!!, .01f)
+        assertEquals("a slower row takes longer", 150f, sungAlong(rows, 14.0)!!, .01f)
+        assertEquals("it stays on the last", 200f, sungAlong(rows, 20.0)!!, .01f)
+        assertTrue("no rows", sungAlong(emptyList(), 5.0) == null)
+    }
+
     @Test fun aTallLineScrollsWithTheSinging() {
         val view = 300f; val m = 20f   // 260 of room, for a line of 600 with its last words at 500 and a translation under them
         fun top(sung: Float, ended: Boolean = false) = tallLineTop(view, m, 600f, sung, 500f, ended)

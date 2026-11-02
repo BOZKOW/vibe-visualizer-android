@@ -70,6 +70,18 @@ fun tallLineTop(view: Float, m: Float, h: Float, sung: Float, last: Float, ended
     return minOf(maxOf(t, foot), m)
 }
 
+/** How far down a tall line the singing is (px), moving on between its rows at the singing's pace, so the line scrolls
+ *  without steps. [rows]: when each row's first word is sung and where the row's middle is, both ascending. Null before
+ *  the first; after the last row starts, that row. */
+fun sungAlong(rows: List<Pair<Double, Float>>, pos: Double): Float? {
+    var k = -1
+    for (i in rows.indices) if (rows[i].first <= pos) k = i else break
+    if (k < 0) return null
+    val (t0, y0) = rows[k]
+    val n = rows.getOrNull(k + 1) ?: return y0
+    return y0 + (n.second - y0) * ((pos - t0) / (n.first - t0)).toFloat()
+}
+
 /** A pause this long (s) gets its "• • •", as in Spicy Lyrics (its getLyricsBetweenShow), however long it is; only the
  *  Focus style's cover takes their place (LyricsRenderer's COVER_BREAK). */
 const val DOTS_FROM = 3.0

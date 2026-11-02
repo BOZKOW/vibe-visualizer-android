@@ -158,6 +158,30 @@ object Ease {
     }
 }
 
+/** A position that follows its target without a jolt: critically damped, so when the target moves on it keeps its speed
+ *  (a restarted Tween starts over). It starts softly and is about there after [set]'s durMs; exact for any frame step. */
+class Glide(start: Float) {
+    private var x = start.toDouble(); private var vel = 0.0; private var to = x; private var w = .01; private var last = Double.NaN
+    val v get() = x.toFloat()
+    fun set(target: Float, now: Double, durMs: Double) {
+        if (target.toDouble() == to) return
+        value(now); to = target.toDouble(); w = 6.0 / max(durMs, 1.0)
+    }
+    fun snap(p: Float) { x = p.toDouble(); to = x; vel = 0.0; last = Double.NaN }
+    fun value(now: Double): Float {
+        val dt = if (last.isNaN()) 0.0 else now - last
+        last = now
+        if (dt > 0.0 && (x != to || vel != 0.0)) {
+            val d = x - to; val c = vel + w * d; val e = exp(-w * dt)
+            val d1 = (d + c * dt) * e
+            vel = (c - w * (d + c * dt)) * e
+            x = to + d1
+            if (abs(d1) < .02 && abs(vel) < .001) { x = to; vel = 0.0 }
+        }
+        return x.toFloat()
+    }
+}
+
 /** A value that glides to new targets like a CSS transition (from wherever it is now). */
 class Tween(var v: Float) {
     private var from = v; private var to = v; private var t0 = 0.0; private var dur = 0.0; private var ease: (Double) -> Double = Ease.ease; private var delay = 0.0

@@ -123,6 +123,7 @@ class LyricsRenderer {
 
     // scrolling
     private val lyY = Tween(0f)
+    private val lyG = Glide(0f); private var gliding = false   // where the lyrics sit while they glide instead (setLyY)
     var lyFree by mutableStateOf(false); private set
     /** A long break: nothing sung for COVER_BREAK or more around now, and the next line not due yet (the cover shows). */
     var rest by mutableStateOf(false); private set
@@ -383,7 +384,7 @@ class LyricsRenderer {
         if (!laidOut) layoutAll()
         val wasPlace = placeUntil > 0 && t < placeUntil
         if (wasPlace) place(t, pos)
-        else if (lyTall && !lyFree && t - lyTallAt > 250) { lyTallAt = t; place(t, pos) }
+        else if (lyTall && !lyFree && t - lyTallAt > 100) { lyTallAt = t; place(t, pos) }
         if (!viewOn) return
         if (!sync) { rest = false; staticScroll(t, pos); tops(t); bump(); return }
         val r = S.b("aRestCover") && S.xFocus && restAt(pos)   // one of Focus mode's (Settings greys it without)
@@ -531,9 +532,15 @@ class LyricsRenderer {
     /** How far down the line (px) the words being sung are: its words and background vocals, not what's under them. A
      *  line without word timing goes by its own time (it stayed at its top, so a tall one never moved). */
     private fun sungRow(d: LV, pos: Double): Float {
-        var best: Float? = null; var bt = Double.NEGATIVE_INFINITY
-        for (r in d.rows) { if (r.kind > 1) continue; r.pieces?.forEach { pc -> if (pc.ts.t <= pos && pc.ts.t > bt) { bt = pc.ts.t; best = F * linePad() + r.y + pc.y + F * r.fs * r.fit * r.lh / 2 } } }
-        best?.let { return it }
+        // each row from when its first word is sung, in order down the line: the words, then background vocals that come
+        // after them (ones sung early would swing it down and back)
+        val at = ArrayList<Pair<Double, Float>>()
+        for (kind in 0..1) for (r in d.rows) { if (r.kind == kind) r.pieces?.forEach { pc ->
+            val y = F * linePad() + r.y + pc.y + F * r.fs * r.fit * r.lh / 2
+            val last = at.lastOrNull()
+            if (last == null || (y > last.second && pc.ts.t > last.first)) at.add(pc.ts.t to y)
+        } }
+        sungAlong(at, pos)?.let { return it }
         val r = d.rows.firstOrNull { it.kind == 0 && it.pieces == null } ?: return 0f
         val t0 = d.l.t ?: return 0f; val e = lineEnd(d.l) ?: lines.getOrNull(d.i + 1)?.t ?: return 0f
         return if (e <= t0) 0f else F * linePad() + r.y + r.h * ((pos - t0) / (e - t0)).coerceIn(0.0, 1.0).toFloat()
@@ -568,15 +575,23 @@ class LyricsRenderer {
 
     private fun setLyY(y: Float, t: Double) {
         if (lyFree) return
-        val left = paceUntil - t   // a scroll over a gap: spread over all of it (eOut is there in a moment)
-        if (left > 0) lyY.set(y, t, left, Ease.ease) else lyY.set(y, t, if (S.lsmooth) 550.0 else 0.0, Ease.eOut)
+        // the small window, on its side, and a tall line anywhere: they glide, keeping their speed when the target moves
+        // on (a line following the singing, the next scroll starting before this one's done)
+        if (S.lsmooth && (gapPaced() || lyTall)) {
+            if (!gliding) { lyG.snap(lyY.value(t)); gliding = true }
+            val left = paceUntil - t   // a scroll over a gap takes all of it
+            lyG.set(y, t, if (left > 0) max(left, 200.0) else 550.0)
+            return
+        }
+        if (gliding) { lyY.snap(lyG.value(t)); gliding = false }
+        lyY.set(y, t, if (S.lsmooth) 550.0 else 0.0, Ease.eOut)
     }
 
     /* ---- scrolling through the lyrics by hand, as in Spicy Lyrics ---- */
     fun freeBy(dy: Float) {
         if (lines.isEmpty() || !sync) { if (isStatic) { stUser = now(); stPos = null; stScroll = (stScroll - dy).coerceIn(0f, max(0f, staticMax())); bump() }; return }
         val t = now()
-        if (!lyFree) { lyFree = true; lyFreeY = lyY.value(t); lv.forEach { targets(it, t, S.xFocus) } }
+        if (!lyFree) { lyFree = true; lyFreeY = if (gliding) lyG.value(t) else lyY.value(t); gliding = false; lv.forEach { targets(it, t, S.xFocus) } }
         val hh = H; val maxY = hh * .45f; val minY = min(maxY, hh * .45f - totalH)
         lyFreeY = (lyFreeY + dy).coerceIn(minY, maxY)
         lyY.snap(lyFreeY)
@@ -596,7 +611,7 @@ class LyricsRenderer {
     /** The line under a tap (y inside the view), or -1. */
     fun lineAt(y: Float): Int {
         if (isStatic) return -1
-        val yy = y - lyY.v
+        val yy = y - (if (gliding) lyG.v else lyY.v)
         for (d in lv) if (!d.dots && d.h > 0 && yy >= d.top && yy < d.top + d.h && d.opacity.v > .05f) return d.i
         return -1
     }
@@ -808,7 +823,7 @@ class LyricsRenderer {
         val t = now()
         val la = leaveA.value(t)
         val pad = ceil(F * .7f).toInt()
-        val baseY = if (isStatic) H * .09f - stScroll else lyY.value(t)
+        val baseY = if (isStatic) H * .09f - stScroll else if (gliding) lyG.value(t) else lyY.value(t)
         val st = isStatic
         // credits under the lyrics: right after the last line
         val lastBottom = lv.lastOrNull()?.let { it.top + it.h } ?: 0f
@@ -819,7 +834,8 @@ class LyricsRenderer {
             val op = op0 * la * (if (t - enterAt < 1300) enterK else 1f)
             if (op <= .004f || d.h <= 0f && !d.dots) continue
             val fy = if (st) 0f else d.fy.value(t); val fx = if (st) 0f else d.fx.value(t)
-            val y = baseY + d.top + fy + (if (enterK < 1f) 26 * dens * (1 - enterK) else 0f)
+            val inView = d.top + fy + (if (enterK < 1f) 26 * dens * (1 - enterK) else 0f)
+            val y = baseY + inView
             val hh = max(d.h, d.hText)
             if (y + hh + pad < -H * .1f || y - pad > H * 1.1f) continue
             val avail = W - padL - padR
@@ -829,7 +845,9 @@ class LyricsRenderer {
                 layer.record(ds, ds.layoutDirection, IntSize(w, h)) { drawIntoCanvas { c -> c.nativeCanvas.translate(pad.toFloat(), pad.toFloat()); drawLine(c.nativeCanvas, d, t) } }
                 d.recW = w; d.recH = h; d.dirty = d.a || moving.contains(d.i) || (S.xBgPop && d.bgOpen.moving(t)) || (d.dots && d.dotScale.moving(t))
             }
-            layer.topLeft = IntOffset((padL + fx - pad).roundToInt(), (y - pad).roundToInt())
+            // the scroll rounded once, for all of them: each line rounding its own sum stepped at its own moment, so the
+            // lines shifted against each other by a pixel as they scrolled
+            layer.topLeft = IntOffset((padL + fx - pad).roundToInt(), baseY.roundToInt() + (inView - pad).roundToInt())
             layer.alpha = op.coerceIn(0f, 1f)
             val blurPx = if (st || lyFree) 0f else d.blur.value(t) * F
             val tapK = ((t - d.tapAt) / 260).coerceIn(0.0, 1.0).toFloat()
