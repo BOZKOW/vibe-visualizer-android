@@ -107,6 +107,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.CircleShape
@@ -282,9 +283,9 @@ private fun Tablet() {
     }
 }
 
-/** A phone on its side, laid out as Spicy Lyrics Mobile's: with lyrics (or the bars), the cover or the Canvas on the
- *  left with the song and the seek bar under it, the lyrics on the right; without lyrics, all in the middle. The
- *  controls come and go as in portrait. */
+/** A phone on its side: all that isn't lyrics on the left (where it plays, what's wrong, the cover or the Canvas, the
+ *  song, the seek bar and the controls, which come and go as in portrait), the lyrics (or the bars) with the whole
+ *  height on the right. */
 @Composable
 private fun LandscapePhone() = LandscapeSplit()
 
@@ -298,55 +299,88 @@ private fun LandscapeSplit() {
     Crossfade(CanvasVideo.cvmode, label = "landcv") { cv -> if (cv) LandscapeCanvas() else LandscapeCover() }
 }
 
-/** With a Canvas, the desktop's: the video fills the left half behind (the backdrop), and over it the cover, smaller,
- *  with the song centred under it (without the cover, the song at the foot of the video); on the right where it plays,
- *  the lyrics (or the bars), the seek bar and the controls. */
+/** With a Canvas, the desktop's: the video fills the left half behind (the backdrop), and over it where it plays (and
+ *  what's wrong), the cover, the song in its big size, a wide seek bar and the controls (without the cover, all that at
+ *  the foot of the video). The cover takes the room that's left: it grows as the controls hide, and fades out where it
+ *  would only be a stamp. */
 @Composable
 private fun LandscapeCanvas() {
     Row(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
-        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().ambientOut()) {
-            val noArt = S.b("cvNoArt")
-            val side = minOf(maxWidth * .62f, maxHeight - 150.dp).coerceAtLeast(96.dp)
+        BoxWithConstraints(Modifier.weight(.85f).fillMaxHeight().ambientOut()) {
             val wide = minOf(maxWidth * .94f, 480.dp)
-            // over the Canvas: the cover, the song in its big size and a wide seek bar (the credits stay with the lyrics)
-            Column(Modifier.fillMaxSize().padding(bottom = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = if (noArt) Arrangement.Bottom else Arrangement.Center) {
-                if (!noArt) { CoverArt(Modifier.size(side), corner = 18.dp); Spacer(Modifier.height(12.dp)) }
-                Box(Modifier.widthIn(max = wide)) { TitleRow(big = true, center = true) }
-                Box(Modifier.widthIn(max = wide).padding(top = 4.dp)) { SeekRow() }
+            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                TopBar(side = true)
+                Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+                    if (!S.b("cvNoArt")) CoverArt(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true)
+                        .graphicsLayer { alpha = ((size.height / density - 48f) / 24f).coerceIn(0f, 1f) }, corner = 18.dp)
+                }
+                Column(Modifier.widthIn(max = wide)) {
+                    // the song centred under the cover; with translate or romanize beside it, from the left, as in portrait
+                    // (centred in what they leave, it would stand off the cover's middle)
+                    val toggles = !barsInstead() && (Lyr.needTr || Lyr.needRom)
+                    TitleRow(big = true, center = !toggles, toggles = toggles, like = false)
+                    SeekRow()
+                    SideControls()
+                }
             }
         }
         Spacer(Modifier.width(20.dp))
-        SideColumn(Modifier.weight(1f), name = false, seek = false)
+        SideColumn(Modifier.weight(1f))
     }
 }
 
-/** Without a Canvas: the cover as tall as the screen on the left, the song in its big size and the seek bar over its
- *  foot (on a soft shade, so they read on any cover); the lyrics with the whole height on the right (duets and
- *  background vocals have room), the bars, the credits and the controls under them. */
+/** Without a Canvas: the cover as tall as the screen on the left, and over it where it plays (and what's wrong) at its
+ *  head, the song in its big size, the seek bar and the controls at its foot, each on a soft shade so they read on any
+ *  cover. When the controls hide, the cover has its middle back. */
 @Composable
 private fun LandscapeCover() {
     Row(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
         Box(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true).ambientOut()) {
             CoverArt(Modifier.fillMaxSize(), corner = 18.dp)
-            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(RoundedCornerShape(bottomStart = 18.dp, bottomEnd = 18.dp))
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .35f), Color.Black.copy(alpha = .7f))))
-                .padding(start = 18.dp, end = 18.dp, top = 44.dp, bottom = 6.dp)) {
-                TitleRow(big = true)
-                SeekRow()
+            var headH by remember { mutableFloatStateOf(0f) }
+            var footH by remember { mutableFloatStateOf(0f) }
+            // drawn behind both, reaching past them and fading out over the cover (nothing at the head: no shade there);
+            // the same corners as the cover's (Settings → Player screen → Cover corners)
+            Column(Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp * (S.i("aCoverR").coerceIn(0, 40) / 22f))).drawBehind {
+                val down = 22.dp.toPx(); val up = 44.dp.toPx()
+                if (headH > 0f) drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .6f), headH / (headH + down) to Color.Black.copy(alpha = .35f), 1f to Color.Transparent, endY = headH + down),
+                    size = androidx.compose.ui.geometry.Size(size.width, headH + down))
+                val y = size.height - footH - up
+                drawRect(Brush.verticalGradient(0f to Color.Transparent, up / (footH + up) to Color.Black.copy(alpha = .38f), 1f to Color.Black.copy(alpha = .72f), startY = y, endY = size.height),
+                    topLeft = Offset(0f, y), size = androidx.compose.ui.geometry.Size(size.width, footH + up))
+            }) {
+                TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.padding(horizontal = 10.dp), side = true)
+                Spacer(Modifier.weight(1f))
+                Column(Modifier.fillMaxWidth().onSizeChanged { footH = it.height.toFloat() }.padding(start = 18.dp, end = 18.dp, bottom = 6.dp)) {
+                    TitleRow(big = true, toggles = !barsInstead())
+                    SeekRow()
+                    SideControls()
+                }
             }
         }
         Spacer(Modifier.width(20.dp))
-        SideColumn(Modifier.weight(1f), name = false, seek = false)
+        SideColumn(Modifier.weight(1f))
     }
 }
 
-/** The right side on its side: where it plays (and what's wrong), the lyrics (or the bars: the Visualizer, or a song
- *  without lyrics), the song (unless its name is over the Canvas), the seek bar and the controls in one row. */
+/** On its side, the bars take the lyrics' place: the Visualizer, or a song without lyrics. */
+private fun barsInstead() = E.screen == "viz" || noLyrics()
+
+/** The controls on its side, in two rows, each its full size (side by side in one row they were too small to hit);
+ *  they hide after a few seconds. */
 @Composable
-private fun SideColumn(modifier: Modifier, name: Boolean, seek: Boolean = true) {
+private fun SideControls() {
+    AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
+        Column(Modifier.fillMaxWidth()) { Transport(big = false); BottomBar(big = false) }
+    }
+}
+
+/** The right side on its side: the lyrics with the whole height (duets and background vocals have room), or the bars,
+ *  then the small bars and the credits under them. All the rest is on the left. */
+@Composable
+private fun SideColumn(modifier: Modifier) {
     Column(modifier.fillMaxHeight()) {
-        TopBar(side = true)
-        val bars = E.screen == "viz" || noLyrics()
+        val bars = barsInstead()
         if (bars && E.screen != "viz") NoLyricsNote(Modifier.fillMaxWidth())
         var areaH by remember { mutableFloatStateOf(0f) }
         Box(Modifier.weight(1f).fillMaxWidth().onSizeChanged { areaH = it.height.toFloat() }) {
@@ -354,12 +388,7 @@ private fun SideColumn(modifier: Modifier, name: Boolean, seek: Boolean = true) 
             else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false)
         }
         if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(34.dp))
-        SongInfo(big = false, toggles = !bars, lyrics = !bars, name = name, seek = seek)
-        // the controls in two rows, each its full size (side by side in one row they were too small to hit); they hide
-        // after a few seconds, and the lyrics get the room back
-        AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
-            Column(Modifier.fillMaxWidth()) { Transport(big = false); BottomBar(big = false) }
-        }
+        SongInfo(big = false, lyrics = !bars, name = false, seek = false)
     }
 }
 
@@ -585,17 +614,17 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
 }
 
 /** What's wrong, in red (broken) or yellow (waiting), or good news in white: words alone (OK, and what fixes it, are
- *  on its detail screen). In a row on its side, where height is short. */
+ *  on its detail screen). On its side, where the room is the left column's: one text of two lines at most. */
 @Composable
 fun NoticeLines(p: E.Prob, row: Boolean = false) {
     val tint = when (p.k) { "err" -> Color(0xFFFFB4AB); "ok" -> Color.White; else -> Color(0xFFFFD27A) }   // red broken, white good news, yellow waiting
     val act: @Composable () -> Unit = {}
     if (row) Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-        // one text: the title whole first, the detail after it cut short if the row runs out
+        // one text: the title whole first, the detail after it cut short if the room runs out
         Text(androidx.compose.ui.text.buildAnnotatedString {
             withStyle(androidx.compose.ui.text.SpanStyle(color = tint, fontWeight = FontWeight.Bold)) { append(p.t) }
             if (p.s.isNotEmpty()) withStyle(androidx.compose.ui.text.SpanStyle(color = dim, fontSize = 12.sp)) { append("  ·  " + p.s) }
-        }, Modifier.weight(1f, fill = false), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }, Modifier.weight(1f, fill = false), fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
         act()
     } else {
         Text(p.t, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = tint, maxLines = if (p.s.isEmpty()) 2 else 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
@@ -668,7 +697,7 @@ private fun MoreButton() {
 }
 
 @Composable
-private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false) {
+private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center) {
     val ver = E.trackVer
     val a = remember { Animatable(1f) }
     LaunchedEffect(ver) { if (!S.low && !E.reduceMotion()) { a.snapTo(0f); a.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
@@ -683,7 +712,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
             if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
             if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
         }
-        if (E.src == "spotify" && !center && S.b("aLike")) LikeButton()
+        if (E.src == "spotify" && like && S.b("aLike")) LikeButton()
     }
 }
 
