@@ -27,6 +27,21 @@ val UNSPACED = Regex("[\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}\\p{IsThai}\\p{Is
 val RTL = Regex("[\\u0590-\\u08FF\\uFB1D-\\uFDFF\\uFE70-\\uFEFF]")
 private val DASH_END = Regex("[-\\u2010-\\u2015]$")
 
+/** The pieces of a sung line (their texts, each with its space if one follows) grouped into whole words, as index ranges: a
+ *  word sung in syllables wraps as one, joined or not (Join Split Words leaves it in parts when they don't line up, and the
+ *  parts fell onto two rows). A row may still end after a space, after a dash, and between letters of a script written
+ *  without spaces. */
+fun wordSpans(texts: List<String>): List<IntRange> {
+    val out = ArrayList<IntRange>(); var from = 0
+    for (k in texts.indices) if (k == texts.lastIndex || mayBreak(texts[k], texts[k + 1])) { out.add(from..k); from = k + 1 }
+    return out
+}
+
+private fun mayBreak(a: String, b: String): Boolean {
+    if (a.isEmpty() || b.isEmpty() || a.last().isWhitespace() || b.first().isWhitespace() || DASH_END.containsMatchIn(a)) return true
+    return UNSPACED.containsMatchIn(a.substring(a.offsetByCodePoints(a.length, -1))) || UNSPACED.containsMatchIn(b.substring(0, b.offsetByCodePoints(0, 1)))
+}
+
 /** Join Split Words, ported from Spicy Lyrics (src/utils/Lyrics/Applyer/Utils/JoinSplitWords.ts, AGPL-3.0): the
  *  parts of a word sung in syllables become one word, unless they don't line up cleanly (a gap over 100 ms, an uneven
  *  pace, a space inside, a trailing dash, a script written without spaces). */
@@ -83,19 +98,23 @@ fun pipTallLineTop(view: Float, m: Float, h: Float, sung: Float, last: Float, en
 }
 
 /** A row of a line's words as it's wrapped on screen: when its first word is sung, when the last word on the row before
- *  it starts (for the first row, its own start), and where its middle is and how tall it is (px down the line). */
-class WordRow(val at: Double, val lastWord: Double, val y: Float, val h: Float)
+ *  it ends (for the first row, its own start), and where its middle is and how tall it is (px down the line). */
+class WordRow(val at: Double, val lastEnd: Double, val y: Float, val h: Float)
 
-/** How long (s) the scroll to the next row or line takes: the last word before it sets it off, the first word there ends
- *  it. Kept from crawling through a long held note or a pause (a slow scroll leaves rows cut in half the whole time, the
- *  owner's complaint on 0.41.6) and from snapping when the words run together. It still ends on the first word. */
-fun scrollSecs(lastWord: Double, first: Double): Double = (first - lastWord).coerceIn(.35, .8)
+/** When the scroll to the next row or line starts: once the last word before it has been sung (from when that word started,
+ *  it left while the word was still going, too soon by the owner's ear on 0.42.0), and no sooner than .8 s before the first
+ *  word there, so it holds through a long pause. Never after that first word. */
+fun scrollFrom(lastEnd: Double, first: Double): Double = minOf(first, maxOf(lastEnd, first - .8))
 
-/** The row the scroll should be on at [pos], -1 before the first: each is moved to in time to be there as its first word
- *  is sung. */
+/** How long (s) that scroll takes: it ends on the first word when there's time. Kept from crawling through a long pause (a
+ *  slow scroll leaves rows cut in half the whole time, the owner's complaint on 0.41.6); with next to no gap, the usual half
+ *  second, landing just after the first word, instead of a snap. */
+fun scrollSecs(lastEnd: Double, first: Double): Double { val d = first - scrollFrom(lastEnd, first); return if (d >= .35) d else .55 }
+
+/** The row the scroll should be on at [pos], -1 before the first. */
 fun dueRow(rows: List<WordRow>, pos: Double): Int {
     var k = -1
-    for (i in rows.indices) { val r = rows[i]; if (pos >= (if (i == 0) r.at else r.at - scrollSecs(r.lastWord, r.at))) k = i else break }
+    for (i in rows.indices) { val r = rows[i]; if (pos >= (if (i == 0) r.at else scrollFrom(r.lastEnd, r.at))) k = i else break }
     return k
 }
 

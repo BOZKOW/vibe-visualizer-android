@@ -67,6 +67,7 @@ class LyricsRenderer {
         var paint: TextPaint? = null
         var y = 0f; var h = 0f
         var fit = 1f   // smaller than its size when one word is wider than the row
+        var spans: List<IntRange>? = null   // the pieces as whole words (wordSpans)
         var rowsW = FloatArray(0)
         val timed get() = pieces != null || oneTs != null
     }
@@ -106,7 +107,7 @@ class LyricsRenderer {
     /* ================= metrics ================= */
     var W = 0f; private set
     var H = 0f; private set
-    var bleedTop = 0f; var bleedBot = 0f   // how far above and under the area (H) they're drawn: to the screen's ends (LyricsPane's behind)
+    var bleedTop = 0f; var bleedBot = 0f; var bleedLeft = 0f   // how far outside the area they're drawn (LyricsPane's behind)
     private var areaH = 0f
     private var screenH = 0f; private var screenW = 0f
     private var dens = 1f
@@ -304,17 +305,27 @@ class LyricsRenderer {
                 val ps = r.pieces
                 // a word wider than the row (a long held "Weeeeeng") makes its line smaller, instead of running off the screen
                 r.fit = 1f
-                if (ps != null) { val p0 = paint(F * r.fs, r.weight); val widest = ps.maxOfOrNull { p0.measureText(it.text.trimEnd()) } ?: 0f; if (widest > maxW) r.fit = max(.4f, maxW / widest * .98f) }
+                val spans = ps?.let { pp -> r.spans ?: wordSpans(pp.map { it.text }).also { r.spans = it } }
+                if (ps != null && spans != null) {
+                    val p0 = paint(F * r.fs, r.weight)
+                    val widest = spans.maxOfOrNull { s -> var w = 0f; for (k in s) w += p0.measureText(if (k == s.last) ps[k].text.trimEnd() else ps[k].text); w } ?: 0f
+                    if (widest > maxW) r.fit = max(.4f, maxW / widest * .98f)
+                }
                 val fs = F * r.fs * r.fit; val lh = fs * r.lh
                 r.y = y + F * r.mt
-                if (ps != null) {
+                if (ps != null && spans != null) {
                     val p = paint(fs, r.weight)
-                    var x = 0f; var row = 0; val rowW = ArrayList<Float>(); var rowStart = 0
-                    for ((k, pc) in ps.withIndex()) {
-                        pc.adv = p.measureText(pc.text); pc.w = p.measureText(pc.text.trimEnd())
-                        if (x > 0 && x + pc.w > maxW) { rowW.add(x); row++; x = 0f; rowStart = k }
-                        pc.x = x; pc.y = row * lh; x += pc.adv
-                        pc.letters?.let { lt -> var off = 0; for (c in lt) { c.dx = p.measureText(pc.text, 0, off); c.w = p.measureText(c.ch); off += c.ch.length } }
+                    var x = 0f; var row = 0; val rowW = ArrayList<Float>()
+                    for (s in spans) {   // a word sung in syllables moves to the next row whole
+                        var wordW = 0f
+                        for (k in s) { val pc = ps[k]; pc.adv = p.measureText(pc.text); pc.w = p.measureText(pc.text.trimEnd()); wordW += if (k == s.last) pc.w else pc.adv }
+                        if (x > 0 && x + wordW > maxW) { rowW.add(x); row++; x = 0f }
+                        for (k in s) {
+                            val pc = ps[k]
+                            if (x > 0 && x + pc.w > maxW) { rowW.add(x); row++; x = 0f }   // only one wider than a row at its smallest
+                            pc.x = x; pc.y = row * lh; x += pc.adv
+                            pc.letters?.let { lt -> var off = 0; for (c in lt) { c.dx = p.measureText(pc.text, 0, off); c.w = p.measureText(c.ch); off += c.ch.length } }
+                        }
                     }
                     rowW.add(x)
                     r.rowsW = rowW.toFloatArray()
@@ -406,9 +417,9 @@ class LyricsRenderer {
         // on its side: the last word on the line sets off the move to the next, its first word ends it
         // (a break's dots keep their own timing, and the Focus style brings each line in its own way)
         val paced = softScroll() && S.lsmooth && !S.xFocus
-        val lastWord = if (paced && i >= 0) lines[i].words?.lastOrNull()?.t else null
+        val lastEnd = if (paced && i >= 0) lines[i].words?.lastOrNull()?.let { it.end ?: it.t } else null
         val nextAt = nx?.takeIf { !it.dots }?.t
-        if (lastWord != null && nextAt != null && pos >= nextAt - scrollSecs(lastWord, nextAt)) si = i + 1
+        if (lastEnd != null && nextAt != null && pos >= scrollFrom(lastEnd, nextAt)) si = i + 1
         var fi = -2; var fo = false; var fn = ""; var fs = ""
         if (S.xFocus) {   // a line is due on screen 200 ms before it's sung, but the line before holds until it's sung to the end
             // a break (its dots) holds until the next line is due, as a line holds until it's sung (it went at once,
@@ -435,7 +446,7 @@ class LyricsRenderer {
         val aks = ak.toString()
         run { var n = lines.size - 1; while (n >= 0 && lines[n].dots) n--; val all = i > n || (i == n && (out || (e == null && pos >= (lines[n].t ?: 0.0) + 4))); if (all != allsung) allsung = all }
         if (si != lsi) {   // one line on takes the words' time; a seek, a break and the rest the usual half second
-            val was = lines.getOrNull(si - 1)?.words?.lastOrNull()?.t; val at = lines.getOrNull(si)?.takeIf { !it.dots }?.t
+            val was = lines.getOrNull(si - 1)?.words?.lastOrNull()?.let { it.end ?: it.t }; val at = lines.getOrNull(si)?.takeIf { !it.dots }?.t
             stepMs = if (paced && si == lsi + 1 && was != null && at != null) scrollSecs(was, at) * 1000 else 550.0
         }
         if (i != li || out != lOut || fi != lfi || fo != lfo || fn != lfn || fs != lfs || aks != lActKey) {
@@ -544,12 +555,12 @@ class LyricsRenderer {
      *  background vocals that come after them (ones sung early would swing it down and back). A line without word timing
      *  shares its time between its rows. */
     private fun wordRows(d: LV): List<WordRow> {
-        val out = ArrayList<WordRow>(); val pad = F * linePad(); var lastAt = 0.0
+        val out = ArrayList<WordRow>(); val pad = F * linePad(); var lastEnd = 0.0
         for (kind in 0..1) for (r in d.rows) { if (r.kind == kind) r.pieces?.forEach { pc ->
             val h = F * r.fs * r.fit * r.lh; val y = pad + r.y + pc.y + h / 2
             val cur = out.lastOrNull()
-            if (cur == null || (y > cur.y && pc.ts.t > cur.at)) { out.add(WordRow(pc.ts.t, if (cur == null) pc.ts.t else lastAt, y, h)); lastAt = pc.ts.t }
-            else if (y == cur.y) lastAt = max(lastAt, pc.ts.t)
+            if (cur == null || (y > cur.y && pc.ts.t > cur.at)) { out.add(WordRow(pc.ts.t, if (cur == null) pc.ts.t else lastEnd, y, h)); lastEnd = pc.ts.end }
+            else if (y == cur.y) lastEnd = max(lastEnd, pc.ts.end)
         } }
         if (out.isNotEmpty()) return out
         val r = d.rows.firstOrNull { it.kind == 0 && it.pieces == null } ?: return out
@@ -604,7 +615,7 @@ class LyricsRenderer {
             lyTall = true; val e = lineEnd(el.l); val ended = e != null && pos >= e
             val rows = wordRows(el); val k = dueRow(rows, pos); val r = rows.getOrNull(max(k, 0))
             t = tallLineTop(H, m, h, r?.let { it.y - it.h / 2 } ?: 0f, rows.getOrNull(k - 1)?.h ?: 0f, ended)
-            if (ended) stepMs = 550.0 else if (k >= 1 && r != null) stepMs = scrollSecs(r.lastWord, r.at) * 1000
+            if (ended) stepMs = 550.0 else if (k >= 1 && r != null) stepMs = scrollSecs(r.lastEnd, r.at) * 1000
             band(m, H - m); return t - el.top
         }
         band(max(0f, min(H * .14f, t - 2)), min(H, max(H * .8f, t + h + 2)))
@@ -650,7 +661,7 @@ class LyricsRenderer {
     /** The line under a tap (y inside the view), or -1. */
     fun lineAt(y: Float): Int {
         if (isStatic) return -1
-        val yy = y - bleedTop - (if (gliding) lyG.v else lyY.v)
+        val yy = y - (if (gliding) lyG.v else lyY.v)
         for (d in lv) if (!d.dots && d.h > 0 && yy >= d.top && yy < d.top + d.h && d.opacity.v > .05f) return d.i
         return -1
     }
@@ -888,7 +899,7 @@ class LyricsRenderer {
             }
             // the scroll rounded once, for all of them: each line rounding its own sum stepped at its own moment, so the
             // lines shifted against each other by a pixel as they scrolled
-            layer.topLeft = IntOffset((padL + fx - pad).roundToInt(), bleedTop.roundToInt() + baseY.roundToInt() + (inView - pad).roundToInt())
+            layer.topLeft = IntOffset((bleedLeft + padL + fx - pad).roundToInt(), bleedTop.roundToInt() + baseY.roundToInt() + (inView - pad).roundToInt())
             layer.alpha = op.coerceIn(0f, 1f)
             val blurPx = if (st || lyFree) 0f else d.blur.value(t) * F
             val tapK = ((t - d.tapAt) / 260).coerceIn(0.0, 1.0).toFloat()

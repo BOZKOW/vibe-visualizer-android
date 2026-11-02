@@ -112,8 +112,11 @@ class ParseTest {
     @Test fun theLastWordSetsOffTheScrollAndTheFirstWordEndsIt() {
         assertEquals("from the last word to the first", .6, scrollSecs(11.4, 12.0), 1e-9)
         assertEquals("a long held note or a pause doesn't make it crawl", .8, scrollSecs(10.0, 15.0), 1e-9)
-        assertEquals("words running together don't make it snap", .35, scrollSecs(11.95, 12.0), 1e-9)
-        assertEquals("lines that overlap neither", .35, scrollSecs(12.0, 11.0), 1e-9)
+        assertEquals("words running together don't make it snap", .55, scrollSecs(11.95, 12.0), 1e-9)
+        assertEquals("lines that overlap neither", .55, scrollSecs(12.0, 11.0), 1e-9)
+        assertEquals("it waits for the last word to end", 11.7, scrollFrom(11.7, 12.0), 1e-9)
+        assertEquals("through a long pause, until .8 s before", 14.2, scrollFrom(10.0, 15.0), 1e-9)
+        assertEquals("a word held past the next line's start: no later than that", 12.0, scrollFrom(13.0, 12.0), 1e-9)
     }
 
     @Test fun eachRowIsDueInTimeForItsFirstWord() {
@@ -167,6 +170,15 @@ class ParseTest {
 
     @Test fun aWindowWithNoRoomDoesntThrow() {
         tallLineTop(10f, 20f, 100f, 50f, 80f, false); tallLineTop(0f, 0f, 0f, 0f, 0f, false); tallLineTop(30f, 18f, 60f, 0f, 0f, false)
+    }
+
+    @Test fun aWordInSyllablesWrapsAsOne() {
+        assertEquals("the parts of a word stay together", listOf(0..0, 1..3, 4..4), wordSpans(listOf("so ", "beau", "ti", "ful ", "song")))
+        assertEquals("a row may end after a dash", listOf(0..0, 1..1, 2..2), wordSpans(listOf("la-", "la-", "la")))
+        assertEquals("and in a script without spaces", listOf(0..0, 1..1, 2..2), wordSpans(listOf("春", "の", "風")))
+        assertEquals("next to one too", listOf(0..0, 1..1), wordSpans(listOf("love", "春")))
+        assertEquals("one word", listOf(0..1), wordSpans(listOf("per", "fect")))
+        assertEquals("nothing", emptyList<IntRange>(), wordSpans(emptyList()))
     }
 
     @Test fun joins() {

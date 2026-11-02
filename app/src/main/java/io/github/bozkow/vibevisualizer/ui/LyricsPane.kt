@@ -114,11 +114,19 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
     val prob = if (n == 0 && problems) E.problems(false).firstOrNull() else null
     val full = behind && !compact && (!S.xFocus || view.isStatic)
     var aboveArea by remember { mutableIntStateOf(0) }; var underArea by remember { mutableIntStateOf(0) }   // px of the screen
+    var leftOf by remember { mutableIntStateOf(0) }; var rightOf by remember { mutableIntStateOf(0) }
     val bleedT = if (full) aboveArea else 0; val bleedB = if (full) underArea else 0
+    // room at the sides for the blur to fade by itself: on its side, cut off where this column ends, it showed as a sharp line
+    val sideRoom = with(dens) { 40.dp.roundToPx() }
+    val bleedL = if (full) minOf(leftOf, sideRoom) else 0; val bleedR = if (full) minOf(rightOf, sideRoom) else 0
     val lyr = rememberGraphicsLayer(); val soft = rememberGraphicsLayer()
     val softFx = remember(dens) { val r = with(dens) { 14.dp.toPx() } / 8f; BlurEffect(r, r, TileMode.Decal) }
     BoxWithConstraints(modifier.onGloballyPositioned { c ->
-        if (behind) { val y = c.positionInWindow().y.roundToInt().coerceAtLeast(0); aboveArea = y; underArea = (c.findRootCoordinates().size.height - y - c.size.height).coerceAtLeast(0) }
+        if (behind) {
+            val at = c.positionInWindow(); val root = c.findRootCoordinates().size
+            val y = at.y.roundToInt().coerceAtLeast(0); aboveArea = y; underArea = (root.height - y - c.size.height).coerceAtLeast(0)
+            val x = at.x.roundToInt().coerceAtLeast(0); leftOf = x; rightOf = (root.width - x - c.size.width).coerceAtLeast(0)
+        }
     }) {
         val wDp = maxWidth.value
         // the lyrics' size: big and bold on a phone, as the web app sizes them on a computer (times Text size)
@@ -127,32 +135,13 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
         Box(
             Modifier.fillMaxSize()
                 .layout { m, c ->
-                    view.bleedTop = bleedT.toFloat(); view.bleedBot = bleedB.toFloat()
-                    val p = m.measure(Constraints.fixed(c.maxWidth, c.maxHeight + bleedT + bleedB))
-                    layout(c.maxWidth, c.maxHeight) { p.place(0, -bleedT) }
+                    view.bleedTop = bleedT.toFloat(); view.bleedBot = bleedB.toFloat(); view.bleedLeft = bleedL.toFloat()
+                    val p = m.measure(Constraints.fixed(c.maxWidth + bleedL + bleedR, c.maxHeight + bleedT + bleedB))
+                    layout(c.maxWidth, c.maxHeight) { p.place(-bleedL, -bleedT) }
                 }
-                .onSizeChanged { sz -> view.size(sz.width.toFloat(), (sz.height - bleedT - bleedB).toFloat(), if (areaHeightPx > 0) areaHeightPx else sz.height.toFloat(),
+                .onSizeChanged { sz -> view.size((sz.width - bleedL - bleedR).toFloat(), (sz.height - bleedT - bleedB).toFloat(), if (areaHeightPx > 0) areaHeightPx else sz.height.toFloat(),
                     conf.screenWidthDp * dens.density, conf.screenHeightDp * dens.density, dens.density, fontPx, padStart * dens.density, padEnd * dens.density) }
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        if (down.position.y < view.bleedTop || down.position.y > size.height - view.bleedBot) return@awaitEachGesture   // the lyrics seen behind the rest
-                        var dragged = false; var lastY = down.position.y; val slop = 8.dp.toPx()
-                        val idx = view.lineAt(down.position.y); view.pressed = idx; view.dragged = false; view.bump()
-                        while (true) {
-                            val ev = awaitPointerEvent(); val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!ch.pressed) break
-                            val dy = ch.position.y - lastY
-                            if (!dragged && abs(ch.position.y - down.position.y) > slop) { dragged = true; view.dragged = true; view.pressed = -1; E.poke() }
-                            if (dragged) { view.freeBy(dy); lastY = ch.position.y; ch.consume() }
-                            else if (ch.positionChange() != Offset.Zero) Unit
-                        }
-                        view.pressed = -1; view.bump()
-                        if (!dragged && idx >= 0 && !E.wakeTap) Lyr.tap(idx)
-                        view.dragged = false
-                    }
-                }
         ) {
             Canvas(Modifier.fillMaxSize()) {
                 view.tick.longValue
@@ -182,25 +171,47 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                     drawRect(Brush.verticalGradient(0f to Color.Transparent, t to Color.Black, b to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
                 }
             }
-            // Refined credits (Spicy Lyrics 6.4.50): right under the last line (not in picture-in-picture: its own small
-            // line says where the lyrics are from)
-            if (n > 0 && !compact && S.credPos == "lyrics" && S.b("xRefCred")) {
-                val c = Lyr.credit
-                if (c != null) {
-                    // Focus mode: the lines fly in from the bottom and away at the top, so the credits wait for the end (the
-                    // corner ones show meanwhile) and then come in the middle, where the lines were; pinned to the foot
-                    // they sat on the lines flying in there
-                    val focus = S.xFocus && !view.isStatic
-                    val a by animateFloatAsState(if (focus) (if (view.allsung) 1f else 0f) else if (view.allsung || view.isStatic) 1f else .55f, tween(600), label = "lcr")
-                    // (in this area only: they're for reading, and out there they'd lie sharp behind the rest)
-                    if (a > 0f) Box(Modifier.fillMaxSize().padding(top = with(dens) { bleedT.toDp() }, bottom = with(dens) { bleedB.toDp() }).clipToBounds()) {
-                        Box(Modifier.fillMaxWidth().then(if (focus) Modifier.align(Alignment.CenterStart) else Modifier.offset { IntOffset(0, view.creditsY.roundToInt()) })
-                            .padding(start = padStart.dp, end = padEnd.dp).alpha(a)) {
-                            RefinedCredits(c, view.lineCount() > 0 && Lyr.L.lastOrNull { !it.dots }?.opp == true && S.b("lcredLast"))
+            // the area itself, inside all that: where the lines are touched (out there they're only seen behind the rest, and the
+            // sides would take touches from what's beside them) and where the credits under them show
+            Box(Modifier.fillMaxSize().padding(start = with(dens) { bleedL.toDp() }, end = with(dens) { bleedR.toDp() }, top = with(dens) { bleedT.toDp() }, bottom = with(dens) { bleedB.toDp() })
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var dragged = false; var lastY = down.position.y; val slop = 8.dp.toPx()
+                        val idx = view.lineAt(down.position.y); view.pressed = idx; view.dragged = false; view.bump()
+                        while (true) {
+                            val ev = awaitPointerEvent(); val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!ch.pressed) break
+                            val dy = ch.position.y - lastY
+                            if (!dragged && abs(ch.position.y - down.position.y) > slop) { dragged = true; view.dragged = true; view.pressed = -1; E.poke() }
+                            if (dragged) { view.freeBy(dy); lastY = ch.position.y; ch.consume() }
+                            else if (ch.positionChange() != Offset.Zero) Unit
+                        }
+                        view.pressed = -1; view.bump()
+                        if (!dragged && idx >= 0 && !E.wakeTap) Lyr.tap(idx)
+                        view.dragged = false
+                    }
+                }) {
+                // Refined credits (Spicy Lyrics 6.4.50): right under the last line (not in picture-in-picture: its own small
+                // line says where the lyrics are from)
+                if (n > 0 && !compact && S.credPos == "lyrics" && S.b("xRefCred")) {
+                    val c = Lyr.credit
+                    if (c != null) {
+                        // Focus mode: the lines fly in from the bottom and away at the top, so the credits wait for the end (the
+                        // corner ones show meanwhile) and then come in the middle, where the lines were; pinned to the foot
+                        // they sat on the lines flying in there
+                        val focus = S.xFocus && !view.isStatic
+                        val a by animateFloatAsState(if (focus) (if (view.allsung) 1f else 0f) else if (view.allsung || view.isStatic) 1f else .55f, tween(600), label = "lcr")
+                        // (in this area only: they're for reading, and out there they'd lie sharp behind the rest)
+                        if (a > 0f) Box(Modifier.fillMaxSize().clipToBounds()) {
+                            Box(Modifier.fillMaxWidth().then(if (focus) Modifier.align(Alignment.CenterStart) else Modifier.offset { IntOffset(0, view.creditsY.roundToInt()) })
+                                .padding(start = padStart.dp, end = padEnd.dp).alpha(a)) {
+                                RefinedCredits(c, view.lineCount() > 0 && Lyr.L.lastOrNull { !it.dots }?.opp == true && S.b("lcredLast"))
+                            }
                         }
                     }
                 }
-            }
+                    }
         }
         // where the lyrics go: messages and problems
         val m = Lyr.msg

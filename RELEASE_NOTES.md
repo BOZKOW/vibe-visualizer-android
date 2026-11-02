@@ -1,16 +1,7 @@
-Vibe Visualizer for Android 0.42.0 (beta). Android 12 or newer; it installs over 0.41.11 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.42.1 (beta). Android 12 or newer; it installs over 0.42.0 (Settings → Help & about → Update now).
 
-### Lyrics from edge to edge
+### Lyrics
 
-- **The lyrics now use the whole height of the screen**, upright and on its side: they run from the top of the screen to its foot, behind the top line, the bars, the credits and, upright, the song and the controls. They stay sharp in the lyrics' own area and blur out behind everything else, with soft edges where one becomes the other. This covers the normal style and untimed lyrics; the Focus style and the small window keep their own way. Low performance mode fades them instead of blurring.
-- Untimed lyrics start closer to the top, without the empty space above them.
-
-### On its side
-
-- **The seek bar and the round buttons are frosted**: nothing sharp shows through them any more, on the cover or on the Canvas. Upright they stay see-through, since only blur is behind them there.
-- **The cover moves further from the camera** when the camera is on its side of the screen.
-- **A softer Canvas**: the video first blurs where it is and then melts into the background, instead of fading straight from sharp to blurred. The blurred part is also blurred twice as much.
-
-### Fixed
-
-- **The Canvas no longer stays dark after the small window**: back on the full screen, its blurred background was missing until the next song.
+- **Split words stay on one row**: a word sung in syllables, which is common in Spicy Lyrics' files, could break in the middle when its parts didn't line up well enough to be joined. It now moves to the next row whole. Rows can still end after a dash, and between letters in scripts written without spaces.
+- **The scroll starts later on its side**, and for lines too long for the screen: it waits until the last word has been sung, and starts at most .8 s before the next first word. It used to set off while that word was still being sung.
+- **No more sharp edges on the blur on its side**: the blurred lyrics were cut off in a straight line at both sides of their column. They now fade out by themselves.
