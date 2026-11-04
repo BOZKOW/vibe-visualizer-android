@@ -36,8 +36,9 @@ object Background {
         val target = if (E.playing()) (tempo * (.35 + min(1.0, Audio.bgEnergy * 2.2) * .4) + .35 * Audio.bgKick).coerceIn(.1, 1.4) else .1
         kwSpeed += (target - kwSpeed) * (1 - exp(-dt / 900))
         kwTime += dt / 1000 * kwSpeed * S.bgspeed / 100
-        // redrawn 60 times a second at most while it moves, 20 once it has slowed down for a pause (it looks the same)
-        val every = if (!E.playing() && kwSpeed < .12) 50 else 16
+        // redrawn 30 times a second at most while it moves, 20 once it has slowed down for a pause: it drifts far too slowly for more
+        // to show, and each is a shader over the whole background
+        val every = if (!E.playing() && kwSpeed < .12) 50 else 33
         if (t - lastF >= every) { lastF = t; E.bgTick.longValue++ }
     }
 

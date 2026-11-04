@@ -175,7 +175,7 @@ private fun LiquidBackground() {
             shader.setFloatUniform("res", size.width, size.height)
             shader.setFloatUniform("t", Background.kwTime.toFloat() * 2.2f)
             shader.setFloatUniform("mixv", Visuals.kwFade(now()))
-            shader.setFloatUniform("sat", (1.5f * S.sat / 170f * Visuals.VIVID_SAT.toFloat()))   // vivid (CoverColors)
+            shader.setFloatUniform("sat", Visuals.bgSat().toFloat())   // vivid (CoverColors), the same as the blurred Canvas
             shader.setFloatUniform("dim", (1f - Visuals.bgBri().toFloat()).coerceIn(0f, .85f))
             shader.setFloatUniform("pulse", Background.pulse.coerceIn(0f, 1f))
             drawRect(brush)
@@ -285,6 +285,18 @@ object Frost {
     var bg: GraphicsLayer? = null                       // the background as it's drawn
     var lyrics: GraphicsLayer? = null                   // the lyrics' blurred ends (LyricsPane), when they're drawn: an eighth of the size...
     var lyricsY = 0f                                    // ...and how far up they start
+    var gradeW = 0f; var gradeH = 0f; var gradeTop = 0f; var gradeShade = 0f   // the grade below, for what's frosted to show too
+}
+
+/** The Canvas screen's grade, over any background, so every song's screen looks the same as one with a Canvas: darker to the
+ *  edges, and at the top and the foot behind what's there ([shade]: how much of that, 0 to 1). Plain gradients: next to nothing to
+ *  draw, and no blur. [top]: where the top's text ends, px. */
+fun DrawScope.screenGrade(w: Float, h: Float, top: Float, shade: Float, k: Float = 1f) {
+    drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = .15f * k), Color.Black.copy(alpha = .55f * k)), Offset(w * .7f, h * .5f), maxOf(w, h) * .8f), size = androidx.compose.ui.geometry.Size(w, h))
+    if (shade > 0f) {
+        val tf = (top / h).coerceIn(.02f, .45f); val a = .45f * shade * k
+        drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = a), tf to Color.Transparent, .55f to Color.Transparent, 1f to Color.Black.copy(alpha = a), startY = 0f, endY = h), size = androidx.compose.ui.geometry.Size(w, h))
+    }
 }
 
 /** Draws what a frosted thing at [at] (in the window) shows, as a DrawScope call. */
@@ -311,6 +323,7 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
             }
             val v = Frost.video; val scr = Frost.screen
             if (v != null && v.size.width > 0 && scr.width > 0) scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) }
+            if (Frost.gradeW > 0f) screenGrade(Frost.gradeW, Frost.gradeH, Frost.gradeTop, Frost.gradeShade)   // (what's behind it is graded)
             Frost.lyrics?.let { l -> if (l.size.width > 0) translate(0f, Frost.lyricsY) { scale(8f, 8f, pivot = Offset.Zero) { drawLayer(l) } } }
         }
         return

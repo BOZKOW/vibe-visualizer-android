@@ -1,11 +1,7 @@
-Vibe Visualizer for Android 0.45.2 (beta). Android 12 or newer; it installs over 0.45.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.45.3 (beta). Android 12 or newer; it installs over 0.45.2 (Settings → Help & about → Update now).
 
-### Low performance mode
+### Every screen looks like the Canvas one
 
-- **No animations at all**: screens, panels and buttons change at once, the lyrics jump to the next line without scrolling or fading, a break's dots simply show, and long song names end in "…" instead of sliding. The words still fill in as they're sung, and the bars and the Canvas video play on if you have them on.
-- **No blur at all**, including "Blur the Canvas" and a still background (a tiny copy of the picture stretched over the screen instead, just as soft).
-- **The newer features follow it too**: the seek bar, buttons, notifications and Glass bars are see-through instead of frosted, colours come from the cover instead of being read from the Canvas, and the Canvas on its side is drawn solid.
-
-### On its side
-
-- **The seek bar and the buttons are back to their width from 0.45.0**; the song name keeps its bigger size.
+- **Songs without a Canvas now get the same look as those with one**: the same strong colours, darker toward the edges, and on the big cover screen a dark top and foot behind the controls, so white text and buttons stay readable over a bright cover. On its side it's the same flat brightness as behind the Canvas there. A plain colour you picked as the background stays as it is.
+- **The seek bar, buttons and notifications include that darkening too**, so they match what's around them.
+- **It doesn't cost performance**: it's only gradients, and the moving background now redraws 30 times a second instead of 60, as it drifts far too slowly for more to show, which saves battery.

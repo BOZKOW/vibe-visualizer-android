@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.foundation.Image
@@ -187,6 +188,7 @@ fun PlayerScreen() {
         val insL = with(dn) { ins.getLeft(dn, ldir).toDp() }
         // a phone on its side: Spicy Lyrics' stage for the Canvas
         val stage = if (wide && maxHeight < 560.dp) LandscapeStage((maxWidth - insL - with(dn) { ins.getRight(dn, ldir).toDp() }).value, (maxHeight - with(dn) { (ins.getTop(dn) + ins.getBottom(dn)).toDp() }).value) else null
+        ScreenGrade(wide, stage != null)
         if (CanvasVideo.active) CanvasBackdrop(wide, centred = wide && maxHeight >= 560.dp && soloWide(), stage = stage, stageStart = insL)
         AmbientBlack()
         val pad = Modifier.fillMaxSize().windowInsetsPadding(ins.only(WindowInsetsSides.Vertical + WindowInsetsSides.Horizontal))
@@ -1033,6 +1035,25 @@ fun Cover(modifier: Modifier = Modifier) {
             val sc = if (p < .6f) .9f + (1.015f - .9f) * (p / .6f) else 1.015f - .015f * ((p - .6f) / .4f)
             Image(it, "Album cover", Modifier.fillMaxSize().graphicsLayer { scaleX = sc; scaleY = sc; alpha = if (prev == null) 1f else (p * 1.6f).coerceAtMost(1f) }.blur((16 * (1 - (p / .6f).coerceAtMost(1f))).dp), contentScale = ContentScale.Crop)
         }
+    }
+}
+
+/** Every song's screen as one with a Canvas (the owner's wish): over the background without one, the blurred Canvas's grade. On a
+ *  phone on its side, as the stage's backdrop there: flat, brightness .65 at the default slider. A colour you picked stays as it is. */
+@Composable
+private fun ScreenGrade(wide: Boolean, stage: Boolean) {
+    val behindLyrics = !wide && E.screen == "lyrics" && !noLyrics()
+    val behind = S.str("cvBehind")
+    val dark = behind == "dark" || behind == "both" || (behind == "blur" && S.low)
+    // as much of the shade as the Canvas's, which is part of its video: faint behind the lyrics
+    val shade = if (!dark || wide) 0f else if (behindLyrics) S.i("cvLyrA").coerceIn(0, 80) / 100f else 1f
+    val top = TopArea.bottom + with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.toPx() }
+    val k by animateFloatAsState(if (CanvasVideo.cvlive || S.bgStyle == "color") 0f else 1f, tween(800), label = "grade")
+    androidx.compose.runtime.SideEffect { Frost.gradeTop = top; Frost.gradeShade = shade }
+    Canvas(Modifier.fillMaxSize().onSizeChanged { Frost.gradeW = it.width.toFloat(); Frost.gradeH = it.height.toFloat() }) {
+        if (k <= 0f) return@Canvas
+        if (stage) drawRect(Color.Black.copy(alpha = (1f - .65f * S.bri / 70f / Visuals.bgBri().toFloat()).coerceIn(0f, 1f) * k))
+        else screenGrade(size.width, size.height, top, shade, k)
     }
 }
 
