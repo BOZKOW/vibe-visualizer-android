@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -315,7 +316,21 @@ fun profileUrl(x: Person): String? = if (x.url?.startsWith("https://") == true) 
 fun Avatar(url: String?, size: Int) {
     if (url == null || !url.startsWith("https://")) return
     val bm by produceState<android.graphics.Bitmap?>(Images.cached("$url@96"), url) { value = Images.load(url, 96) }
-    bm?.let { Image(it.asImageBitmap(), null, Modifier.size(size.dp).clip(CircleShape)) }
+    // a GIF moves, once the still is in (so the file is cached and isn't downloaded twice). Not in Low performance mode, and
+    // not under Settings or in Ambient mode: there its first frame saves the frames it would keep asking for.
+    val moving by produceState(Images.cachedMoving(url, 96), url, S.low, bm != null) {
+        value = if (S.low || bm == null) null else Images.loadMoving(url, 96)
+    }
+    val d = moving
+    if (d != null && !S.low && !E.quiet && !E.ambient) Canvas(Modifier.size(size.dp).clip(CircleShape)) {
+        // filling the circle, as the still does. Android moves it on by itself from here, on the render thread.
+        val w = this.size.width; val h = this.size.height
+        val s = maxOf(w / d.intrinsicWidth, h / d.intrinsicHeight)
+        val dw = d.intrinsicWidth * s; val dh = d.intrinsicHeight * s
+        d.setBounds(((w - dw) / 2).toInt(), ((h - dh) / 2).toInt(), ((w + dw) / 2).toInt(), ((h + dh) / 2).toInt())
+        d.draw(drawContext.canvas.nativeCanvas)
+    }
+    else bm?.let { Image(it.asImageBitmap(), null, Modifier.size(size.dp).clip(CircleShape), contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
 }
 
 @Composable

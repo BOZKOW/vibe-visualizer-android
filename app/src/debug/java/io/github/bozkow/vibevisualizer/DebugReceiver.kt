@@ -8,6 +8,9 @@ import android.os.Looper
 import io.github.bozkow.vibevisualizer.core.Defaults
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.engine.E
+import io.github.bozkow.vibevisualizer.engine.Lyr
+import io.github.bozkow.vibevisualizer.lyrics.Credit
+import io.github.bozkow.vibevisualizer.lyrics.Person
 
 /** Debug builds only (app/src/debug): a test on the emulator sets any setting and opens any Settings page or pop-up
  *  directly, as Settings would, without finding them on screen:
@@ -24,6 +27,12 @@ class DebugReceiver : BroadcastReceiver() {
             i.getStringExtra("year")?.let { E.year = it }
             if (i.hasExtra("dj")) E.onSpDj()
             i.getStringExtra("toast")?.let { E.toast(it, "warn") }
+            // the lyrics' credit names a maker with this picture, and an uploader with --es uploader (Lyr's setter is private)
+            i.getStringExtra("avatar")?.let { a ->
+                val up = i.getStringExtra("uploader")?.let { Person("uploader", null, null, it) }
+                Lyr::class.java.getDeclaredMethod("setCredit", Credit::class.java).apply { isAccessible = true }
+                    .invoke(Lyr, Credit("spicy_lyrics", uploader = up, maker = Person("maker", null, null, a)))
+            }
             if (page != null) { if (page == "close") E.settingsPage = null else E.openSettings(page) }
             if (sheet != null) E.sheet = if (sheet == "close") null else sheet
         }

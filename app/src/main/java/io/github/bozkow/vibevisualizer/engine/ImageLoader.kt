@@ -2,10 +2,13 @@ package io.github.bozkow.vibevisualizer.engine
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.graphics.drawable.AnimatedImageDrawable
 import android.net.Uri
 import android.util.LruCache
 import io.github.bozkow.vibevisualizer.core.Net
 import io.github.bozkow.vibevisualizer.core.Vibe
+import java.nio.ByteBuffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -41,4 +44,38 @@ object Images {
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = s; inPreferredConfig = Bitmap.Config.ARGB_8888 })
         }.getOrNull()
     }
+
+    private val moving = LruCache<String, AnimatedImageDrawable>(4)   // each keeps its file in memory: at most two show at once
+    private val stills = LruCache<String, Boolean>(64)                // looked at, and they don't move
+
+    fun cachedMoving(url: String, max: Int): AnimatedImageDrawable? = moving.get("$url@$max")
+
+    /** A picture's moving version if it has one (GIF, animated WebP, whatever the address says), already running; null for
+     *  a still one. Android decodes and draws its frames off the main thread, and only while it's being drawn. */
+    suspend fun loadMoving(url: String, max: Int): AnimatedImageDrawable? {
+        val key = "$url@$max"
+        moving.get(key)?.let { return it }
+        if (stills.get(key) != null) return null
+        val r = try { Net.fetch(movingUrl(url)) } catch (e: Exception) { return null }
+        if (!r.ok) return null
+        val d = withContext(Dispatchers.Default) {
+            runCatching {
+                ImageDecoder.decodeDrawable(ImageDecoder.createSource(ByteBuffer.wrap(r.body))) { dec, info, _ ->
+                    val w = info.size.width; val h = info.size.height; val big = maxOf(w, h)
+                    if (big > max) dec.setTargetSize((w * max / big).coerceAtLeast(1), (h * max / big).coerceAtLeast(1))
+                } as? AnimatedImageDrawable
+            }.getOrNull()
+        }
+        if (d == null) { stills.put(key, true); return null }
+        d.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
+        d.start()
+        moving.put(key, d)
+        return d
+    }
+}
+
+/** Discord starts the name of a picture that can move with a_, and serves it still unless it's asked for the GIF. */
+fun movingUrl(url: String): String {
+    val m = Regex("""^(https://cdn\.discordapp\.com/.*/a_[^/?]+)\.(?:png|jpe?g|webp)(\?.*)?$""").find(url) ?: return url
+    return m.groupValues[1] + ".gif" + m.groupValues[2]
 }
