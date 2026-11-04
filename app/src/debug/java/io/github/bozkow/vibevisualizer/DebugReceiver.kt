@@ -23,6 +23,7 @@ class DebugReceiver : BroadcastReceiver() {
             }
             i.getStringExtra("year")?.let { E.year = it }
             if (i.hasExtra("dj")) E.onSpDj()
+            i.getStringExtra("toast")?.let { E.toast(it, "warn") }
             if (page != null) { if (page == "close") E.settingsPage = null else E.openSettings(page) }
             if (sheet != null) E.sheet = if (sheet == "close") null else sheet
         }

@@ -27,6 +27,8 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.drawscope.scale
@@ -239,7 +241,7 @@ private fun LyricsScreen() {
 private fun LyricsWithLyrics() {
     val hidden = E.uiHidden
     Column(Modifier.fillMaxSize()) {
-        TopBar(Modifier.padding(horizontal = 24.dp))
+        TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true)
         var areaH by remember { mutableFloatStateOf(0f) }
         // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
         val rest = restCover()
@@ -470,7 +472,7 @@ private fun EmptyState() {
 /** The top of every screen: where the music plays from at the left and on what device at the right, and under them the
  *  space for what's wrong. Always there, also with the controls away. */
 @Composable
-private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false) {
+private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false, floatNotice: Boolean = false) {
     E.sec.intValue
     // where it plays from and on, short enough to stand either side of the camera whole (with "PLAYING FROM …" and
     // "PLAYING ON …" both only ever showed their first words, crawling); an icon says which is which
@@ -496,7 +498,9 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
                 }
             }
         } else if (S.b("aTopLine")) TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"))
-        NoticeSpace(home, row = side)
+        // [floatNotice]: over what's under it, taking no room: on the lyrics screen it pushed the lyrics down and back up
+        if (floatNotice) Box(Modifier.fillMaxWidth().layout { m, c -> val p = m.measure(c.copy(minHeight = 0)); layout(p.width, 0) { p.place(0, 0) } }) { NoticeSpace(home, row = side) }
+        else NoticeSpace(home, row = side)
     }
 }
 
@@ -579,7 +583,8 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
 }
 
 /** Under the top line: what's wrong (or that the phone is warm), while it lasts, even with the controls away. One at a
- *  time: several take turns (4.5 s each), a new one first, with a dot for each. Only a hard error has a button. */
+ *  time: several take turns (4.5 s each), a new one first, with a dot for each, and you can swipe between them, after which it
+ *  stays on the one you left it on. Only a hard error has a button. */
 @Composable
 private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     val all = E.notices(home)
@@ -587,11 +592,14 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     var turn by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // on and on while there's more than one (a change in the list doesn't start them over)…
     val many = all.size > 1
-    LaunchedEffect(many) { while (many) { kotlinx.coroutines.delay(4500); turn++ } }
+    var byHand by remember { mutableStateOf(false) }   // swiped: no more turns by themselves, until a new one comes
+    var dir by remember { androidx.compose.runtime.mutableIntStateOf(0) }   // which way the last swipe went (1: on to the next)
+    LaunchedEffect(many, byHand) { while (many && !byHand) { kotlinx.coroutines.delay(4500); turn++ } }
     // …and a new one shows first
     val seen = remember { HashSet<String>() }
-    LaunchedEffect(ids) { if (ids.any { it !in seen }) turn = 0; seen.clear(); seen.addAll(ids) }
-    val k = if (all.isEmpty()) 0 else turn % all.size
+    LaunchedEffect(ids) { if (ids.any { it !in seen }) { turn = 0; byHand = false; dir = 0 }; seen.clear(); seen.addAll(ids) }
+    val k = if (all.isEmpty()) 0 else ((turn % all.size) + all.size) % all.size
+    val swipe = remember { Animatable(0f) }; val scope = androidx.compose.runtime.rememberCoroutineScope()
     val p = all.getOrNull(k)
     val last = remember { arrayOfNulls<E.Prob>(1) }   // still shown while it slides away
     if (p != null) last[0] = p
@@ -604,12 +612,24 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
             // tapped: its detail screen (what's wrong, what to do, OK), growing out of it; pressed, it gives a little
             val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
             Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape).frosted(oval = false)
+                .then(if (S.low) Modifier.background(Color(0xFF101018).copy(alpha = .7f)) else Modifier)   // (no frost: it's over the lyrics)
                 .background(Color.White.copy(alpha = .12f)).border(1.dp, Color.White.copy(alpha = .22f), shape)
+                .then(if (!many) Modifier else Modifier.pointerInput(Unit) {
+                    // byHand already at the start: a turn by itself under the finger made the swipe land back on the same one
+                    detectHorizontalDragGestures(onDragStart = { byHand = true }, onDragEnd = {
+                        scope.launch {
+                            val far = kotlin.math.abs(swipe.value) > size.width * .18f
+                            if (far) { dir = if (swipe.value < 0) 1 else -1; turn += dir; byHand = true; swipe.snapTo(0f) }
+                            else swipe.animateTo(0f, spring(.8f, Spring.StiffnessMediumLow))
+                        }
+                    }, onDragCancel = { scope.launch { swipe.animateTo(0f) } }) { ch, dx -> ch.consume(); scope.launch { swipe.snapTo(swipe.value + dx) } }
+                })
                 .quietTouch().clickable(press, androidx.compose.material3.ripple()) { last[0]?.let { E.haptic(); E.noticeOpen = it } }
                 .animateContentSize(if (Pop.calm) tween(0) else spring(.8f, Spring.StiffnessMediumLow))) {
                 // a different one cross-fades in; a countdown in the same one just counts
-                AnimatedContent(last[0], contentKey = { it?.let { q -> q.id + q.t } }, contentAlignment = Alignment.Center, transitionSpec = {
+                AnimatedContent(last[0], Modifier.graphicsLayer { translationX = swipe.value; alpha = 1f - (kotlin.math.abs(swipe.value) / size.width.coerceAtLeast(1f)).coerceAtMost(1f) * .8f }, contentKey = { it?.let { q -> q.id + q.t } }, contentAlignment = Alignment.Center, transitionSpec = {
                     if (Pop.calm) fadeIn(tween(200)) togetherWith fadeOut(tween(120))
+                    else if (dir != 0) (fadeIn(tween(200)) + androidx.compose.animation.slideInHorizontally(tween(240)) { w -> dir * w }) togetherWith (fadeOut(tween(160)) + androidx.compose.animation.slideOutHorizontally(tween(240)) { w -> -dir * w })
                     else (fadeIn(tween(260)) + slideInVertically(spring(.7f, Spring.StiffnessMediumLow)) { it / 2 } + scaleIn(spring(.6f, Spring.StiffnessMediumLow), initialScale = .92f)) togetherWith (fadeOut(tween(160)) + scaleOut(tween(160), targetScale = .96f))
                 }, label = "notice") { q ->
                     // words alone, in the middle of the glass: OK and what fixes it are on the screen tapping opens

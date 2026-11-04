@@ -102,11 +102,12 @@ class MainActivity : ComponentActivity() {
             window.attributes = window.attributes.apply { screenBrightness = if (on) minOf(sys, S.i("aAmbBright").coerceIn(3, 60) / 100f) else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
         } }
         lifecycleScope.launch { snapshotFlow { S.b("aHideStatus") to S.b("aHideNav") }.collect { bars() } }
-        // Ambient mode asks for little: 30 Hz with the lyrics or the bars moving, 10 Hz for a clock, where a variable-rate (LTPO) screen
-        // idles lower by itself as nothing new is drawn. A vote of 60 Hz or more kept it from doing so. A touch brings the full rate back.
+        // Ambient mode with only its clock asks for little (10 Hz): nothing new is drawn, and a variable-rate (LTPO) screen idles right
+        // down by itself; a touch brings the full rate back. Anywhere lyrics show, it mustn't: no low vote, no mode pinned, and the
+        // system's own saving on the refresh rate off, as the owner's S25 dropped to 1 Hz in the lyrics
         lifecycleScope.launch {
-            snapshotFlow { Triple(S.str("fpscap"), S.low, if (E.ambient) (if (E.ambientMoves()) 30f else 10f) else 0f) }.collect { (c, low, amb) ->
-                refreshRate(if (amb > 0f) amb else if (low) 60f else c.toFloatOrNull() ?: 0f, amb > 0f)
+            snapshotFlow { listOf(S.str("fpscap"), S.low, E.ambient && !E.ambientMoves(), E.lyricsVisible() && io.github.bozkow.vibevisualizer.engine.Lyr.lines > 0 && E.settingsPage == null) }.collect { (c, low, clock, words) ->
+                refreshRate(if (clock == true) 10f else if (low == true) 60f else (c as String).toFloatOrNull() ?: 0f, pin = clock == true, saving = clock == true || words != true)
             }
         }
     }
@@ -216,7 +217,8 @@ class MainActivity : ComponentActivity() {
     private fun android.view.View.createRecomposer(motion: androidx.compose.ui.MotionDurationScale) = createLifecycleAwareWindowRecomposer(motion, lifecycle)
 
     /* ---- display ---- */
-    private fun refreshRate(hz: Float, pin: Boolean = false) {
+    private fun refreshRate(hz: Float, pin: Boolean = false, saving: Boolean = true) {
+        if (android.os.Build.VERSION.SDK_INT >= 35) runCatching { window.isFrameRatePowerSavingsBalanced = saving }
         window.attributes = window.attributes.apply {
             preferredRefreshRate = hz
             // [pin]: the slowest mode that still gives [hz], where the screen lists such modes (0: no wish)

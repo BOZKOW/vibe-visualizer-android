@@ -1,7 +1,11 @@
-Vibe Visualizer for Android 0.45.3 (beta). Android 12 or newer; it installs over 0.45.2 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.45.4 (beta). Android 12 or newer; it installs over 0.45.3 (Settings → Help & about → Update now).
 
-### Every screen looks like the Canvas one
+### Notifications
 
-- **Songs without a Canvas now get the same look as those with one**: the same strong colours, darker toward the edges, and on the big cover screen a dark top and foot behind the controls, so white text and buttons stay readable over a bright cover. On its side it's the same flat brightness as behind the Canvas there. A plain colour you picked as the background stays as it is.
-- **The seek bar, buttons and notifications include that darkening too**, so they match what's around them.
-- **It doesn't cost performance**: it's only gradients, and the moving background now redraws 30 times a second instead of 60, as it drifts far too slowly for more to show, which saves battery.
+- **Swipe between notifications**: when there are two or more at the top, swipe the pill left or right to go through them. After a swipe they stop changing by themselves until a new one arrives. Tapping one still opens its details.
+- **A notification no longer moves the lyrics**: on the lyrics screen it now floats over them, so the lyrics and controls stay exactly where they are. The big cover screen still makes room for it, as before.
+- In Low performance mode the floating notification has a dark backing, so its words stay readable over the lyrics.
+
+### Screen refresh rate
+
+- **Should stop dropping to 1 Hz in lyrics**: while lyrics are showing, the app now asks Android not to slow the screen down to save power. Other screens can still save power, and the Ambient clock still runs at its low rate. The emulator only has a 60 Hz screen, so this can't be confirmed until it's tried on a real phone. If it still happens, the "screen" line in Settings → Help & about → Copy debug info shows the rate.
