@@ -133,6 +133,9 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
     val sideRoom = with(dens) { 40.dp.roundToPx() }
     val bleedL = if (full) minOf(leftOf, sideRoom) else 0; val bleedR = if (full) minOf(rightOf, sideRoom) else 0
     val soft = rememberGraphicsLayer()
+    // [soft] on a picture of its own, drawn from there by all that show it: the lyrics here and what's frosted upright over them
+    val softDone = rememberGraphicsLayer()
+    androidx.compose.runtime.DisposableEffect(softDone) { onDispose { if (Frost.lyrics === softDone) Frost.lyrics = null } }
     val cheap = S.low || E.quiet   // (Low performance mode, and under Settings' blur: they only fade at the ends)
     val softFx = remember(dens) { val r = with(dens) { 14.dp.toPx() } / 8f; BlurEffect(r, r, TileMode.Decal) }
     BoxWithConstraints(modifier.onGloballyPositioned { c ->
@@ -166,6 +169,7 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                     view.draw(this) { gc.createGraphicsLayer() }
                     val a = bleedT / h; val b = 1f - bleedB / h; val rp = minOf(80.dp.toPx() / h, (b - a) / 2.01f)
                     drawRect(Brush.verticalGradient(*bandStops(a, b, rp, 0f, 1f)), blendMode = BlendMode.DstIn)
+                    if (cheap && S.low && Frost.lyrics === softDone) Frost.lyrics = null
                     if (!cheap) {
                         // an eighth of the size, one blur pass, locked to its own pixels: the lines are drawn at the same place among them
                         // whatever the scroll, and what's left of it moves the finished picture. Drawn in place they jumped 8 px at a time
@@ -180,9 +184,13 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                             val shh = sh.toFloat(); val up = (f - rem) / f / shh; val hk = h / f / shh
                             drawRect(Brush.verticalGradient(*bandStops(a * hk + up, b * hk + up, rp * hk, .6f, 0f)), blendMode = BlendMode.DstIn)
                         }
-                        translate(0f, rem - f) { scale(f, f, pivot = Offset.Zero) { drawLayer(soft) } }
+                        softDone.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+                        softDone.record(IntSize(sw, sh)) { drawLayer(soft) }
+                        translate(0f, rem - f) { scale(f, f, pivot = Offset.Zero) { drawLayer(softDone) } }
+                        Frost.lyrics = softDone; Frost.lyricsY = rem - f
                     }
                 } else if (h > 0) {
+                    if (Frost.lyrics === softDone) Frost.lyrics = null
                     view.draw(this) { gc.createGraphicsLayer() }
                     // the clear band: sharp between two fades (wider for a line too tall for it)
                     val t = (view.bandTop() / h).coerceIn(0.001f, .98f); val b = (view.bandBottom() / h).coerceIn(t + .001f, .999f)

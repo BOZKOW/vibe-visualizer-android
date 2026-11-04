@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -68,6 +69,7 @@ import io.github.bozkow.vibevisualizer.core.now
 import io.github.bozkow.vibevisualizer.engine.Background
 import io.github.bozkow.vibevisualizer.engine.CanvasVideo
 import io.github.bozkow.vibevisualizer.engine.E
+import io.github.bozkow.vibevisualizer.engine.Lyr
 import io.github.bozkow.vibevisualizer.engine.Visuals
 import io.github.bozkow.vibevisualizer.ui.theme.Bg
 import kotlin.math.cos
@@ -83,7 +85,10 @@ fun BackgroundLayer(modifier: Modifier = Modifier) {
     val style = S.bgStyle
     val cvlive = CanvasVideo.cvlive
     val cvA by animateFloatAsState(if (cvlive) 1f else 0f, tween(800), label = "cv")
-    Box(modifier.fillMaxSize().background(Bg)) {
+    // recorded as it's drawn, so what's frosted upright can show it too (FrostBack)
+    val seen = rememberGraphicsLayer()
+    DisposableEffect(seen) { Frost.bg = seen; onDispose { if (Frost.bg === seen) Frost.bg = null } }
+    Box(modifier.fillMaxSize().drawWithContent { seen.record { this@drawWithContent.drawContent() }; drawLayer(seen) }.background(Bg)) {
         if (cvA < 1f) Box(Modifier.fillMaxSize()) {
             when {
                 style == "dynamic" && !S.low -> if (Build.VERSION.SDK_INT >= 33) LiquidBackground() else LayersBackground()
@@ -261,14 +266,20 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
 }
 
 /** The seek bar, the buttons and the notifications lie right on the cover, the video or the lyrics, so on the player they're
- *  frosted instead of see-through. No blur is run for them: they show part of a picture that's blurred already, the Canvas's
- *  copy above or the cover's, made once a song. */
+ *  frosted instead of see-through. No blur is run for them: they show part of pictures that are blurred already. Upright that's
+ *  what's really behind them: the background, the Canvas's blurred copy and the lyrics' blurred ends (a crop of the cover had
+ *  nothing to do with what was under it, and a blurred picture of its own for them took fast video from 21% to 39% janky).
+ *  On its side the Canvas's copy, or the cover's, made once a song. */
 val LocalFrost = staticCompositionLocalOf { false }
 
 object Frost {
     var video by mutableStateOf<GraphicsLayer?>(null)   // the Canvas, blurred ([CanvasBlur])
     var screen = IntSize.Zero                           // the size that's drawn at
     var cover by mutableStateOf(Rect.Zero)              // where the cover is, in the window
+    var upright by mutableStateOf(false)                // the phone's held upright: frost shows what's behind it
+    var bg: GraphicsLayer? = null                       // the background as it's drawn
+    var lyrics: GraphicsLayer? = null                   // the lyrics' blurred ends (LyricsPane), when they're drawn: an eighth of the size...
+    var lyricsY = 0f                                    // ...and how far up they start
 }
 
 /** Draws what a frosted thing at [at] (in the window) shows, as a DrawScope call. */
@@ -277,11 +288,28 @@ fun frostPainter(): DrawScope.(Offset) -> Unit {
     Visuals.bakeVer
     val src = Visuals.kwSrc
     val img = remember(src) { src?.asImageBitmap() }
-    return remember(img) { { at -> drawFrost(img, at) } }
+    val still = Background.still
+    val stillImg = remember(still) { still?.asImageBitmap() }
+    return remember(img, stillImg) { { at -> drawFrost(img, stillImg, at) } }
 }
 
-private fun DrawScope.drawFrost(img: ImageBitmap?, at: Offset) {
+private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: Offset) {
     drawRect(Color(0xFF18181E))   // never see-through, whatever's there yet
+    if (Frost.upright) {
+        translate(-at.x, -at.y) {
+            val c = Frost.cover
+            when (S.bgStyle) {
+                // (a still background's picture itself: drawn through its own blur, that would be worked out again for each of these)
+                "artist", "cover" -> if (stillImg != null) drawImage(stillImg, IntOffset.Zero, IntSize(stillImg.width, stillImg.height), IntOffset.Zero, IntSize((c.right + c.left).roundToInt().coerceAtLeast(1), (c.bottom + c.top).roundToInt().coerceAtLeast(1)), filterQuality = FilterQuality.Low)
+                "color" -> drawRect(Visuals.plainColor())
+                else -> Frost.bg?.let { drawLayer(it) }
+            }
+            val v = Frost.video; val scr = Frost.screen
+            if (v != null && v.size.width > 0 && scr.width > 0) scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) }
+            Frost.lyrics?.let { l -> if (l.size.width > 0) translate(0f, Frost.lyricsY) { scale(8f, 8f, pivot = Offset.Zero) { drawLayer(l) } } }
+        }
+        return
+    }
     val v = Frost.video; val scr = Frost.screen
     if (v != null && v.size.width > 0 && scr.width > 0) {
         translate(-at.x, -at.y) { scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) } }

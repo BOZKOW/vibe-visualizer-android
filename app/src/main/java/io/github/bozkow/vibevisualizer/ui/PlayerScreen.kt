@@ -192,6 +192,7 @@ fun PlayerScreen() {
         val pad = Modifier.fillMaxSize().windowInsetsPadding(ins.only(WindowInsetsSides.Vertical + WindowInsetsSides.Horizontal))
         // Ambient mode: its own screen, as a phone's always-on display
         if (E.ambient) { Box(pad) { AmbientScreen() }; return@BoxWithConstraints }
+        androidx.compose.runtime.SideEffect { Frost.upright = !wide }
         when {
             E.src == "none" -> Box(pad) { EmptyState() }
             wide -> Box(pad) { WideLayout() }
@@ -321,12 +322,13 @@ private fun LandscapeCanvas() {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val st = LandscapeStage(maxWidth.value, maxHeight.value)
         val start = if (cameraOnLeft()) 48.dp else 20.dp   // (as the cover's, without a Canvas)
-        val dockW = maxOf(st.solid.dp - start, 220.dp)
+        // (the song in its big size and the seek bar as wide as before the stage, 0.44: the owner's wish; the lyrics start after them)
+        val dockW = minOf((maxWidth - 60.dp) * (.85f / 1.85f) * .94f, 480.dp)
         Row(Modifier.fillMaxSize().padding(start = start, end = maxOf(st.lyricsEndGap.dp, 8.dp), top = 8.dp, bottom = 8.dp)) {
             Column(Modifier.width(dockW).fillMaxHeight().ambientOut()) {
                 TopBar(side = true)
                 Spacer(Modifier.weight(1f))
-                TitleRow(big = false, toggles = !barsInstead())
+                TitleRow(big = true, toggles = !barsInstead())
                 SeekRow()
                 SideControls()
             }
