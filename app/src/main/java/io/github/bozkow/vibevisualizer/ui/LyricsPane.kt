@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
@@ -166,14 +167,20 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                     val a = bleedT / h; val b = 1f - bleedB / h; val rp = minOf(80.dp.toPx() / h, (b - a) / 2.01f)
                     drawRect(Brush.verticalGradient(*bandStops(a, b, rp, 0f, 1f)), blendMode = BlendMode.DstIn)
                     if (!cheap) {
-                        val sw = maxOf(1, (size.width / 8f).roundToInt()); val sh = maxOf(1, (h / 8f).roundToInt()); val full0 = size
+                        // an eighth of the size, one blur pass, locked to its own pixels: the lines are drawn at the same place among them
+                        // whatever the scroll, and what's left of it moves the finished picture. Drawn in place they jumped 8 px at a time
+                        // as they scrolled, however fast the frames came ("it looks like PowerPoint")
+                        val f = 8f; val sw = (size.width / f).toInt() + 1; val sh = (h / f).toInt() + 3
+                        val rem = ((view.drawnY % f) + f) % f
                         soft.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
                         if (soft.renderEffect !== softFx) soft.renderEffect = softFx
                         soft.record(IntSize(sw, sh)) {
-                            scale(sw / full0.width, sh / full0.height, pivot = Offset.Zero) { view.drawPlain(this, (a + rp) * h, (b - rp) * h) }
-                            drawRect(Brush.verticalGradient(*bandStops(a, b, rp, .6f, 0f)), blendMode = BlendMode.DstIn)   // (.6: what's over them stays easy to read)
+                            scale(1f / f, 1f / f, pivot = Offset.Zero) { translate(0f, f - rem) { view.drawPlain(this, (a + rp) * h, (b - rp) * h) } }
+                            // (.6: what's over them stays easy to read; the mask stays where it is on the screen)
+                            val shh = sh.toFloat(); val up = (f - rem) / f / shh; val hk = h / f / shh
+                            drawRect(Brush.verticalGradient(*bandStops(a * hk + up, b * hk + up, rp * hk, .6f, 0f)), blendMode = BlendMode.DstIn)
                         }
-                        scale(full0.width / sw, full0.height / sh, pivot = Offset.Zero) { drawLayer(soft) }
+                        translate(0f, rem - f) { scale(f, f, pivot = Offset.Zero) { drawLayer(soft) } }
                     }
                 } else if (h > 0) {
                     view.draw(this) { gc.createGraphicsLayer() }

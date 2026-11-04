@@ -96,7 +96,13 @@ class MainActivity : ComponentActivity() {
             window.attributes = window.attributes.apply { screenBrightness = if (on) minOf(sys, S.i("aAmbBright").coerceIn(3, 60) / 100f) else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
         } }
         lifecycleScope.launch { snapshotFlow { S.b("aHideStatus") to S.b("aHideNav") }.collect { bars() } }
-        lifecycleScope.launch { snapshotFlow { S.str("fpscap") to S.low }.collect { (c, low) -> refreshRate(if (low) 60f else c.toFloatOrNull() ?: 0f) } }
+        // Ambient mode asks for little: 30 Hz with the lyrics or the bars moving, 10 Hz for a clock, where a variable-rate (LTPO) screen
+        // idles lower by itself as nothing new is drawn. A vote of 60 Hz or more kept it from doing so. A touch brings the full rate back.
+        lifecycleScope.launch {
+            snapshotFlow { Triple(S.str("fpscap"), S.low, if (E.ambient) (if (E.ambientMoves()) 30f else 10f) else 0f) }.collect { (c, low, amb) ->
+                refreshRate(if (amb > 0f) amb else if (low) 60f else c.toFloatOrNull() ?: 0f, amb > 0f)
+            }
+        }
     }
 
     /** The first start of the app's process: the engine's first steps. */
@@ -198,7 +204,16 @@ class MainActivity : ComponentActivity() {
     }
 
     /* ---- display ---- */
-    private fun refreshRate(hz: Float) { window.attributes = window.attributes.apply { preferredRefreshRate = hz } }
+    private fun refreshRate(hz: Float, pin: Boolean = false) {
+        window.attributes = window.attributes.apply {
+            preferredRefreshRate = hz
+            // [pin]: the slowest mode that still gives [hz], where the screen lists such modes (0: no wish)
+            preferredDisplayModeId = if (!pin) 0 else display?.let { d ->
+                val same = d.supportedModes.filter { it.physicalWidth == d.mode.physicalWidth && it.physicalHeight == d.mode.physicalHeight }
+                (same.filter { it.refreshRate >= hz - .5f }.minByOrNull { it.refreshRate } ?: same.maxByOrNull { it.refreshRate })?.modeId
+            } ?: 0
+        }
+    }
 
     /* ---- the web app's keyboard shortcuts, for a keyboard (tablets, DeX, Chromebooks) ---- */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {

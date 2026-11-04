@@ -189,6 +189,21 @@ class ParseTest {
         assertEquals("outside the ramp it stays put", 1f, io.github.bozkow.vibevisualizer.ui.softStep(1.5f), 1e-6f)
     }
 
+    @Test fun theCanvasStageIsSpicyLyrics() {
+        // a page of 780 by 360 dp, its numbers worked out from Spicy Lyrics Mobile's LandscapeMetrics
+        val st = io.github.bozkow.vibevisualizer.ui.LandscapeStage(780f, 360f)
+        assertEquals("the cover it stands for, min(30cqw, 52cqh) * 1.1, and the edge gap", 299.f(), st.solid, .5f)
+        assertEquals("its soft edge, 45% of the cover", 92.7f, st.feather, .2f)
+        assertEquals(st.solid + st.feather, st.width, .01f)
+        assertEquals("the lyrics start over that soft edge", 337f, st.lyricsStart, 1f)
+        assertTrue("before it has faded out", st.lyricsStart > st.solid && st.lyricsStart < st.width)
+        // a short, narrow window mustn't turn anything negative
+        val small = io.github.bozkow.vibevisualizer.ui.LandscapeStage(320f, 120f)
+        assertTrue(small.solid > 0f && small.lyricsEndGap >= 0f)
+    }
+
+    private fun Int.f() = toFloat()
+
     @Test fun joins() {
         val ws = listOf(Word(0.0, .2, "beau", false), Word(.2, .4, "ti", false), Word(.4, .6, "ful", true))
         val ts = ws.map { TS(it.t, it.end!!) }

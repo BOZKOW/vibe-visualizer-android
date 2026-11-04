@@ -220,9 +220,10 @@ private fun StillBackground() {
  *  each copy held up the frame being drawn, so the lyrics stuttered (the more the video moved, the worse). [vidSize]: how
  *  big [vid]'s recording is, as state: it's recorded after this is drawn, so this draws again once it's there (coming back
  *  from the small window it had nothing to draw and nothing asked again, so the background stayed dark). [wide]: on its
- *  side, blurred more. */
+ *  side, blurred more. [stage]: Spicy Lyrics' stage over it (a phone on its side): its grade, flat at brightness .65 for the
+ *  default slider, no vignette, and the video 1.3 times bigger, so its edges stay out of the blur. */
 @Composable
-fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false) {
+fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false, stage: Boolean = false) {
     val cvA by animateFloatAsState(if (CanvasVideo.cvlive) 1f else 0f, tween(800), label = "cv")
     if (cvA <= 0f) return
     val quiet = E.quiet
@@ -232,7 +233,7 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
     // with their own clips, its blur was worked out again for each of them, for every frame of the video
     val done = rememberGraphicsLayer()
     DisposableEffect(done) { Frost.video = done; onDispose { if (Frost.video === done) Frost.video = null } }
-    val cf = remember(S.bri, S.sat) { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) }) }
+    val cf = remember(S.bri, S.sat, stage) { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = if (stage) .65f * S.bri / 70f else Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) }) }
     Canvas(Modifier.fillMaxSize().onSizeChanged { Frost.screen = it }) {
         val lw = vs.width; val lh = vs.height
         if (lw > 0 && lh > 0) {
@@ -248,20 +249,20 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
             small.alpha = cvA
             small.record(IntSize(sw, sh)) {
                 // the video covering the screen (upright it's the whole screen already; side by side, the left side's)
-                val sc = maxOf(sw / lw.toFloat(), sh / lh.toFloat())
+                val sc = maxOf(sw / lw.toFloat(), sh / lh.toFloat()) * (if (stage) 1.3f else 1f)
                 translate((sw - lw * sc) / 2f, (sh - lh * sc) / 2f) { scale(sc, sc, pivot = Offset.Zero) { drawLayer(vid) } }
             }
             done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
             done.record(IntSize(sw, sh)) { drawLayer(small) }
             scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(done) }
         }
-        drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = .15f * cvA), Color.Black.copy(alpha = .55f * cvA)), Offset(size.width * .7f, size.height * .5f), maxOf(size.width, size.height) * .8f))
+        if (!stage) drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = .15f * cvA), Color.Black.copy(alpha = .55f * cvA)), Offset(size.width * .7f, size.height * .5f), maxOf(size.width, size.height) * .8f))
     }
 }
 
-/** On its side the seek bar and the buttons lie right on the cover or the video, so they're frosted instead of see-through
- *  (upright only blur is behind them). No blur is run for them: they show part of a picture that's blurred already, the
- *  Canvas's copy above or the cover's, made once a song. */
+/** The seek bar, the buttons and the notifications lie right on the cover, the video or the lyrics, so on the player they're
+ *  frosted instead of see-through. No blur is run for them: they show part of a picture that's blurred already, the Canvas's
+ *  copy above or the cover's, made once a song. */
 val LocalFrost = staticCompositionLocalOf { false }
 
 object Frost {
@@ -294,7 +295,7 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, at: Offset) {
     drawRect(Color.Black.copy(alpha = .35f))   // the white on it keeps reading on a bright cover
 }
 
-/** Frost behind a round button or a notice, on its side only. [inset]: when the button is drawn smaller than it's laid out.
+/** Frost behind a round button or a notice, on the player. [inset]: when the button is drawn smaller than it's laid out.
  *  [oval] false: the thing is clipped to its own shape already. */
 fun Modifier.frosted(inset: Dp = 0.dp, oval: Boolean = true): Modifier = composed {
     if (!LocalFrost.current) return@composed Modifier

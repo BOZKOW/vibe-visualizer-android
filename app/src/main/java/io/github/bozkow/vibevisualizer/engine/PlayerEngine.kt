@@ -585,6 +585,10 @@ object E {
     /** Settings and the menus aren't for whoever picks up a locked phone: over the lock screen they ask to unlock first. */
     private fun unlocked(go: () -> Unit) { unlock?.invoke(go) ?: go() }
 
+    /** Ambient mode: does anything keep moving (the lyrics word by word, the bars, the player behind it)? With only the clock on
+     *  screen nothing needs to be drawn between its changes, and a variable-rate (LTPO) screen can idle right down. */
+    fun ambientMoves() = S.b("aAmbBars") || (S.b("aAmbLyrics") && Lyr.lines > 0) || S.str("aAmbBg") == "dim"
+
     /* ================= the frame loop ================= */
     private var last = 0.0; private var fAcc = 0.0; private var fPrev = 0.0; private var lastUi = 0.0
     private var fc = 0; private var ft = 0.0
@@ -600,7 +604,8 @@ object E {
         // paused with nothing moving and no touch for 2 s (no bars, no colours gliding, no seeking): 30 a second are plenty;
         // a touch brings the full rate back at once
         val still = t - movedAt > 2000 && wall() - activeAt > 2000
-        val iv = 1000.0 / min(if (cap > 0) cap else 240, if (S.low || still) 30 else 240)
+        // (Ambient mode: slowly, so the screen can slow down too: see MainActivity's refresh rate)
+        val iv = 1000.0 / min(if (cap > 0) cap else 240, if (ambient) (if (ambientMoves()) 30 else 4) else if (S.low || still) 30 else 240)
         fAcc += min(t - (if (fPrev == 0.0) t else fPrev), 100.0); fPrev = t
         if (fAcc < iv - .5) return
         fAcc = min(fAcc - iv, iv)

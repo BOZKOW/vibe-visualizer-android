@@ -46,7 +46,7 @@ fun VibeRoot() {
     VibeTheme {
         // the frame loop: one clock for everything (the same one the rest of the app reads)
         // paused and untouched, it waits a little between frames (about 30 a second): less battery when the app stays open
-        LaunchedEffect(Unit) { while (true) { if (E.idle()) kotlinx.coroutines.delay(25); withFrameNanos { E.frame(now()) } } }
+        LaunchedEffect(Unit) { while (true) { if (E.ambient && !E.ambientMoves()) kotlinx.coroutines.delay(240) else if (E.idle()) kotlinx.coroutines.delay(25); withFrameNanos { E.frame(now()) } } }
         Box(Modifier.fillMaxSize().onSizeChanged { Pop.root = it }.pointerInput(Unit) {
             awaitEachGesture {   // a touch brings the controls back; while they're hidden, the first tap only does that
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)

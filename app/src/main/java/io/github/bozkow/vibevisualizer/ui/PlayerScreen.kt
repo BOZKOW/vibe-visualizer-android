@@ -181,17 +181,25 @@ fun PlayerScreen() {
         // upright they get the phone's layout, no wider than 600 dp
         val wide = (maxWidth >= 600.dp && maxWidth >= maxHeight) || (maxWidth > maxHeight && maxHeight < 520.dp)
         if (E.wide != wide) E.wide = wide
-        if (CanvasVideo.active) CanvasBackdrop(wide, centred = wide && maxHeight >= 560.dp && soloWide())
-        AmbientBlack()
         // clear of the bars and of the camera hole (where it really is: on its side some phones report less room)
-        val pad = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.navigationBarsIgnoringVisibility).union(cutoutInsets()).only(WindowInsetsSides.Vertical + WindowInsetsSides.Horizontal))
+        val ins = WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.navigationBarsIgnoringVisibility).union(cutoutInsets())
+        val dn = androidx.compose.ui.platform.LocalDensity.current; val ldir = androidx.compose.ui.platform.LocalLayoutDirection.current
+        val insL = with(dn) { ins.getLeft(dn, ldir).toDp() }
+        // a phone on its side: Spicy Lyrics' stage for the Canvas
+        val stage = if (wide && maxHeight < 560.dp) LandscapeStage((maxWidth - insL - with(dn) { ins.getRight(dn, ldir).toDp() }).value, (maxHeight - with(dn) { (ins.getTop(dn) + ins.getBottom(dn)).toDp() }).value) else null
+        if (CanvasVideo.active) CanvasBackdrop(wide, centred = wide && maxHeight >= 560.dp && soloWide(), stage = stage, stageStart = insL)
+        AmbientBlack()
+        val pad = Modifier.fillMaxSize().windowInsetsPadding(ins.only(WindowInsetsSides.Vertical + WindowInsetsSides.Horizontal))
         // Ambient mode: its own screen, as a phone's always-on display
         if (E.ambient) { Box(pad) { AmbientScreen() }; return@BoxWithConstraints }
         when {
             E.src == "none" -> Box(pad) { EmptyState() }
             wide -> Box(pad) { WideLayout() }
             // one screen: the cover, the lyrics and the bars together (a song without lyrics: the big cover)
-            else -> Box(pad, contentAlignment = Alignment.TopCenter) { Box(Modifier.widthIn(max = 600.dp).fillMaxSize()) { LyricsScreen() } }
+            else -> Box(pad.onGloballyPositioned { Frost.cover = it.boundsInWindow() }, contentAlignment = Alignment.TopCenter) {
+                // frosted as on its side: the lyrics run behind all of this now (no cover here: its blurred copy stands for the screen)
+                androidx.compose.runtime.CompositionLocalProvider(LocalFrost provides true) { Box(Modifier.widthIn(max = 600.dp).fillMaxSize()) { LyricsScreen() } }
+            }
         }
     }
 }
@@ -305,33 +313,26 @@ private fun LandscapeSplit() {
     }
 }
 
-/** With a Canvas, the desktop's: the video fills the left half behind (the backdrop), and over it where it plays (and
- *  what's wrong), the cover, the song in its big size, a wide seek bar and the controls (without the cover, all that at
- *  the foot of the video). The cover takes the room that's left: it grows as the controls hide, and fades out where it
- *  would only be a stamp. */
+/** With a Canvas, Spicy Lyrics': the video takes the cover's place (the backdrop), so none is drawn, and the song, the seek bar
+ *  and the controls are docked at its foot like a video player's, stacked from the bottom, the name a caption (CanvasImmersive
+ *  in Spicy Lyrics, CoverStage in Spicy Lyrics Mobile). The lyrics take the rest, from over the video's soft edge. */
 @Composable
 private fun LandscapeCanvas() {
-    Row(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp)) {
-        BoxWithConstraints(Modifier.weight(.85f).fillMaxHeight().ambientOut()) {
-            val wide = minOf(maxWidth * .94f, 480.dp)
-            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val st = LandscapeStage(maxWidth.value, maxHeight.value)
+        val start = if (cameraOnLeft()) 48.dp else 20.dp   // (as the cover's, without a Canvas)
+        val dockW = maxOf(st.solid.dp - start, 220.dp)
+        Row(Modifier.fillMaxSize().padding(start = start, end = maxOf(st.lyricsEndGap.dp, 8.dp), top = 8.dp, bottom = 8.dp)) {
+            Column(Modifier.width(dockW).fillMaxHeight().ambientOut()) {
                 TopBar(side = true)
-                Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                    if (!S.b("cvNoArt")) CoverArt(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true)
-                        .graphicsLayer { alpha = ((size.height / density - 48f) / 24f).coerceIn(0f, 1f) }, corner = 18.dp)
-                }
-                Column(Modifier.widthIn(max = wide)) {
-                    // the song centred under the cover; with translate or romanize beside it, from the left, as in portrait
-                    // (centred in what they leave, it would stand off the cover's middle)
-                    val toggles = !barsInstead() && (Lyr.needTr || Lyr.needRom)
-                    TitleRow(big = true, center = !toggles, toggles = toggles, like = false)
-                    SeekRow()
-                    SideControls()
-                }
+                Spacer(Modifier.weight(1f))
+                TitleRow(big = false, toggles = !barsInstead())
+                SeekRow()
+                SideControls()
             }
+            Spacer(Modifier.width(maxOf(st.lyricsStart.dp - start - dockW, 8.dp)))
+            SideColumn(Modifier.weight(1f))
         }
-        Spacer(Modifier.width(20.dp))
-        SideColumn(Modifier.weight(1f))
     }
 }
 
@@ -901,7 +902,7 @@ private fun SeekRow(inline: Boolean = false) {
     // Scrub preview (Experiments): while you drag, a bubble above your finger with the time you'd jump to, and the
     // times say the same; off, they show where the song really is until you let go
     val scrub = S.b("xScrub")
-    // on its side, frosted: it lies right on the cover or the video
+    // frosted: it lies right on the cover, the video or the lyrics
     var at by remember { mutableStateOf(Offset.Zero) }
     val paintFrost = if (LocalFrost.current) frostPainter() else null
     val under: (androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit)? = if (paintFrost != null) ({ paintFrost(this, at) }) else null
@@ -1038,9 +1039,11 @@ fun Cover(modifier: Modifier = Modifier) {
  *  wide screen it fills the left side and fades out to the right, as in the web app. The view is there from the start:
  *  the video's first frame (which reveals it) can only be drawn into one. */
 @Composable
-private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
+private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStage? = null, stageStart: Dp = 0.dp) {
     val behindLyrics = !wide && E.screen == "lyrics" && !noLyrics()
-    val a by animateFloatAsState(if (!CanvasVideo.cvmode) 0f else if (behindLyrics) S.i("cvLyrA").coerceIn(0, 80) / 100f else 1f, tween(800), label = "canvas")
+    val a by animateFloatAsState(if (!CanvasVideo.cvmode) 0f else if (behindLyrics) S.i("cvLyrA").coerceIn(0, 80) / 100f else 1f, if (stage != null) tween(900, easing = androidx.compose.animation.core.CubicBezierEasing(.23f, 1f, .32f, 1f)) else tween(800), label = "canvas")
+    // Spicy Lyrics' stage: a veil that deepens while the controls show
+    val ctl by animateFloatAsState(if (E.uiHidden) 0f else 1f, tween(300), label = "cvctl")
     // side by side without lyrics, the video glides to the middle and fades out on both sides (moved, not laid out
     // again: the video's crop is set for its size)
     val c by animateFloatAsState(if (centred) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else tween(700, easing = FastOutSlowInEasing), label = "cvcentre")
@@ -1062,18 +1065,30 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean) {
     // the video, recorded as it's drawn, so the background can draw it again blurred (on the GPU, see CanvasBlur)
     val vid = rememberGraphicsLayer()
     var vidSize by remember { mutableStateOf(IntSize.Zero) }
-    CanvasBlur(vid, { vidSize }, wide)
+    CanvasBlur(vid, { vidSize }, wide, stage != null)
     // on its side the sharp video first blurs where it is, then fades into the blurred background (straight from sharp to the
     // blurred copy, which sits elsewhere, the two showed as an edge)
     val sideR = with(d) { 28.dp.toPx() }
-    val soft = wide && !S.low && c <= 0f && !E.quiet
-    Box((if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f))
+    val soft = wide && stage == null && !S.low && c <= 0f && !E.quiet
+    val stageW = stage?.let { stageStart + it.width.dp }; val featherPx = stage?.let { with(d) { it.feather.dp.toPx() } } ?: 0f
+    // (.75: translucent, so the blurred backdrop carries through the video and the two read as one surface)
+    Box((if (stageW != null) Modifier.fillMaxHeight().width(stageW) else if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f) * (if (stage != null) .75f else 1f))
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.22f / .56f) * c }.drawWithContent {
             drawContent()
             // as dark at the top (behind the status bar and the top bar) as behind the controls at the bottom
             val tf = ((topPx + rampPx * 2) / size.height).coerceIn(.02f, .45f)
             val shade = Brush.verticalGradient(0f to Color.Black.copy(alpha = .45f * topK), tf to Color.Transparent, .55f to Color.Transparent, 1f to Color.Black.copy(alpha = .45f))
-            if (wide) {
+            if (stage != null) {
+                // a black veil at 1 - b is the picture at brightness b, without a filter pass per frame; darker to the foot for the
+                // dock (eased: a short straight ramp showed as a band; over .75, as all of this is); and a soft edge only toward
+                // the lyrics and over the top, on eased stops: a straight ramp leaves a line where it reaches full strength
+                val b = 1f - .45f * ctl
+                drawRect(Color.Black.copy(alpha = 1f - .8f * (.45f + .55f * b)))
+                drawRect(Brush.verticalGradient(0f to Color.Transparent, .45f to Color.Transparent, .6f to Color.Black.copy(alpha = .05f), .72f to Color.Black.copy(alpha = .15f), .84f to Color.Black.copy(alpha = .25f), 1f to Color.Black.copy(alpha = .35f)))
+                val w = size.width; fun x(at: Float) = ((w - featherPx * at) / w).coerceIn(0f, 1f)
+                drawRect(Brush.horizontalGradient(0f to Color.Black, x(1f) to Color.Black, x(.72f) to Color.Black.copy(alpha = .85f), x(.38f) to Color.Black.copy(alpha = .36f), x(.18f) to Color.Black.copy(alpha = .1f), 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+                drawRect(Brush.verticalGradient(0f to Color.Transparent, .09f to Color.Black.copy(alpha = .28f), .18f to Color.Black), blendMode = BlendMode.DstIn)
+            } else if (wide) {
                 // side by side: the shade fades out with the video (drawn after the fade it stopped in a hard line at the
                 // edge), over a long, eased fade into the blurred Canvas behind
                 // the desktop's: darker at the top and the foot, for the text over it
@@ -1202,11 +1217,12 @@ private fun NoLyricsNote(modifier: Modifier = Modifier) {
     }
 }
 
-/** object-fit: cover for the TextureView (Canvas videos are 9:16). */
+/** object-fit: cover for the TextureView (Canvas videos are 9:16), and object-position 50% 40%, as Spicy Lyrics': faces sit in
+ *  the upper half of most, and a centred crop cuts them off. */
 private fun coverFit(tv: TextureView) {
     val vw = 720f; val vh = 1280f
     val w = tv.width.toFloat(); val h = tv.height.toFloat(); if (w <= 0 || h <= 0) return
-    val s = maxOf(w / vw, h / vh); val m = Matrix(); m.setScale(vw * s / w, vh * s / h, w / 2, h / 2); tv.setTransform(m)
+    val s = maxOf(w / vw, h / vh); val m = Matrix(); m.setScale(vw * s / w, vh * s / h, w / 2, h * .4f); tv.setTransform(m)
 }
 
 private var lastRom = "replace"

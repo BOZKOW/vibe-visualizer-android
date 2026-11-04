@@ -820,6 +820,7 @@ object Lyr {
         "cover: " + E.coverNote.ifEmpty { "—" },
         "song changes: " + (when (E.src) { "spotify" -> Spotify.paceNote(); "media" -> "follows " + io.github.bozkow.vibevisualizer.media.MediaApps.appName() + " (" + io.github.bozkow.vibevisualizer.media.MediaApps.pkg + ")"; else -> "—" }),
         "camera cutout: " + io.github.bozkow.vibevisualizer.ui.cutoutNote(E.activity?.window?.decorView),
+        "screen: " + (E.activity?.display?.let { d -> "${d.refreshRate.toInt()} Hz now · modes " + d.supportedModes.map { it.refreshRate.toInt() }.distinct().sorted().joinToString(", ") } ?: "?") + (if (E.ambient) " · Ambient mode" else ""),
         "last lookup: " + (lookupLog.joinToString("; ") { it.p + " " + it.st + (it.ms?.let { m -> " ${m}ms" } ?: "") }.ifEmpty { "—" }),
         "sources: " + S.str("lprov"),
         "problems: " + E.problems(false).joinToString("; ") { it.t },

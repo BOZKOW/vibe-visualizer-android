@@ -110,6 +110,7 @@ class LyricsRenderer {
     /* ================= metrics ================= */
     var W = 0f; private set
     var H = 0f; private set
+    var drawnY = 0   // where the scroll put the lines on the last draw (px, whole), for the blurred ends to hold still among their pixels
     var bleedTop = 0f; var bleedBot = 0f; var bleedLeft = 0f   // how far outside the area they're drawn (LyricsPane's behind)
     private var areaH = 0f
     private var screenH = 0f; private var screenW = 0f
@@ -884,6 +885,7 @@ class LyricsRenderer {
         val pad = ceil(F * .7f).toInt()
         val baseY = if (isStatic) (if (bleedTop > 0f) 12 * dens else H * .09f) - stScroll else if (gliding) lyG.value(t) else lyY.value(t)
         val st = isStatic
+        drawnY = bleedTop.roundToInt() + baseY.roundToInt()
         // credits under the lyrics: right after the last line
         val lastBottom = lv.lastOrNull()?.let { it.top + it.h } ?: 0f
         val cy = baseY + lastBottom + F * .5f; if (abs(cy - creditsY) > .5f) creditsY = cy

@@ -36,7 +36,7 @@ fun BarsView(modifier: Modifier = Modifier) {
     // the music plays on another device that the bars can't hear: they fade away
     val k by androidx.compose.animation.core.animateFloatAsState(if (Audio.away) 0f else 1f, androidx.compose.animation.core.tween(600), label = "baraway")
     if (k <= 0f) return
-    // Glass bars (Settings → Visualizer): as the seek bar and the buttons: see-through upright, frosted on its side
+    // Glass bars (Settings → Visualizer): as the seek bar and the buttons: frosted on the player, see-through in the small window
     val glassy = S.b("barGlass")
     val paintFrost = if (glassy && LocalFrost.current) frostPainter() else null
     var at by remember { mutableStateOf(Offset.Zero) }

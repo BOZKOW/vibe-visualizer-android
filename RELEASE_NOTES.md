@@ -1,22 +1,22 @@
-Vibe Visualizer for Android 0.44.0 (beta). Android 12 or newer; it installs over 0.43.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.45.0 (beta). Android 12 or newer; it installs over 0.44.0 (Settings → Help & about → Update now).
 
-### Smoother with a Canvas
+### The Canvas on its side, as Spicy Lyrics does it
 
-- **Much less stutter while a Canvas plays**: each lyric line's blur was worked out twice a frame, and the Canvas's blurred copy again for every frosted button, for every frame of the video. Each is now worked out once. On the test emulator, janky frames went from about 41% to 10% upright and 13% to 5% on its side with a slow video, and from about 44% to 21% and 34% to 22% with a fast one.
-- **The video can no longer change the screen's refresh rate**, which would have slowed the whole app to the video's pace.
+- **The video now takes the cover's place**, on a stage laid out with Spicy Lyrics' own measurements: sharp up to a set point, then one long, eased soft edge toward the lyrics, which run over it. It's translucent, so the blurred background carries through and the two read as one surface, and it fades in over the top. No cover is drawn over it on its side, whatever the setting.
+- **The song, the seek bar and the controls are docked at its foot**, like a video player's, with the name as a caption.
+- **A dim veil over the video** that deepens while the controls show, so they stay readable.
+- **The picture is cropped for faces**: 40% from the top instead of the middle, which often cut them off.
+- **The blurred background** follows Spicy Lyrics' colours, without the old dark edges.
+- It's lighter too: the video isn't blurred in place any more, and janky frames with a fast video went from 22% to 13% on the test emulator.
 
-### Song changes
+### Frosted upright too
 
-- **No more default colours in between**: the cover and background used to go from the old song to the default colours and only then to the new song, whenever the new cover took a moment. The old ones now stay until the new one is ready, and the default colours only show for a song that really has no cover.
-- **The background is made off the main thread**, so a song change holds up less.
+- **The seek bar, the buttons, the notifications and the Glass bars are frosted upright as well**, now that the lyrics run behind them. It costs nothing measurable: they show part of a picture that's already blurred.
 
-### Spotify's DJ
+### Ambient mode and variable refresh rate
 
-- **The cover and its colours stay while the DJ talks**, instead of going to the default colours and back each time.
-- **The lyrics no longer get stuck on loading** when the DJ's name for what's playing changes while it talks.
-- **A moment with no song named no longer reloads everything**, and something Spotify sends with no name isn't treated as a song any more.
-- **Far fewer requests to Spotify while the DJ talks**: they could run into its limits.
+- **Ambient mode now lets a variable-rate (LTPO) screen slow down**: with only the clock showing, the app draws nothing between its changes and asks for 10 Hz, so the screen can idle as low as it goes; with the lyrics or the bars moving it asks for 30 Hz. Any touch brings the full rate back. Debug info now shows the screen's current rate.
 
-### Glass bars
+### Smoother lyrics behind the blur
 
-- **New option: Settings → Visualizer → Glass bars.** The bars take the glass look of the seek bar and the buttons, tinted with the song's colours: see-through upright, frosted on its side.
+- **The lyrics behind the blur no longer move in jumps**: their blurred copy moved 8 pixels at a time as they scrolled. It now moves by single pixels, for no extra work.
