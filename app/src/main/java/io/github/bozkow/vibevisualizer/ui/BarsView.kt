@@ -5,6 +5,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -28,7 +36,11 @@ fun BarsView(modifier: Modifier = Modifier) {
     // the music plays on another device that the bars can't hear: they fade away
     val k by androidx.compose.animation.core.animateFloatAsState(if (Audio.away) 0f else 1f, androidx.compose.animation.core.tween(600), label = "baraway")
     if (k <= 0f) return
-    Canvas(modifier.then(if (k < 1f) Modifier.graphicsLayer { alpha = k } else Modifier)) {
+    // Glass bars (Settings → Visualizer): as the seek bar and the buttons: see-through upright, frosted on its side
+    val glassy = S.b("barGlass")
+    val paintFrost = if (glassy && LocalFrost.current) frostPainter() else null
+    var at by remember { mutableStateOf(Offset.Zero) }
+    Canvas(modifier.then(if (k < 1f) Modifier.graphicsLayer { alpha = k } else Modifier).then(if (paintFrost != null) Modifier.onGloballyPositioned { at = it.positionInWindow() } else Modifier)) {
         E.barsTick.longValue
         val n = Audio.N; val vals = Audio.vals; val pal = Visuals.pal
         if (n == 0 || vals.size < n || pal.size < n || size.width <= 0f) return@Canvas
@@ -46,6 +58,14 @@ fun BarsView(modifier: Modifier = Modifier) {
                 if (rd) { val cr = min(r + gr, hh / 2); ap.addRoundRect(x, y, x + ww, y + hh, cr, cr, android.graphics.Path.Direction.CW) } else ap.addRect(x, y, x + ww, y + hh, android.graphics.Path.Direction.CW)
             }
             return p
+        }
+        if (glassy) {
+            val p = pass(vals, 0f)
+            if (paintFrost != null) clipPath(p) { paintFrost(this, at) }
+            drawPath(p, brush, alpha = .3f)   // tinted with the song's colours, or they'd all be one grey
+            drawPath(p, GlassFill)
+            drawPath(p, GlassEdge, style = Stroke(1.dp.toPx()))
+            return@Canvas
         }
         // motion blur: the last frames, fading (the web app fades the canvas a little every frame)
         val blur = if (S.low) 0 else S.i("blur")

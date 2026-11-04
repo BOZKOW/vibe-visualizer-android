@@ -254,6 +254,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sl("gap", "Bar gap", 0, 70),
         Item.Sw("glow", "Glow"),
         Item.Sw("round", "Rounded bars"),
+        Item.Sw("barGlass", "Glass bars", "Glass like the seek bar and the buttons, tinted with the song's colours: see-through upright, frosted on its side."),
     ), sub = "What the bars hear, Vibe Bridge, where and how they look", group = 0),
     Page("lyrics", "Lyrics", VIcons.lyrics, listOf(
         Item.Sub("Sources"),

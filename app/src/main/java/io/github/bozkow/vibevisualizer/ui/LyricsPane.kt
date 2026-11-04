@@ -131,7 +131,7 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
     // room at the sides for the blur to fade by itself: on its side, cut off where this column ends, it showed as a sharp line
     val sideRoom = with(dens) { 40.dp.roundToPx() }
     val bleedL = if (full) minOf(leftOf, sideRoom) else 0; val bleedR = if (full) minOf(rightOf, sideRoom) else 0
-    val lyr = rememberGraphicsLayer(); val soft = rememberGraphicsLayer()
+    val soft = rememberGraphicsLayer()
     val cheap = S.low || E.quiet   // (Low performance mode, and under Settings' blur: they only fade at the ends)
     val softFx = remember(dens) { val r = with(dens) { 14.dp.toPx() } / 8f; BlurEffect(r, r, TileMode.Decal) }
     BoxWithConstraints(modifier.onGloballyPositioned { c ->
@@ -162,8 +162,7 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                 if (full && h > 0) {
                     // sharp in this area, blurred from there to the screen's ends, soft where one becomes the other (Low
                     // performance mode: no blur, they only fade). The blur costs little: at an eighth of the size, one pass.
-                    if (cheap) view.draw(this) { gc.createGraphicsLayer() }
-                    else { lyr.record { view.draw(this) { gc.createGraphicsLayer() } }; drawLayer(lyr) }
+                    view.draw(this) { gc.createGraphicsLayer() }
                     val a = bleedT / h; val b = 1f - bleedB / h; val rp = minOf(80.dp.toPx() / h, (b - a) / 2.01f)
                     drawRect(Brush.verticalGradient(*bandStops(a, b, rp, 0f, 1f)), blendMode = BlendMode.DstIn)
                     if (!cheap) {
@@ -171,7 +170,7 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                         soft.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
                         if (soft.renderEffect !== softFx) soft.renderEffect = softFx
                         soft.record(IntSize(sw, sh)) {
-                            scale(sw / full0.width, sh / full0.height, pivot = Offset.Zero) { drawLayer(lyr) }
+                            scale(sw / full0.width, sh / full0.height, pivot = Offset.Zero) { view.drawPlain(this, (a + rp) * h, (b - rp) * h) }
                             drawRect(Brush.verticalGradient(*bandStops(a, b, rp, .6f, 0f)), blendMode = BlendMode.DstIn)   // (.6: what's over them stays easy to read)
                         }
                         scale(full0.width / sw, full0.height / sh, pivot = Offset.Zero) { drawLayer(soft) }

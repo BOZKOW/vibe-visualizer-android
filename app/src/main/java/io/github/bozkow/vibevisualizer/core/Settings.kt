@@ -38,7 +38,7 @@ object Defaults {
         "lseekFade" to true, "lnotice" to true, "aRestCover" to true, "aPreload" to true, "aCoverLine" to true, "volshow" to true, "fpscap" to "60", "credPos" to "corner", "cvNoArt" to false, "cvBlur" to false, "cvBlurAmt" to 50, "cvShrink" to true, "cvSpicy" to true, "cvBehind" to "dark",
         "capDev" to "", "romMode" to "replace", "tr" to false, "trTo" to navLang(), "trSkip" to "", "theme" to "cover",
         "c1" to "#ff5a5f", "c2" to "#4f8cff", "auto" to true, "boost" to 100, "resp" to 25, "blur" to 0, "bars" to 72,
-        "gap" to 28, "glow" to false, "round" to true, "scale" to "1", "fps" to false, "bgblur" to 60, "bri" to 70,
+        "gap" to 28, "glow" to false, "barGlass" to false, "round" to true, "scale" to "1", "fps" to false, "bgblur" to 60, "bri" to 70,
         "sat" to 170, "bgspeed" to 100, "online" to true, "volume" to 100, "view" to "both",
         "lprov" to "spicy:1,spotify:1,lrclib:1,netease:1", "loff" to 0, "lsize" to 100, "lblur" to true,
         "canvasOn" to true, "low" to false, "perfAsk" to true, "anim" to "system", "lDesync" to "ask", "design" to "glass",

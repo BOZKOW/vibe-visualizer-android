@@ -264,7 +264,7 @@ object Spotify {
         val artists = it.optJSONArray("artists") ?: JSONArray()
         return SongMeta(id = it.optString("id"), uri = it.optString("uri"), title = it.optString("name"),
             artist = if (ep) it.optJSONObject("show")?.optString("name") ?: "" else (0 until artists.length()).joinToString(", ") { k -> artists.getJSONObject(k).optString("name") },
-            album = if (ep) "" else it.optJSONObject("album")?.optString("name") ?: "", duration = it.optDouble("duration_ms") / 1000,
+            album = if (ep) "" else it.optJSONObject("album")?.optString("name") ?: "", duration = it.optDouble("duration_ms", 0.0) / 1000,
             cover = imgs.optJSONObject(0)?.optString("url") ?: "", coverSmall = imgs.optJSONObject(1)?.optString("url") ?: "", isrc = it.optJSONObject("external_ids")?.optString("isrc") ?: "",
             year = ((if (ep) it.optString("release_date") else it.optJSONObject("album")?.optString("release_date")) ?: "").take(4).takeIf { y -> y.length == 4 && y.all(Char::isDigit) } ?: "", artistId = if (ep) "" else artists.optJSONObject(0)?.optString("id") ?: "", ep = ep)
     }
@@ -274,13 +274,14 @@ object Spotify {
     suspend fun queueAhead(n: Int): List<SongMeta> {
         if (!connected || wall() < backoff) return emptyList()
         val q = (runCatching { api("/me/player/queue") }.getOrNull() as? JSONObject)?.optJSONArray("queue") ?: return emptyList()
-        return (0 until minOf(q.length(), n)).mapNotNull { i -> q.optJSONObject(i)?.takeIf { it.optString("id").isNotEmpty() }?.let { metaOf(it) } }
+        return (0 until minOf(q.length(), n)).mapNotNull { i -> q.optJSONObject(i)?.takeIf { it.optString("id").let { s -> s.isNotEmpty() && s != "null" } && it.optString("name").isNotBlank() && it.optString("type") != "unknown" }?.let { metaOf(it) } }
     }
 
     private fun apply(d: JSONObject?, mid: Double) {
         val nowT = now(); val before = if (spState?.playing == true) curMs() else null; val oldId = spId
         spFetched = mid
-        val it = d?.optJSONObject("item")
+        // an item that names nothing (the DJ's voice can come as one) is no song: it went on to lookups with no name
+        val it = d?.optJSONObject("item")?.takeIf { x -> x.optString("name").isNotBlank() && x.optString("type") != "unknown" }
         spxFrom(d)
         if (it == null) {
             // playing, but nothing Spotify names: the DJ talking between songs (as Spicy Lyrics tells it: a track of an
@@ -288,6 +289,9 @@ object Spotify {
             // instead of "Nothing playing" in between
             if (d?.optBoolean("is_playing") == true) {
                 val dj = d.optString("currently_playing_type") == "unknown" || d.optJSONObject("context")?.optString("uri") == DJ_CONTEXT
+                // a moment of no name between two reports of a song isn't the DJ: everything on screen went and came back for it
+                if (dj && djSeen == 0L) djSeen = wall()
+                if (dj && wall() - djSeen < 2500 && !E.dj && spId != null) { isPlaying = true; E.onSpUpdate(); return }
                 if (dj) { isPlaying = true; spState = null; spId = null; meta = null; E.onSpDj(); return }
                 if (E.title.isNotEmpty()) { isPlaying = true; E.onSpUpdate(); return }
             }
@@ -295,8 +299,9 @@ object Spotify {
             if (spId != null || E.title.isEmpty()) { spId = null; meta = null; E.spIdle() }
             return
         }
+        djSeen = 0L
         val m = metaOf(it)
-        val st = PState(d.optBoolean("is_playing"), d.optDouble("progress_ms", 0.0), it.optDouble("duration_ms"))
+        val st = PState(d.optBoolean("is_playing"), d.optDouble("progress_ms", 0.0), it.optDouble("duration_ms", 0.0))
         spState = st
         // small differences glide in over ~0.6 s instead of jumping the lyrics; big ones (seek, skip, pause) snap
         val after = st.progress + if (st.playing) nowT - mid else 0.0
@@ -320,6 +325,7 @@ object Spotify {
     }
 
     private const val DJ_CONTEXT = "spotify:playlist:37i9dQZF1EYkqdzj48dyYq"   // Spotify's DJ
+    private var djSeen = 0L   // when Spotify first named nothing, playing
 
     /** The Spotify app on this phone plays the song the Web API reported: its timing is used. */
     fun appTiming(): Boolean {
@@ -360,7 +366,8 @@ object Spotify {
     fun onAppState() {
         if (E.src == "media" && connected && S.b("aSession") && SpotifyApp.playing) { E.setSource("spotify"); return }   // back from another music app
         if (appTiming()) { isPlaying = SpotifyApp.playing; E.onSpUpdate(); return }
-        if (E.src == "spotify" && S.b("aSession") && SpotifyApp.connected.value && SpotifyApp.title.isNotEmpty() && wall() - lastCatch > 5000) catchUp()
+        // (not while the DJ talks: the Web API has no song to name, and each report of the app's asked it eight times over, into its limits)
+        if (E.src == "spotify" && !E.dj && S.b("aSession") && SpotifyApp.connected.value && SpotifyApp.title.isNotEmpty() && wall() - lastCatch > 5000) catchUp()
     }
 
     /** A new song started in the Spotify app. */

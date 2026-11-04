@@ -228,7 +228,10 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
     val quiet = E.quiet
     val vs = vidSize()   // (read here, not as it draws: there it never asked again, seen in a log of each draw)
     val small = rememberGraphicsLayer()
-    DisposableEffect(small) { Frost.video = small; onDispose { if (Frost.video === small) Frost.video = null } }
+    // [small] on a picture of its own, drawn from there by all that show it: drawn straight by each frosted button and the bar,
+    // with their own clips, its blur was worked out again for each of them, for every frame of the video
+    val done = rememberGraphicsLayer()
+    DisposableEffect(done) { Frost.video = done; onDispose { if (Frost.video === done) Frost.video = null } }
     val cf = remember(S.bri, S.sat) { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) }) }
     Canvas(Modifier.fillMaxSize().onSizeChanged { Frost.screen = it }) {
         val lw = vs.width; val lh = vs.height
@@ -248,7 +251,9 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
                 val sc = maxOf(sw / lw.toFloat(), sh / lh.toFloat())
                 translate((sw - lw * sc) / 2f, (sh - lh * sc) / 2f) { scale(sc, sc, pivot = Offset.Zero) { drawLayer(vid) } }
             }
-            scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(small) }
+            done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+            done.record(IntSize(sw, sh)) { drawLayer(small) }
+            scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(done) }
         }
         drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = .15f * cvA), Color.Black.copy(alpha = .55f * cvA)), Offset(size.width * .7f, size.height * .5f), maxOf(size.width, size.height) * .8f))
     }

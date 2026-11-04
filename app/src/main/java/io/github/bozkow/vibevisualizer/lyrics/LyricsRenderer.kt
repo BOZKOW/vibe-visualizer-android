@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -89,7 +90,9 @@ class LyricsRenderer {
         val dotSp = if (l.dots) Array(3) { DotSprings() } else null
         val dotV = DoubleArray(12)
         var sweep: Sweep? = null
-        var layer: GraphicsLayer? = null
+        var layer: GraphicsLayer? = null   // the line as seen: its blur and shadow, where it is
+        var inner: GraphicsLayer? = null   // its picture (and how faint), so the blurred ends can draw it without that blur (drawPlain)
+        var px = 0f; var py = 0f; var shown = false
         var dirty = true
         var recW = 0; var recH = 0
         var key = ""
@@ -194,7 +197,7 @@ class LyricsRenderer {
 
     fun enter() { if (!S.low) { enterAt = now() + 16; enterFrom = max(0, li) } }
 
-    private fun release() { lv.forEach { it.layer?.let { l -> releaser?.invoke(l) }; it.layer = null } }
+    private fun release() { lv.forEach { d -> d.layer?.let { l -> releaser?.invoke(l) }; d.inner?.let { l -> releaser?.invoke(l) }; d.layer = null; d.inner = null } }
     var releaser: ((GraphicsLayer) -> Unit)? = null
 
     private fun build() {
@@ -887,6 +890,7 @@ class LyricsRenderer {
         var slide = 0f   // from the breaks above: their room coming or going (tops)
         val hush = quiet()
         for (d in lv) {
+            d.shown = false
             val above = slide; if (d.dots) slide += d.dotOff.value(t)
             val op0 = if (st) 1f else d.opacity.value(t)
             val enterK = if (enterAt > 0 && !st) { val delay = min(abs(d.i - enterFrom), 12) * 45.0; Ease.eOut(((t - enterAt - delay) / 700).coerceIn(0.0, 1.0)).toFloat() } else 1f
@@ -899,15 +903,18 @@ class LyricsRenderer {
             if (y + hh + pad < -H * .1f - bleedTop || y - pad > H * 1.1f + bleedBot) continue
             val avail = W - padL - padR
             val w = (avail + 2 * pad).toInt(); val h = (hh + 2 * pad).toInt().coerceAtLeast(1)
-            val layer = d.layer ?: obtain().also { d.layer = it; d.dirty = true }
-            if (d.dirty || d.recW != w || d.recH != h || d.tapAt > t - 300) {
-                layer.record(ds, ds.layoutDirection, IntSize(w, h)) { drawIntoCanvas { c -> c.nativeCanvas.translate(pad.toFloat(), pad.toFloat()); drawLine(c.nativeCanvas, d, t) } }
-                d.recW = w; d.recH = h; d.dirty = d.a || moving.contains(d.i) || (S.xBgPop && d.bgOpen.moving(t)) || (d.dots && d.dotScale.moving(t))
+            val inner = d.inner ?: obtain().also { d.inner = it; d.dirty = true; it.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.ModulateAlpha }
+            val layer = d.layer ?: obtain().also { d.layer = it; d.recW = 0 }
+            val sized = d.recW != w || d.recH != h
+            if (d.dirty || sized || d.tapAt > t - 300) {
+                inner.record(ds, ds.layoutDirection, IntSize(w, h)) { drawIntoCanvas { c -> c.nativeCanvas.translate(pad.toFloat(), pad.toFloat()); drawLine(c.nativeCanvas, d, t) } }
+                d.dirty = d.a || moving.contains(d.i) || (S.xBgPop && d.bgOpen.moving(t)) || (d.dots && d.dotScale.moving(t))
             }
+            if (sized) { layer.record(ds, ds.layoutDirection, IntSize(w, h)) { drawLayer(inner) }; d.recW = w; d.recH = h }
             // the scroll rounded once, for all of them: each line rounding its own sum stepped at its own moment, so the
             // lines shifted against each other by a pixel as they scrolled
             layer.topLeft = IntOffset((bleedLeft + padL + fx - pad).roundToInt(), bleedTop.roundToInt() + baseY.roundToInt() + (inView - pad).roundToInt())
-            layer.alpha = op.coerceIn(0f, 1f)
+            inner.alpha = op.coerceIn(0f, 1f)
             val blurPx = if (st || lyFree || hush) 0f else d.blur.value(t) * F
             val tapK = ((t - d.tapAt) / 260).coerceIn(0.0, 1.0).toFloat()
             val sc = if (tapK < 1f) .97f + .03f * Ease.easeOut(tapK.toDouble()).toFloat() else 1f
@@ -915,8 +922,20 @@ class LyricsRenderer {
             layer.pivotOffset = androidx.compose.ui.geometry.Offset(if (d.opp) pad + avail else pad.toFloat(), h / 2f)
             val fx2 = effect(blurPx, d.a && !S.low && !st && !hush); if (layer.renderEffect !== fx2) layer.renderEffect = fx2
             ds.drawLayer(layer)
+            d.px = layer.topLeft.x.toFloat(); d.py = layer.topLeft.y.toFloat(); d.shown = true
         }
         if (enterAt > 0 && t - enterAt > 1300) enterAt = -1e9
+    }
+
+    /** The lines' pictures for the blurred copy past the lyrics' area (LyricsPane), after [draw]: without their own blur, as a
+     *  blur drawn a second time under another scale is worked out again, for every line, every frame (the whole app stuttered
+     *  behind a Canvas, whose every frame draws all this). Those wholly between [from] and [to] don't show in it. */
+    fun drawPlain(ds: DrawScope, from: Float, to: Float) {
+        for (d in lv) {
+            if (!d.shown || (d.py >= from && d.py + d.recH <= to)) continue
+            val l = d.inner ?: continue
+            ds.translate(d.px, d.py) { drawLayer(l) }
+        }
     }
 
     /** Masks for the lyrics area: the clear band (sharp between two fades), widened for a tall line. */

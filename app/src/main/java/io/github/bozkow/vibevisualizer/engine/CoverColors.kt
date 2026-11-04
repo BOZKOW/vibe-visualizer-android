@@ -15,6 +15,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import io.github.bozkow.vibevisualizer.audio.Audio
 import io.github.bozkow.vibevisualizer.core.S
+import io.github.bozkow.vibevisualizer.core.Vibe
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import io.github.bozkow.vibevisualizer.core.now
 import kotlin.math.abs
 import kotlin.math.floor
@@ -160,15 +164,14 @@ object Visuals {
     private val LV = arrayOf(doubleArrayOf(1.0, .5, .5), doubleArrayOf(1 / 1.7, .2, .8), doubleArrayOf(1 / 2.1, .85, .15))
 
     /** paint(): the cover cropped square, or soft blobs of its colors */
-    private fun paint(c: Canvas, s: Int) {
+    private fun paint(c: Canvas, s: Int, img: Bitmap?, cols: List<IntArray>) {
         c.drawColor(0xFF07070C.toInt())
-        val img = cover
         if (img != null) {
             val m = min(img.width, img.height)
             c.drawBitmap(img, Rect((img.width - m) / 2, (img.height - m) / 2, (img.width + m) / 2, (img.height + m) / 2), Rect(0, 0, s, s), Paint(Paint.FILTER_BITMAP_FLAG))
         } else {
             val P = arrayOf(floatArrayOf(.25f, .3f), floatArrayOf(.75f, .7f), floatArrayOf(.7f, .2f), floatArrayOf(.2f, .8f))
-            rawCols.forEachIndexed { i, k ->
+            cols.forEachIndexed { i, k ->
                 val p = P[i % 4]; val col = (k[0] shl 16) or (k[1] shl 8) or k[2]
                 val pt = Paint().apply { shader = RadialGradient(p[0] * s, p[1] * s, s * .75f, intArrayOf((0xF2 shl 24) or col, col), null, Shader.TileMode.CLAMP) }
                 c.drawRect(0f, 0f, s.toFloat(), s.toFloat(), pt)
@@ -215,33 +218,41 @@ object Visuals {
         return a
     }
 
-    /** renderBg(): the cover, blurred, and the three layers. fade: crossfade from the old one (a new song). */
+    /** renderBg(): the cover, blurred, and the three layers, made off the main thread (it held up the song change) and swapped
+     *  in when ready. fade: crossfade from the old one (a new song). */
+    private var bakeJob: kotlinx.coroutines.Job? = null
     fun bake(fade: Boolean) {
-        runCatching {
+        bakeJob?.cancel()
+        val img = cover; val cols = rawCols; val blur = S.bgblur; val sat = bgSat(); val bri = bgBri()
+        bakeJob = Vibe.scope.launch {
             val s = 128
-            val pb = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
-            paint(Canvas(pb), s)
-            blurBitmap(pb, S.bgblur * .06, bgSat(), bgBri())
-            if (fade && baked != null && !S.low) { bakedPrev = baked; spritesPrev = sprites.copyOf(); fadeAt = now() } else { bakedPrev = null; fadeAt = 0.0 }
-            baked = pb
-            val kw = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
-            paint(Canvas(kw), s)
-            blurBitmap(kw, 2 + S.bgblur / 60.0 * 6, 1.0, 1.0)
-            if (fade && kwSrc != null && !S.low) { kwPrev = kwSrc; kwAt = now() } else kwPrev = null
-            kwSrc = kw
-            val rp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            for (i in 0 until 3) {
-                val cs = (s * LV[i][0]).toInt(); val ox = ((s - cs) * LV[i][1]).toInt(); val oy = ((s - cs) * LV[i][2]).toInt()
-                val sp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888); val c = Canvas(sp)
-                c.drawBitmap(pb, Rect(ox, oy, ox + cs, oy + cs), Rect(0, 0, s, s), rp)
-                if (i > 0) {   // soft round edges for the live layers
-                    val m = Paint().apply { shader = RadialGradient(64f, 64f, 64f, intArrayOf(0xFF000000.toInt(), 0xFF000000.toInt(), 0), floatArrayOf(0f, 30f / 64f, 1f), Shader.TileMode.CLAMP); xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
-                    c.drawRect(0f, 0f, s.toFloat(), s.toFloat(), m)
+            val made = runCatching { withContext(Dispatchers.Default) {
+                val pb = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+                paint(Canvas(pb), s, img, cols)
+                blurBitmap(pb, blur * .06, sat, bri)
+                val kw = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+                paint(Canvas(kw), s, img, cols)
+                blurBitmap(kw, 2 + blur / 60.0 * 6, 1.0, 1.0)
+                val rp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                val sp = Array(3) { i ->
+                    val cs = (s * LV[i][0]).toInt(); val ox = ((s - cs) * LV[i][1]).toInt(); val oy = ((s - cs) * LV[i][2]).toInt()
+                    val b = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888); val c = Canvas(b)
+                    c.drawBitmap(pb, Rect(ox, oy, ox + cs, oy + cs), Rect(0, 0, s, s), rp)
+                    if (i > 0) {   // soft round edges for the live layers
+                        val m = Paint().apply { shader = RadialGradient(64f, 64f, 64f, intArrayOf(0xFF000000.toInt(), 0xFF000000.toInt(), 0), floatArrayOf(0f, 30f / 64f, 1f), Shader.TileMode.CLAMP); xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
+                        c.drawRect(0f, 0f, s.toFloat(), s.toFloat(), m)
+                    }
+                    b
                 }
-                sprites[i] = sp
-            }
+                Triple(pb, kw, sp)
+            } }.onFailure { if (it !is kotlinx.coroutines.CancellationException) android.util.Log.w("VV", "background: $it") }.getOrNull() ?: return@launch
+            if (fade && baked != null && !S.low) { bakedPrev = baked; spritesPrev = sprites.copyOf(); fadeAt = now() } else { bakedPrev = null; fadeAt = 0.0 }
+            baked = made.first
+            if (fade && kwSrc != null && !S.low) { kwPrev = kwSrc; kwAt = now() } else kwPrev = null
+            kwSrc = made.second
+            made.third.forEachIndexed { i, b -> sprites[i] = b }
             bakeVer++
-        }.onFailure { android.util.Log.w("VV", "background: $it") }
+        }
     }
 
     fun fadeProgress(t: Double): Float = if (bakedPrev == null || fadeAt == 0.0) 1f else min(1.0, (t - fadeAt) / 900).toFloat().also { if (it >= 1f) { bakedPrev = null; spritesPrev = arrayOfNulls(3) } }

@@ -69,6 +69,8 @@ object CanvasVideo {
 
     private fun ensure(): ExoPlayer = player ?: ExoPlayer.Builder(Vibe.app).setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(Vibe.app, cached))).build().apply {
         volume = 0f; repeatMode = Player.REPEAT_MODE_ONE; addListener(listener)
+        // never asks the screen to follow the video's frame rate: on an adaptive panel that would slow the whole app to its pace
+        videoChangeFrameRateStrategy = androidx.media3.common.C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF
         view?.get()?.let { setVideoTextureView(it) }
         player = this
     }

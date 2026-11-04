@@ -258,9 +258,10 @@ object E {
         Lyr.load(meta, tok)
         Preload.songStarted()
         mediaArt = setCoverBitmap(MediaApps.cover(), "From " + MediaApps.appName(), tok)
-        if (!mediaArt) {
-            resetCover()
-            if (S.b("online")) Vibe.scope.launch { status = "Searching for cover…"; if (!findCover(meta, tok) && tok == coverTok) status = "No cover found · using default" }
+        // (what's on screen stays until there's something else: only with no cover in the end the default colours)
+        if (!mediaArt) Vibe.scope.launch {
+            if (S.b("online")) { status = "Searching for cover…"; if (!findCover(meta, tok) && tok == coverTok) { status = "No cover found · using default"; if (!mediaArt) resetCover() } }
+            else { delay(1500); if (tok == coverTok && !mediaArt) resetCover() }
         }
         updPlay()
     }
@@ -289,12 +290,14 @@ object E {
     private var appShown = ""; private var appArt = false
     fun onAppSong(t: String, a: String, art: android.graphics.Bitmap?) {
         if (t.isEmpty() || t == title || src != "spotify" || aheadId.isNotEmpty()) return   // (a skip from here: shown already)
+        // while the DJ talks: the app's name for it and its picture, if any. The lyrics wait for the Web API to name a song: from
+        // here they went on "loading" until it did, as onSpDj has nothing more to do once in the DJ
+        if (dj) { title = t; artist = a; album = SpotifyApp.album; trackVer++; appShown = t; appArt = art != null && setCoverBitmap(art, "From the Spotify app", coverTok); return }
         val tok = ++coverTok
         Audio.dropBars(); CanvasVideo.clear(true); Lyr.loading()
         title = t; artist = a; year = ""; album = SpotifyApp.album; status = "Spotify"; trackVer++
         appShown = t; earlyId = ""
-        appArt = art != null && setCoverBitmap(art, "From the Spotify app", tok)
-        if (!appArt) resetCover()
+        appArt = art != null && setCoverBitmap(art, "From the Spotify app", tok)   // (none yet: the last one stays until the Web API's)
         // the song found ahead in your queue: its lyrics and Canvas start now, before Spotify's Web API names it
         Preload.nextFor(t, SpotifyApp.durMs.toDouble())?.let { m -> earlyId = m.id; Lyr.load(m, tok); CanvasVideo.lookup(m, tok) }
     }
@@ -310,7 +313,7 @@ object E {
         title = m.title; artist = m.artist; year = m.year; album = m.album; status = "Spotify"; trackVer++
         aheadId = m.id; appShown = ""; appArt = false; earlyId = ""
         Spotify.skippedTo(m)
-        Vibe.scope.launch { if (!(m.cover.isNotEmpty() && setCover(m.cover, "", tok))) { if (tok == coverTok) resetCover() } }
+        Vibe.scope.launch { if (m.cover.isNotEmpty()) setCover(m.cover, "", tok) }   // (didn't load: onSpTrack tries more, and only then the default colours)
         Lyr.load(m, tok); CanvasVideo.lookup(m, tok)
     }
 
@@ -322,13 +325,16 @@ object E {
     }
 
     /** Spotify's DJ talking between songs: nothing to line lyrics up with, as Spicy Lyrics says; they're back with the
-     *  next song (onSpTrack). */
+     *  next song (onSpTrack). The last cover and its colours stay: each time the DJ spoke they went to the default ones and
+     *  back. */
     var dj = false; private set
     fun onSpDj() {
         if (dj) { updPlay(); return }
         dj = true; ++coverTok; aheadId = ""; appShown = ""; earlyId = ""
-        Audio.dropBars(); CanvasVideo.clear(false); resetCover()
-        title = "DJ"; artist = "Spotify"; year = ""; album = ""; status = "Spotify"; trackVer++
+        Audio.dropBars(); CanvasVideo.clear(false)
+        val named = SpotifyApp.title.isNotEmpty() && SpotifyApp.title != title   // the Spotify app's name for it, when it has moved on
+        title = if (named) SpotifyApp.title else "DJ"; artist = if (named) SpotifyApp.artist else "Spotify"; year = ""; album = ""; status = "Spotify"; trackVer++
+        if (named) appShown = title
         Lyr.clear("Lyrics aren’t available with the DJ", "The DJ talks between the songs and mixes them together, so there’s nothing to line lyrics up with. They’re back with the next song.", "none")
         updPlay()
     }
@@ -386,7 +392,7 @@ object E {
     fun onFileItem(uri: Uri, name: String) {
         curArtistId = ""
         val tok = ++coverTok
-        CanvasVideo.clear(false); Audio.dropBars(); resetCover()
+        CanvasVideo.clear(false); Audio.dropBars()   // (the last cover stays until this song's is read: at the end, the default colours if it has none)
         val fn = fileSong(name, null)
         title = fn.title; artist = fn.artist; year = ""; album = ""; status = ""; trackVer++
         Lyr.loading()
@@ -402,9 +408,9 @@ object E {
             // Android's own album art for the file: its picture, or a cover.jpg / folder.jpg next to it
             Files.androidArt(uri)?.let { if (tok == coverTok && setCoverBitmap(it, "From this phone", tok)) return@launch }
             if (tok != coverTok) return@launch
-            if (!S.b("online")) { status = "No cover · using default"; return@launch }
+            if (!S.b("online")) { status = "No cover · using default"; resetCover(); return@launch }
             status = "Searching for cover…"
-            if (!findCover(meta.copy(title = meta.title.ifEmpty { Files.clean(name) }), tok) && tok == coverTok) status = "No cover found · using default"
+            if (!findCover(meta.copy(title = meta.title.ifEmpty { Files.clean(name) }), tok) && tok == coverTok) { status = "No cover found · using default"; resetCover() }
         }
         updPlay()
     }
