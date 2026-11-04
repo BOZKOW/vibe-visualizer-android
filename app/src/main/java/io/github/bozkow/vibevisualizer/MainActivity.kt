@@ -15,6 +15,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.compose.ui.platform.createLifecycleAwareWindowRecomposer
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -73,7 +74,12 @@ class MainActivity : ComponentActivity() {
         // the Spotify app's link let go when the app was last closed: ask Android to bind it again
         if (SpotifyApp.hasAccess(this)) runCatching { android.service.notification.NotificationListenerService.requestRebind(android.content.ComponentName(this, io.github.bozkow.vibevisualizer.spotify.SessionListener::class.java)) }
         if (savedInstanceState == null) { first(); io.github.bozkow.vibevisualizer.engine.Crashes.tell() }
-        setContent { VibeRoot() }
+        // Low performance mode: no animations at all. Every one of Compose's, in one place, as Android's own "remove animations"
+        readAndroidAnim()
+        val motion = object : androidx.compose.ui.MotionDurationScale {
+            override val scaleFactor get() = if (S.low) 0f else androidAnim   // (otherwise Android's own setting, as Compose does by itself)
+        }
+        setContent(parent = window.decorView.createRecomposer(motion)) { VibeRoot() }
         handle(intent)
 
         // keep the screen on while music plays; picture-in-picture follows the music too
@@ -147,7 +153,10 @@ class MainActivity : ComponentActivity() {
         if (!isInPictureInPictureMode) { E.onVisible(false); CanvasVideo.onBackground() }
         Vibe.settings.flush()
     }
-    override fun onResume() { super.onResume(); SpotifyApp.refresh(this); io.github.bozkow.vibevisualizer.media.MediaApps.refresh(this); Background.resume(); Updates.showConfirm() }
+    private var androidAnim = 1f
+    private fun readAndroidAnim() { androidAnim = runCatching { Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) }.getOrDefault(1f) }
+
+    override fun onResume() { super.onResume(); readAndroidAnim(); SpotifyApp.refresh(this); io.github.bozkow.vibevisualizer.media.MediaApps.refresh(this); Background.resume(); Updates.showConfirm() }
 
     /** Settings → Phone: the status bar (with the notifications) and the navigation bar hidden or shown. Hidden, a swipe
      *  from the edge brings them back for a moment. */
@@ -202,6 +211,9 @@ class MainActivity : ComponentActivity() {
         E.inPip = isInPictureInPictureMode
         if (!isInPictureInPictureMode && !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) E.onVisible(false)
     }
+
+    @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
+    private fun android.view.View.createRecomposer(motion: androidx.compose.ui.MotionDurationScale) = createLifecycleAwareWindowRecomposer(motion, lifecycle)
 
     /* ---- display ---- */
     private fun refreshRate(hz: Float, pin: Boolean = false) {

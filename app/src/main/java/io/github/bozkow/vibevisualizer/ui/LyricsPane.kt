@@ -128,10 +128,12 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
     val full = behind && !compact && (!S.xFocus || view.isStatic)
     var aboveArea by remember { mutableIntStateOf(0) }; var underArea by remember { mutableIntStateOf(0) }   // px of the screen
     var leftOf by remember { mutableIntStateOf(0) }; var rightOf by remember { mutableIntStateOf(0) }
-    val bleedT = if (full) aboveArea else 0; val bleedB = if (full) underArea else 0
+    // (Low performance mode: nothing shows out there, as they only fade: no bigger box, and no lines drawn there to be erased)
+    val out = full && !S.low
+    val bleedT = if (out) aboveArea else 0; val bleedB = if (out) underArea else 0
     // room at the sides for the blur to fade by itself: on its side, cut off where this column ends, it showed as a sharp line
     val sideRoom = with(dens) { 40.dp.roundToPx() }
-    val bleedL = if (full) minOf(leftOf, sideRoom) else 0; val bleedR = if (full) minOf(rightOf, sideRoom) else 0
+    val bleedL = if (out) minOf(leftOf, sideRoom) else 0; val bleedR = if (out) minOf(rightOf, sideRoom) else 0
     val soft = rememberGraphicsLayer()
     // [soft] on a picture of its own, drawn from there by all that show it: the lyrics here and what's frosted upright over them
     val softDone = rememberGraphicsLayer()

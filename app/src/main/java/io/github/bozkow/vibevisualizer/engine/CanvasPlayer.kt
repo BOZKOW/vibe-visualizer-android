@@ -94,6 +94,7 @@ object CanvasVideo {
     private var colorJob: Job? = null
     private fun lookAtColors() {
         colorJob?.cancel()
+        if (S.low) return   // (Low performance mode: the cover's colours, with no frames copied back)
         colorJob = Vibe.scope.launch {
             val w = 48; val h = 85; val frames = ArrayList<Bitmap>()
             for (wait in longArrayOf(800, 1700, 2500)) {
@@ -205,7 +206,11 @@ object CanvasVideo {
         cvmode = S.canvasOn && has
         cvlive = S.canvasOn && has && !S.low
         if (!S.canvasOn) { player?.pause(); colorJob?.cancel(); Visuals.setCanvasColors(null) }
-        else { syncPlay(); if (has && !Visuals.hasCanvasColors && colorJob?.isActive != true) lookAtColors() }
+        else {
+            syncPlay()
+            if (S.low) { colorJob?.cancel(); Visuals.setCanvasColors(null) }
+            else if (has && !Visuals.hasCanvasColors && colorJob?.isActive != true) lookAtColors()
+        }
     }
 
     fun syncPlay() {

@@ -375,7 +375,7 @@ class LyricsRenderer {
                     // its room comes and goes at once for where the lyrics are placed; on screen the lines after it slide
                     // over (they jumped by its height in one frame: 133 px at a break's end on a phone on its side)
                     val nh = if (d.a && !d.longBreak) d.hText else 0f
-                    if (nh != d.h && S.lsmooth) { d.dotOff.snap(d.dotOff.value(now) + d.h - nh); d.dotOff.set(0f, now, 550.0, Ease.ease) }
+                    if (nh != d.h && S.lsmooth && !S.low) { d.dotOff.snap(d.dotOff.value(now) + d.h - nh); d.dotOff.set(0f, now, 550.0, Ease.ease) }
                     nh
                 }
                 S.xBgPop && !isStatic && d.bgH > 0 -> d.hText - d.bgH * (1 - d.bgOpen.value(now))
@@ -513,9 +513,10 @@ class LyricsRenderer {
         d.opacity.set(op, t, if (d.dots) 140.0 else dO, eO)
         d.blur.set(bl, t, dB, eB)
         d.fy.set(y, t, dT, eT); d.fx.set(x, t, dT, eT)
-        if (snap) { d.opacity.snap(op); d.blur.snap(bl); d.fy.snap(y); d.fx.snap(x) }
-        if (S.xBgPop) d.bgOpen.set(if (d.a) 1f else 0f, t, 500.0, Ease.eOut) else d.bgOpen.snap(1f)
-        if (d.dots) d.dotOp.set(if (d.a && !d.longBreak) 1f else 0f, t, 140.0, Ease.linear)
+        // (Low performance mode: no fades, no flights)
+        if (snap || S.low) { d.opacity.snap(op); d.blur.snap(bl); d.fy.snap(y); d.fx.snap(x) }
+        if (S.xBgPop) { if (S.low) d.bgOpen.snap(if (d.a) 1f else 0f) else d.bgOpen.set(if (d.a) 1f else 0f, t, 500.0, Ease.eOut) } else d.bgOpen.snap(1f)
+        if (d.dots) { if (S.low) d.dotOp.snap(if (d.a && !d.longBreak) 1f else 0f) else d.dotOp.set(if (d.a && !d.longBreak) 1f else 0f, t, 140.0, Ease.linear) }
     }
 
     /* ---- where the lyrics sit (place / fitLine) ---- */
@@ -632,19 +633,19 @@ class LyricsRenderer {
         return t - el.top
     }
 
-    private fun band(a: Float, b: Float) { val n = now(); bandT.set(a, n, 550.0, Ease.eOut); bandB.set(b, n, 550.0, Ease.eOut) }
+    private fun band(a: Float, b: Float) { val n = now(); val ms = if (S.low) 0.0 else 550.0; bandT.set(a, n, ms, Ease.eOut); bandB.set(b, n, ms, Ease.eOut) }
 
     private fun setLyY(y: Float, t: Double) {
         if (lyFree) return
         // on its side, and a tall line anywhere but the small window: they glide instead of snapping into place, on the
         // words' timing (frame, fitLine); it keeps its speed when the target moves on
-        if (S.lsmooth && !pipScroll() && ((softScroll() && !S.xFocus) || lyTall)) {   // (the Focus style's as upright)
+        if (S.lsmooth && !S.low && !pipScroll() && ((softScroll() && !S.xFocus) || lyTall)) {   // (the Focus style's as upright)
             if (!gliding) { lyG.snap(lyY.value(t)); gliding = true }
             lyG.set(y, t, stepMs)
             return
         }
         if (gliding) { lyY.snap(lyG.value(t)); gliding = false }
-        lyY.set(y, t, if (S.lsmooth) 550.0 else 0.0, Ease.eOut)
+        lyY.set(y, t, if (S.lsmooth && !S.low) 550.0 else 0.0, Ease.eOut)   // (Low performance mode: it jumps)
     }
 
     /* ---- scrolling through the lyrics by hand, as in Spicy Lyrics ---- */
@@ -704,6 +705,8 @@ class LyricsRenderer {
         while (it.hasNext()) {
             val k = it.next(); val d = lv.getOrNull(k)
             if (d == null) { it.remove(); continue }
+            // Low performance mode: a break's dots simply show, without their breathing and filling
+            if (d.dots && S.low) { val on = if (d.a && !d.longBreak) 1f else 0f; if (d.dotScale.v != on) { d.dotScale.snap(on); restDots(d) }; it.remove(); continue }
             d.dirty = true
             if (d.dots) {
                 if (k > li) { restDots(d); it.remove(); continue }
@@ -919,7 +922,7 @@ class LyricsRenderer {
             inner.alpha = op.coerceIn(0f, 1f)
             val blurPx = if (st || lyFree || hush) 0f else d.blur.value(t) * F
             val tapK = ((t - d.tapAt) / 260).coerceIn(0.0, 1.0).toFloat()
-            val sc = if (tapK < 1f) .97f + .03f * Ease.easeOut(tapK.toDouble()).toFloat() else 1f
+            val sc = if (tapK < 1f && !S.low) .97f + .03f * Ease.easeOut(tapK.toDouble()).toFloat() else 1f
             layer.scaleX = sc; layer.scaleY = sc
             layer.pivotOffset = androidx.compose.ui.geometry.Offset(if (d.opp) pad + avail else pad.toFloat(), h / 2f)
             val fx2 = effect(blurPx, d.a && !S.low && !st && !hush); if (layer.renderEffect !== fx2) layer.renderEffect = fx2

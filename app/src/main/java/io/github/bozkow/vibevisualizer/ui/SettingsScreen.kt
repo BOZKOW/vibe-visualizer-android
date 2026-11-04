@@ -344,7 +344,7 @@ private fun pages(): List<Page> = listOf(
         Item.Custom("widget settings lines around romanization translation size song controls progress background darker centred") { WidgetList() },
     ), sub = "Picture-in-picture, home screen widgets", group = 2),
     Page("perf", "Performance & battery", VIcons.bolt, listOf(
-        Item.Sw("low", "Low performance mode"),
+        Item.Sw("low", "Low performance mode", "For a slower or hot phone: no animations, blurs or frost, no moving background, the cover's colours even with a Canvas, 30 frames a second."),
         Item.Sw("aSaverLow", "Low performance mode with Power saving", "Turns on by itself while the phone’s Power saving is on, and off again when it ends (if it came on that way)."),
         Item.Sw("perfAsk", "Suggest Low performance mode when needed", "Watches how smoothly the app runs while a song plays, and how warm the phone is (the battery at 40 °C or more, or Android saying it’s warm: the warning says which). If the phone can’t keep up, gets warm, or the battery is low, a card offers to turn Low performance mode on."),
         Item.Sub("Smoothness"),

@@ -199,7 +199,7 @@ fun PlayerScreen() {
             // one screen: the cover, the lyrics and the bars together (a song without lyrics: the big cover)
             else -> Box(pad.onGloballyPositioned { Frost.cover = it.boundsInWindow() }, contentAlignment = Alignment.TopCenter) {
                 // frosted as on its side: the lyrics run behind all of this now (no cover here: its blurred copy stands for the screen)
-                androidx.compose.runtime.CompositionLocalProvider(LocalFrost provides true) { Box(Modifier.widthIn(max = 600.dp).fillMaxSize()) { LyricsScreen() } }
+                androidx.compose.runtime.CompositionLocalProvider(LocalFrost provides !S.low) { Box(Modifier.widthIn(max = 600.dp).fillMaxSize()) { LyricsScreen() } }
             }
         }
     }
@@ -309,7 +309,7 @@ private val hideCtl = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(
  *  the song centred over it, the lyrics on the right); otherwise the cover as tall as the screen on the left. */
 @Composable
 private fun LandscapeSplit() {
-    androidx.compose.runtime.CompositionLocalProvider(LocalFrost provides true) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalFrost provides !S.low) {   // (Low performance mode: see-through)
         Crossfade(CanvasVideo.cvmode, label = "landcv") { cv -> if (cv) LandscapeCanvas() else LandscapeCover() }
     }
 }
@@ -322,8 +322,8 @@ private fun LandscapeCanvas() {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val st = LandscapeStage(maxWidth.value, maxHeight.value)
         val start = if (cameraOnLeft()) 48.dp else 20.dp   // (as the cover's, without a Canvas)
-        // (the song in its big size and the seek bar as wide as before the stage, 0.44: the owner's wish; the lyrics start after them)
-        val dockW = minOf((maxWidth - 60.dp) * (.85f / 1.85f) * .94f, 480.dp)
+        // (the song in its big size, but the seek bar and the buttons at the stage's width: wider, as on 0.45.1, looked worse to the owner)
+        val dockW = maxOf(st.solid.dp - start, 220.dp)
         Row(Modifier.fillMaxSize().padding(start = start, end = maxOf(st.lyricsEndGap.dp, 8.dp), top = 8.dp, bottom = 8.dp)) {
             Column(Modifier.width(dockW).fillMaxHeight().ambientOut()) {
                 TopBar(side = true)
@@ -568,7 +568,7 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
     Box(Modifier.fillMaxWidth().onSizeChanged { boxW = it.width }, contentAlignment = align) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) { Icon(icon, null, Modifier.size(12.dp), tint = color); Spacer(Modifier.width(5.dp)) }
-            if (!S.b("aMarquee")) Text(text, Modifier.weight(1f, fill = false), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!S.b("aMarquee") || S.low) Text(text, Modifier.weight(1f, fill = false), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
             else Text(text, Modifier.weight(1f, fill = false).then(if (over) Modifier.fadeSides(10.dp, 14.dp) else Modifier).basicMarquee(iterations = if (E.settingsPage == null) Int.MAX_VALUE else 0, initialDelayMillis = 2500)
                 .then(if (over) Modifier.padding(start = 10.dp) else Modifier),
                 fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
@@ -734,7 +734,7 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
     var boxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var textW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
     val over = boxW > 0 && textW > boxW
-    if (!S.b("aMarquee")) {   // Settings → Player screen → Scroll long names, off: it ends in "…"
+    if (!S.b("aMarquee") || S.low) {   // Settings → Player screen → Scroll long names, off (or Low performance mode): it ends in "…"
         Text(text, style = TextStyle(shadow = textShadow), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
         return
     }
@@ -1045,7 +1045,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     val behindLyrics = !wide && E.screen == "lyrics" && !noLyrics()
     val a by animateFloatAsState(if (!CanvasVideo.cvmode) 0f else if (behindLyrics) S.i("cvLyrA").coerceIn(0, 80) / 100f else 1f, if (stage != null) tween(900, easing = androidx.compose.animation.core.CubicBezierEasing(.23f, 1f, .32f, 1f)) else tween(800), label = "canvas")
     // Spicy Lyrics' stage: a veil that deepens while the controls show
-    val ctl by animateFloatAsState(if (E.uiHidden) 0f else 1f, tween(300), label = "cvctl")
+    val ctl by animateFloatAsState(if (E.uiHidden) 0f else 1f, if (S.low) tween(0) else tween(300), label = "cvctl")
     // side by side without lyrics, the video glides to the middle and fades out on both sides (moved, not laid out
     // again: the video's crop is set for its size)
     val c by animateFloatAsState(if (centred) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else tween(700, easing = FastOutSlowInEasing), label = "cvcentre")
@@ -1073,8 +1073,9 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     val sideR = with(d) { 28.dp.toPx() }
     val soft = wide && stage == null && !S.low && c <= 0f && !E.quiet
     val stageW = stage?.let { stageStart + it.width.dp }; val featherPx = stage?.let { with(d) { it.feather.dp.toPx() } } ?: 0f
-    // (.75: translucent, so the blurred backdrop carries through the video and the two read as one surface)
-    Box((if (stageW != null) Modifier.fillMaxHeight().width(stageW) else if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f) * (if (stage != null) .75f else 1f))
+    // (.75: translucent, so the blurred backdrop carries through the video and the two read as one surface; Low performance mode has
+    // no such backdrop, and it was the cover's colours that came through)
+    Box((if (stageW != null) Modifier.fillMaxHeight().width(stageW) else if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f) * (if (stage != null && !S.low) .75f else 1f))
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.22f / .56f) * c }.drawWithContent {
             drawContent()
             // as dark at the top (behind the status bar and the top bar) as behind the controls at the bottom
@@ -1159,7 +1160,7 @@ private val EASE_A = floatArrayOf(1f, .9f, .66f, .38f, .14f, 0f)
  *  stretched back, which is cheap, unlike a full-screen blur every frame. */
 @Composable
 private fun CanvasVideoView() {
-    if (S.b("cvBlur")) BoxWithConstraints(Modifier.fillMaxSize()) {
+    if (S.b("cvBlur") && !S.low) BoxWithConstraints(Modifier.fillMaxSize()) {
         val fw = constraints.maxWidth; val fh = constraints.maxHeight
         val sw = (fw / 4).coerceAtLeast(1); val sh = (fh / 4).coerceAtLeast(1)
         val r = S.i("cvBlurAmt").coerceIn(5, 100) / 100f * 14f   // in quarter-size pixels: up to ~56 on the screen

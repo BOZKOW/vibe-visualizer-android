@@ -88,7 +88,8 @@ fun BackgroundLayer(modifier: Modifier = Modifier) {
     // recorded as it's drawn, so what's frosted upright can show it too (FrostBack)
     val seen = rememberGraphicsLayer()
     DisposableEffect(seen) { Frost.bg = seen; onDispose { if (Frost.bg === seen) Frost.bg = null } }
-    Box(modifier.fillMaxSize().drawWithContent { seen.record { this@drawWithContent.drawContent() }; drawLayer(seen) }.background(Bg)) {
+    val low = S.low   // (no frost there)
+    Box(modifier.fillMaxSize().drawWithContent { if (low) drawContent() else { seen.record { this@drawWithContent.drawContent() }; drawLayer(seen) } }.background(Bg)) {
         if (cvA < 1f) Box(Modifier.fillMaxSize()) {
             when {
                 style == "dynamic" && !S.low -> if (Build.VERSION.SDK_INT >= 33) LiquidBackground() else LayersBackground()
@@ -216,7 +217,11 @@ private fun StillBackground() {
     val bm = Background.still ?: return
     val img = remember(bm) { bm.asImageBitmap() }
     val m = remember(S.bri, S.sat) { ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) } }
-    Image(img, null, Modifier.fillMaxSize().scale(1.12f).blur((S.bgblur * .6f).dp), contentScale = ContentScale.Crop, colorFilter = ColorFilter.colorMatrix(m))
+    // (Low performance mode, no blur: a tiny copy stretched over the screen is as soft)
+    val low = S.low
+    val tiny = remember(bm, low) { if (low) Bitmap.createScaledBitmap(bm, 32, 32, true).asImageBitmap() else null }
+    if (tiny != null) Image(tiny, null, Modifier.fillMaxSize().scale(1.12f), contentScale = ContentScale.Crop, colorFilter = ColorFilter.colorMatrix(m), filterQuality = FilterQuality.Low)
+    else Image(img, null, Modifier.fillMaxSize().scale(1.12f).blur((S.bgblur * .6f).dp), contentScale = ContentScale.Crop, colorFilter = ColorFilter.colorMatrix(m))
 }
 
 /** The Canvas video, blurred, as the background behind everything: [vid] (the video as the player draws it, recorded)
