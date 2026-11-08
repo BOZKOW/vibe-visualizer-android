@@ -184,7 +184,7 @@ object AnimatedCover {
     private val cache by lazy { SimpleCache(File(Vibe.app.cacheDir, "motion"), LeastRecentlyUsedCacheEvictor(150L shl 20), CanvasVideo.cacheDb) }   // a loop is a few MB
 
     private val listener = object : Player.Listener {
-        override fun onRenderedFirstFrame() { ready = true }
+        override fun onRenderedFirstFrame() { ready = true; colors.start() }
         override fun onVideoSizeChanged(s: VideoSize) {
             if (s.width > 0 && s.height > 0) { vw = s.width.toFloat(); vh = s.height.toFloat(); aspect = vw * s.pixelWidthHeightRatio / vh; view?.get()?.let(::fit) }
         }
@@ -208,18 +208,25 @@ object AnimatedCover {
         }
     }
 
+    /** Its colours for the bars (under the Canvas's, when one plays): kept while it moves from one cover to another. */
+    private val colors = FrameColors({ view?.get() }, { player?.isPlaying == true }) { stale = false; Visuals.setMotionColors(it) }
+    private var stale = false   // another song came since its colours were found: they go with its cover
+
+    /** Another song (or the same one again): what it found goes when its cover does; one that stays looks again. */
+    fun newSong() { if (view?.get() != null && ready) { stale = true; colors.start() } else colors.stop() }
+
     /** A cover shows [url] in [tv] (another cover may have been showing it). */
     fun attach(tv: TextureView, url: String) {
         val p = ensure()
         if (view?.get() !== tv) { view?.get()?.removeOnLayoutChangeListener(fit); view = WeakReference(tv); ready = false; p.setVideoTextureView(tv); tv.addOnLayoutChangeListener(fit) }
-        if (url != cur) { cur = url; ready = false; aspect = 1f; p.setMediaItem(MediaItem.fromUri(url)); p.prepare() }
+        if (url != cur) { if (cur != null) colors.stop(); stale = false; cur = url; ready = false; aspect = 1f; p.setMediaItem(MediaItem.fromUri(url)); p.prepare() }
         sync()
     }
 
     /** That cover is going away: only lets go if it's the one the video plays in. */
     fun detach(tv: TextureView) {
         if (view?.get() !== tv) return
-        tv.removeOnLayoutChangeListener(fit); view = null; ready = false
+        tv.removeOnLayoutChangeListener(fit); view = null; ready = false; colors.stop(clear = stale); stale = false
         player?.clearVideoTextureView(tv); player?.pause()
     }
 
@@ -235,5 +242,5 @@ object AnimatedCover {
         val s = max(w / vw, h / vh); tv.setTransform(Matrix().apply { setScale(vw * s / w, vh * s / h, w / 2, h / 2) })
     }
 
-    fun release() { player?.release(); player = null; cur = null; ready = false }
+    fun release() { colors.stop(); player?.release(); player = null; cur = null; ready = false }
 }

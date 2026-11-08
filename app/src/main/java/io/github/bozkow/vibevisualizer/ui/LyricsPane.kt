@@ -207,17 +207,23 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         var dragged = false; var lastY = down.position.y; val slop = 8.dp.toPx()
+                        // only a quick tap with one finger that stays put jumps to a line: not one held (the phone gripped), slid
+                        // sideways, or with another finger or a palm on the screen too
+                        var stray = false; var upAt = down.uptimeMillis
                         val idx = view.lineAt(down.position.y); view.pressed = idx; view.dragged = false; view.bump()
                         while (true) {
                             val ev = awaitPointerEvent(); val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                            if (ev.changes.count { it.pressed } > 1) stray = true
+                            upAt = ch.uptimeMillis
                             if (!ch.pressed) break
                             val dy = ch.position.y - lastY
                             if (!dragged && abs(ch.position.y - down.position.y) > slop) { dragged = true; view.dragged = true; view.pressed = -1; E.poke() }
+                            if (!dragged && abs(ch.position.x - down.position.x) > slop * 2) { stray = true; view.pressed = -1 }
                             if (dragged) { view.freeBy(dy); lastY = ch.position.y; ch.consume() }
-                            else if (ch.positionChange() != Offset.Zero) Unit
                         }
                         view.pressed = -1; view.bump()
-                        if (!dragged && idx >= 0 && !E.wakeTap) Lyr.tap(idx)
+                        val quick = upAt - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
+                        if (!dragged && !stray && quick && idx >= 0 && !E.wakeTap) Lyr.tap(idx)
                         view.dragged = false
                     }
                 }) {

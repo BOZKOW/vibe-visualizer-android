@@ -8,12 +8,16 @@ import java.util.Locale
 object Match {
     /** A name with case, accents, "&" and punctuation evened out. */
     fun key(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFKD)
-        .replace(Regex("\\p{M}+"), "")
+        .replace(MARKS, "")
         .lowercase(Locale.ROOT)
         .replace("&", " and ")
-        .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+        .replace(NOT_WORD, " ")
         .trim()
-        .replace(Regex("\\s+"), " ")
+        .replace(SPACES, " ")
+    // made once, not on every call: a song change checks tens of names, on the main thread
+    private val MARKS = Regex("\\p{M}+")
+    private val NOT_WORD = Regex("[^\\p{L}\\p{N}]+")
+    private val SPACES = Regex("\\s+")
 
     private val SEPARATOR = Regex("\\s+[-–—]\\s+")
     private val TRAILING_BRACKETS = Regex("\\s*[(\\[][^()\\[\\]]*[)\\]]\\s*$")

@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.toPath
+import kotlin.math.roundToInt
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -66,14 +68,15 @@ fun WavySeek(frac: Float, wavy: Boolean, onDrag: (Float) -> Unit, onDone: (Float
     val amp by animateFloatAsState(if (wavy) 1f else 0f, tween(450), label = "amp")
     val drag by rememberUpdatedState(onDrag); val done by rememberUpdatedState(onDone)
     var last by remember { mutableFloatStateOf(0f) }
+    val pct = (frac.coerceIn(0f, 1f) * 100).roundToInt()   // what TalkBack reads (see ThickSeek)
     Canvas(Modifier.fillMaxWidth().height(30.dp)
         .semantics {
-            contentDescription = "Seek"; progressBarRangeInfo = ProgressBarRangeInfo(frac, 0f..1f)
+            contentDescription = "Seek"; progressBarRangeInfo = ProgressBarRangeInfo(pct / 100f, 0f..1f)
             if (enabled) setProgress { v -> done(v.coerceIn(0f, 1f)); true }
         }
         .pointerInput(enabled) {
             if (!enabled) return@pointerInput
-            detectTapGestures { o -> done((o.x / size.width).coerceIn(0f, 1f)) }
+            detectTapGestures(onLongPress = { }) { o -> done((o.x / size.width).coerceIn(0f, 1f)) }   // (held and let go: no seek)
         }
         .pointerInput(enabled) {
             if (!enabled) return@pointerInput
@@ -101,12 +104,17 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
     val drag by rememberUpdatedState(onDrag); val done by rememberUpdatedState(onDone)
     val clip = remember { Path() }   // [under]: what the track shows instead of what's behind it (Frost)
     var last by remember { mutableFloatStateOf(0f) }
+    // what TalkBack reads, in whole percent: it changes every second or two, not every frame. Each change makes Compose
+    // go over the whole screen again for accessibility, and with any accessibility service on (a lot of phones have one)
+    // that took a third of the phone's time and made every animation stutter
+    val now by rememberUpdatedState(frac)
+    val pct by remember { derivedStateOf { (now().coerceIn(0f, 1f) * 100).roundToInt() } }
     Canvas(modifier.fillMaxWidth().height(30.dp)
         .semantics {
-            contentDescription = "Seek"; progressBarRangeInfo = ProgressBarRangeInfo(frac(), 0f..1f)
+            contentDescription = "Seek"; progressBarRangeInfo = ProgressBarRangeInfo(pct / 100f, 0f..1f)
             if (enabled) setProgress { v -> done(v.coerceIn(0f, 1f)); true }
         }
-        .pointerInput(enabled) { if (!enabled) return@pointerInput; detectTapGestures { o -> done((o.x / size.width).coerceIn(0f, 1f)) } }
+        .pointerInput(enabled) { if (!enabled) return@pointerInput; detectTapGestures(onLongPress = { }) { o -> done((o.x / size.width).coerceIn(0f, 1f)) } }   // (held and let go: no seek)
         .pointerInput(enabled) {
             if (!enabled) return@pointerInput
             detectHorizontalDragGestures(onDragStart = { o -> last = (o.x / size.width).coerceIn(0f, 1f); drag(last) }, onDragEnd = { done(last) }, onDragCancel = { done(last) }) { ch, _ ->

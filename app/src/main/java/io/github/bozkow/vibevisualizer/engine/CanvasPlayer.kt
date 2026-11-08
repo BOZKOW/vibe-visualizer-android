@@ -88,36 +88,13 @@ object CanvasVideo {
 
     val hasVideo get() = url != null && ready
 
-    /** The video's colors for the bars and the app's accent. A look at it now and then, never all the time: copying a frame back
-     *  from the GPU holds up the frame being drawn (0.35.0 did it 12 times a second, and the lyrics stuttered). Three looks over
-     *  a few seconds, as many videos fade in from black; black ones don't count. */
-    private var colorJob: Job? = null
-    private fun lookAtColors() {
-        colorJob?.cancel()
-        if (S.low) return   // (Low performance mode: the cover's colours, with no frames copied back)
-        colorJob = Vibe.scope.launch {
-            val w = 48; val h = 85; val frames = ArrayList<Bitmap>()
-            for (wait in longArrayOf(800, 1700, 2500)) {
-                delay(wait)
-                val f = view?.get()?.takeIf { it.isAvailable }?.getBitmap(w, h) ?: continue
-                if (litEnough(f)) {
-                    frames.add(f)
-                    val all = Bitmap.createBitmap(w * frames.size, h, Bitmap.Config.ARGB_8888)
-                    android.graphics.Canvas(all).let { c -> frames.forEachIndexed { i, b -> c.drawBitmap(b, (i * w).toFloat(), 0f, null) } }
-                    Visuals.setCanvasColors(all)
-                }
-            }
-        }
-    }
-
-    private fun litEnough(b: Bitmap): Boolean {
-        val px = IntArray(b.width * b.height); b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
-        return px.sumOf { p -> ((p shr 16 and 255) + (p shr 8 and 255) + (p and 255)).toLong() } / (3.0 * 255 * px.size) > .04
-    }
+    /** The video's colours for the bars and the app's accent (what's on screen, instead of the cover's). */
+    private val colors = FrameColors({ view?.get() }, { player?.isPlaying == true }, Visuals::setCanvasColors)
+    private fun lookAtColors() = colors.start()
 
     fun clear(keepLayout: Boolean) {
         url = null; ready = false; active = false; spicyId = null
-        colorJob?.cancel(); Visuals.setCanvasColors(null)
+        colors.stop(); AnimatedCover.newSong()
         player?.let { it.stop(); it.clearMediaItems() }
         cvlive = false
         if (!keepLayout) cvmode = false
@@ -215,11 +192,11 @@ object CanvasVideo {
         val has = hasVideo
         cvmode = S.canvasOn && has
         cvlive = S.canvasOn && has && !S.low
-        if (!S.canvasOn) { player?.pause(); colorJob?.cancel(); Visuals.setCanvasColors(null) }
+        if (!S.canvasOn) { player?.pause(); colors.stop() }
         else {
             syncPlay()
-            if (S.low) { colorJob?.cancel(); Visuals.setCanvasColors(null) }
-            else if (has && !Visuals.hasCanvasColors && colorJob?.isActive != true) lookAtColors()
+            if (S.low) colors.stop()
+            else if (has && !Visuals.hasCanvasColors && !colors.running) lookAtColors()
         }
     }
 

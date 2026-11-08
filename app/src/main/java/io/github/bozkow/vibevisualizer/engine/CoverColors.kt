@@ -120,6 +120,14 @@ object Visuals {
         canvasBars = c; palDirty = true
     }
 
+    /** The same from an animated cover that plays (under the Canvas's: that's what's behind everything when it plays). */
+    private var motionBars: List<IntArray>? = null
+    fun setMotionColors(img: Bitmap?) {
+        val c = img?.let { i -> runCatching { extract(i).second }.getOrNull() }
+        if (c == null && motionBars == null) return
+        motionBars = c; palDirty = true
+    }
+
     var quietVer = -1; private set   // a cover that changes without its animation (the same picture, sharper)
 
     fun setCover(img: Bitmap?, quiet: Boolean = false) {
@@ -135,7 +143,7 @@ object Visuals {
     /* ---- palette + bands ---- */
     fun buildPal() {
         val n = Audio.N
-        val st: List<IntArray> = when (S.str("theme")) { "cover" -> canvasBars ?: barCols; "custom" -> listOf(hex(S.str("c1")), hex(S.str("c2"))); else -> (STOPS[S.str("theme")] ?: STOPS.getValue("aurora")).map(::hex) }
+        val st: List<IntArray> = when (S.str("theme")) { "cover" -> canvasBars ?: motionBars ?: barCols; "custom" -> listOf(hex(S.str("c1")), hex(S.str("c2"))); else -> (STOPS[S.str("theme")] ?: STOPS.getValue("aurora")).map(::hex) }
         val to = Array(n) { i ->
             val t = if (n > 1) i.toDouble() / (n - 1) else 0.0; val f = t * (st.size - 1); val j = min(floor(f).toInt(), st.size - 2).coerceAtLeast(0); val u = f - j
             val a = st[j]; val b = st[min(j + 1, st.size - 1)]
@@ -244,6 +252,7 @@ object Visuals {
                     }
                     b
                 }
+                pb.prepareToDraw(); kw.prepareToDraw(); sp.forEach { it.prepareToDraw() }   // to the graphics card before they're drawn
                 Triple(pb, kw, sp)
             } }.onFailure { if (it !is kotlinx.coroutines.CancellationException) android.util.Log.w("VV", "background: $it") }.getOrNull() ?: return@launch
             if (fade && baked != null && !S.low) { bakedPrev = baked; spritesPrev = sprites.copyOf(); fadeAt = now() } else { bakedPrev = null; fadeAt = 0.0 }

@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -224,7 +223,7 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
             // upright it grows to Apple's tall shape while a tall animated cover plays (Spicy Lyrics Mobile 0.19.0)
             if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(bigCoverShape(), matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp, tall = true)
         }
-        if (S.view == "both") Box(Modifier.bleedX(24.dp)) { ExtraBars(Modifier.fillMaxWidth().height(64.dp).padding(bottom = 6.dp)) }   // (edge to edge, out of the margins; 48 dp tall until 0.46.1)
+        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(64.dp).padding(bottom = 6.dp))   // (48 dp tall until 0.46.1; edge to edge in 0.46.2 only, the owner preferred it inside the margins)
         SongInfo(big = true, note = noLyricsNote)
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column { Transport(big = true); if (S.b("volshow")) VolumeRow(); BottomBar() }
@@ -260,7 +259,7 @@ private fun LyricsWithLyrics() {
                 CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
         }
-        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp))   // (edge to edge: 12 dp in from the sides until 0.46.1)
+        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
         Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true, restCover = rest) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
@@ -577,7 +576,7 @@ private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: Im
         } else Modifier.height(32.dp))
         .graphicsLayer { alpha = if (at == null) 0f else 1f }) {
         // each in the middle of its side
-        AnimatedContent(top to topIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw).then(if (onTopClick != null) Modifier.clickable { E.haptic(); onTopClick() } else Modifier), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { (t, ic) ->
+        AnimatedContent(top to topIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw).then(if (onTopClick != null) Modifier.quickClick(null, indication = androidx.compose.material3.ripple()) { E.haptic(); onTopClick() } else Modifier), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { (t, ic) ->
             TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic, bleedL = outerL)
         }
         AnimatedContent(dev to devIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(rx.roundToInt(), 0) }.width(rw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { (t, ic) ->
@@ -605,7 +604,7 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
             val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
             val m = if (over) Modifier.edgeMarquee(bleedL, bleedR, if (bleedL > 0.dp) 12.dp else 10.dp, if (bleedR > 0.dp) 16.dp else 14.dp, iter)
                 .then(if (bleedL > 0.dp) Modifier else Modifier.padding(start = 10.dp))
-                else Modifier.basicMarquee(iterations = iter, initialDelayMillis = 2500)
+                else Modifier.pingPong(iter)
             Box(m) {
                 Row(Modifier.onSizeChanged { rowW = it.width }, verticalAlignment = Alignment.CenterVertically) {
                     if (icon != null) { Icon(icon, null, Modifier.size(12.dp), tint = color); Spacer(Modifier.width(5.dp)) }
@@ -722,7 +721,7 @@ private fun NoticeText(text: androidx.compose.ui.text.AnnotatedString, size: and
     val over = maxW > 0 && textW > maxW
     val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
     Text(text, Modifier.layout { m, c -> if (c.hasBoundedWidth && c.maxWidth != maxW) maxW = c.maxWidth; val pl = m.measure(c); layout(pl.width, pl.height) { pl.place(0, 0) } }
-        .then(if (over) Modifier.edgeMarquee(16.dp, 16.dp, 12.dp, 12.dp, iter) else Modifier.basicMarquee(iterations = iter, initialDelayMillis = 2500)),
+        .then(if (over) Modifier.edgeMarquee(16.dp, 16.dp, 12.dp, 12.dp, iter) else Modifier.pingPong(iter)),
         fontSize = size, fontWeight = weight, color = color, maxLines = 1, softWrap = false, textAlign = TextAlign.Center, onTextLayout = { textW = it.size.width })
 }
 
@@ -813,7 +812,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
     }
 }
 
-/** A name that scrolls on and on when it's too long for its row, fading out at both sides (it rests under Settings). */
+/** A name that slides to its end and back when it's too long for its row, fading out at both sides (it rests under Settings). */
 @Composable
 private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp,
                       bleedL: Dp = 0.dp, bleedR: Dp = 0.dp) {
@@ -830,7 +829,7 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
     // [bleedR]). A name that fits isn't moved (a centred one would sit off centre)
     val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
     val scroll = if (over) Modifier.edgeMarquee(if (bleedL > 0.dp) bleedL else 20.dp, bleedR, if (bleedL > 0.dp) 14.dp else 20.dp, if (bleedR > 0.dp) 18.dp else 28.dp, iter)
-        else Modifier.basicMarquee(iterations = iter, initialDelayMillis = 2500)
+        else Modifier.pingPong(iter)
     Box(Modifier.onSizeChanged { boxW = it.width }) {
         Text(text, scroll, style = TextStyle(shadow = textShadow),
             fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
@@ -844,10 +843,11 @@ private fun LikeButton() {
     val pop = remember { Animatable(1f) }
     LaunchedEffect(liked) { if (liked && !S.low && !E.reduceMotion()) { pop.snapTo(.6f); pop.animateTo(1f, spring(.35f, Spring.StiffnessMedium)) } }
     // the icon's edge lines up with the title's right edge (the touch area reaches past it)
-    IconButton(onClick = { E.haptic(); Spotify.toggleLike() }, enabled = Spotify.meta?.ep == false,
-        modifier = Modifier.offset(x = 12.dp).semantics { contentDescription = if (liked) "Remove from Liked Songs" else "Save to Liked Songs" }) {
+    val ok = Spotify.meta?.ep == false
+    Box(Modifier.offset(x = 12.dp).size(48.dp).clip(CircleShape).quickClick(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, ok, androidx.compose.material3.ripple()) { E.haptic(); Spotify.toggleLike() }
+        .semantics { contentDescription = if (liked) "Remove from Liked Songs" else "Save to Liked Songs" }, contentAlignment = Alignment.Center) {
         Icon(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, null, Modifier.size(28.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value },
-            tint = if (liked) Color(0xFF1ED760) else Color.White)
+            tint = (if (liked) Color(0xFF1ED760) else Color.White).let { if (ok) it else it.copy(alpha = .38f) })
     }
 }
 
@@ -940,8 +940,7 @@ private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp
     // off: frosted glass (GlassFill and GlassEdge, as the seek bar's track)
     Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).frosted().background(Color.White.copy(alpha = .12f + .8f * k))
         .border(1.dp, Color.White.copy(alpha = .22f + .7f * k), CircleShape)
-        .then(if (onLongClick == null) Modifier.clickable(src, androidx.compose.material3.ripple(), enabled = enabled) { E.haptic(); onClick() }
-            else Modifier.combinedClickable(src, androidx.compose.material3.ripple(), enabled = enabled, onLongClick = { E.haptic(); onLongClick() }) { E.haptic(); onClick() })
+        .quickClick(src, enabled, androidx.compose.material3.ripple(), onHold = onLongClick?.let { h -> { E.haptic(); h() } }) { E.haptic(); onClick() }
         .semantics { contentDescription = desc; selected = on }, contentAlignment = Alignment.Center) {
         if (icon != null) Icon(icon, null, Modifier.size(d * .42f), tint = fg)
         else Text(text ?: "", fontSize = (d.value * .3f).sp, fontWeight = FontWeight.Bold, color = fg)
@@ -957,14 +956,15 @@ private fun CtlIcon(icon: ImageVector, desc: String, size: Dp = 24.dp, enabled: 
     // previous / next ([nudge] -1 / 1): the arrows slide out the way you skip, fading, and spring back in from the other side
     val k = remember { Animatable(0f) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    IconButton(onClick = {
-        E.haptic(); onClick()
-        if (nudge != 0 && !Pop.calm) scope.launch { k.snapTo(0f); k.animateTo(1f, tween(130, easing = androidx.compose.animation.core.FastOutLinearInEasing)); k.snapTo(-1f); k.animateTo(0f, spring(.62f, 520f)) }
-    }, enabled = enabled, interactionSource = src, modifier = Modifier.size(maxOf(48.dp, size + 12.dp)).pressScale(src, .86f)
-        .semantics { contentDescription = desc; if (dot) selected = on },
-        colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent, contentColor = tint, disabledContentColor = Color.White.copy(alpha = .3f))) {
+    // (a round button as IconButton is, but only a quick tap counts: quickClick)
+    Box(Modifier.size(maxOf(48.dp, size + 12.dp)).pressScale(src, .86f).clip(CircleShape)
+        .quickClick(src, enabled, androidx.compose.material3.ripple()) {
+            E.haptic(); onClick()
+            if (nudge != 0 && !Pop.calm) scope.launch { k.snapTo(0f); k.animateTo(1f, tween(130, easing = androidx.compose.animation.core.FastOutLinearInEasing)); k.snapTo(-1f); k.animateTo(0f, spring(.62f, 520f)) }
+        }
+        .semantics { contentDescription = desc; if (dot) selected = on }, contentAlignment = Alignment.Center) {
         Icon(icon, null, Modifier.size(size).graphicsLayer { val x = k.value; translationX = x * nudge * size.toPx() * .38f; alpha = 1f - kotlin.math.abs(x) * .9f }
-            .drawWithContent { drawContent(); if (dk > .01f) drawCircle(tint, 2.2.dp.toPx() * dk.coerceAtMost(1.2f), Offset(this.size.width / 2, this.size.height + 5.dp.toPx()), alpha = dk.coerceIn(0f, 1f)) })
+            .drawWithContent { drawContent(); if (dk > .01f) drawCircle(tint, 2.2.dp.toPx() * dk.coerceAtMost(1.2f), Offset(this.size.width / 2, this.size.height + 5.dp.toPx()), alpha = dk.coerceIn(0f, 1f)) }, tint = if (enabled) tint else Color.White.copy(alpha = .3f))
     }
 }
 
@@ -977,7 +977,7 @@ private fun PlayButton(size: Dp) {
     val pop = remember { Animatable(1f) }
     LaunchedEffect(playing) { if (!S.low && !E.reduceMotion()) { pop.snapTo(.86f); pop.animateTo(1f, spring(.45f, Spring.StiffnessMedium)) } }
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    Box(Modifier.size(size).pressScale(src, .88f).clip(CircleShape).clickable(src, androidx.compose.material3.ripple()) { E.haptic(); E.toggle() }.semantics { contentDescription = if (playing) "Pause" else "Play" }, contentAlignment = Alignment.Center) {
+    Box(Modifier.size(size).pressScale(src, .88f).clip(CircleShape).quickClick(src, indication = androidx.compose.material3.ripple()) { E.haptic(); E.toggle() }.semantics { contentDescription = if (playing) "Pause" else "Play" }, contentAlignment = Alignment.Center) {
         // play and pause swap with a quick scale and fade
         // play and pause swap with a quarter turn, a springy scale and a fade
         AnimatedContent(playing, transitionSpec = {

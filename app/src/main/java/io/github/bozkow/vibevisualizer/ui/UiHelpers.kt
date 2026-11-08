@@ -1,5 +1,9 @@
 package io.github.bozkow.vibevisualizer.ui
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.composed
 import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabColorSchemeParams
@@ -22,7 +26,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.layout.layout
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -158,6 +161,15 @@ fun Modifier.fadeEdges(top: Dp = 28.dp, bottom: Dp = 0.dp): Modifier = this
 @Composable fun Modifier.statusBarsSpace(): Modifier = windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
 @Composable fun Modifier.navBarsSpace(): Modifier = windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility)
 
+/** A click only a quick tap makes. Held past the long-press time, it's let go without doing anything: an accidental touch
+ *  (the phone gripped, a palm or a resting thumb lifted off a button) is a long one, and it skipped or paused the song.
+ *  [onHold]: what holding it does instead, if anything (with its buzz). */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun Modifier.quickClick(src: androidx.compose.foundation.interaction.MutableInteractionSource?, enabled: Boolean = true,
+                        indication: androidx.compose.foundation.Indication? = null, onHold: (() -> Unit)? = null, onClick: () -> Unit): Modifier =
+    this.combinedClickable(src, indication, enabled = enabled, role = Role.Button, onLongClick = onHold ?: {}, hapticFeedbackEnabled = false,
+        onClick = onClick)
+
 /** A press you can feel: the thing shrinks a little while it's held and springs back (no motion with reduced motion). */
 @Composable
 fun Modifier.pressScale(src: androidx.compose.foundation.interaction.InteractionSource, to: Float = .9f): Modifier {
@@ -168,8 +180,9 @@ fun Modifier.pressScale(src: androidx.compose.foundation.interaction.Interaction
     return this.graphicsLayer { scaleX = k; scaleY = k }
 }
 
-/** A marquee that reaches [bleedStart] and [bleedEnd] past its own box (out to the screen's sides, 0.46.1), fading out over
- *  [fadeStart] and [fadeEnd] there. At rest what scrolls starts where it would without it, its first letter whole. */
+/** Scrolling that reaches [bleedStart] and [bleedEnd] past its own box (out to the screen's sides, 0.46.1), fading out over
+ *  [fadeStart] and [fadeEnd] there. At rest what scrolls starts where it would without it, its first letter whole; it goes
+ *  there and back ([pingPong]), its last letter coming to rest just before the fade at the end. */
 fun Modifier.edgeMarquee(bleedStart: Dp, bleedEnd: Dp, fadeStart: Dp, fadeEnd: Dp, iterations: Int): Modifier = this
     .layout { m, c ->
         val l = bleedStart.roundToPx(); val r = bleedEnd.roundToPx()
@@ -178,8 +191,39 @@ fun Modifier.edgeMarquee(bleedStart: Dp, bleedEnd: Dp, fadeStart: Dp, fadeEnd: D
         layout(w, p.height) { p.place(-l, 0) }
     }
     .fadeSides(fadeStart, fadeEnd)
-    .basicMarquee(iterations = iterations, initialDelayMillis = 2500)
+    .pingPong(iterations, endGap = fadeEnd)
     .padding(start = bleedStart)
+
+/** Text too long for its room slides left until its end shows ([endGap] short of the edge: clear of a fade there), waits,
+ *  and slides back to where it started, again and again ([iterations] times; 0: it stays at its start). Not round and off
+ *  the side as a marquee: the start and the end are always on screen, one after the other. Text that fits stays put. */
+fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 2500): Modifier = composed {
+    val x = remember { androidx.compose.animation.core.Animatable(0f) }
+    var travel by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val dens = androidx.compose.ui.platform.LocalDensity.current
+    val calm = S.low || io.github.bozkow.vibevisualizer.engine.E.reduceMotion()
+    LaunchedEffect(travel, iterations, calm) {
+        if (travel <= 0) x.snapTo(0f) else if (x.value != 0f) x.animateTo(0f, androidx.compose.animation.core.tween(500))
+        if (travel <= 0 || iterations <= 0 || calm) return@LaunchedEffect
+        // about 36 dp a second, easing in and out at the ends
+        val ms = (travel / with(dens) { 36.dp.toPx() } * 1000).toInt().coerceIn(700, 15000)
+        val ease = androidx.compose.animation.core.tween<Float>(ms, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+        repeat(iterations) {
+            kotlinx.coroutines.delay(delayMillis.toLong())
+            x.animateTo(-travel.toFloat(), ease)
+            kotlinx.coroutines.delay(1800)
+            x.animateTo(0f, ease)
+        }
+    }
+    clipToBounds().layout { m, c ->
+        val p = m.measure(c.copy(minWidth = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
+        val w = (if (c.hasBoundedWidth) p.width.coerceAtMost(c.maxWidth) else p.width).coerceAtLeast(c.minWidth)
+        val t = if (p.width > w) p.width - w + endGap.roundToPx() else 0
+        if (t != travel) travel = t
+        // moved by the layer only: a frame of sliding redraws it, nothing is measured or placed again
+        layout(w, p.height) { p.placeWithLayer(0, 0) { translationX = x.value } }
+    }
+}
 
 /** Out past the side margins by [by] on each side (the bars, to the screen's edges: 0.46.1). */
 fun Modifier.bleedX(by: Dp): Modifier = this.layout { m, c ->

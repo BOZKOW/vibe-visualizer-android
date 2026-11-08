@@ -42,6 +42,9 @@ object Images {
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
             var s = 1; while (o.outWidth / (s * 2) >= max && o.outHeight / (s * 2) >= max) s *= 2
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = s; inPreferredConfig = Bitmap.Config.ARGB_8888 })
+                // on to the graphics card now, in the background: else it went there in the first frame that drew it, and the
+                // song change stuttered
+                ?.also { it.prepareToDraw() }
         }.getOrNull()
     }
 
