@@ -224,7 +224,7 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
             // upright it grows to Apple's tall shape while a tall animated cover plays (Spicy Lyrics Mobile 0.19.0)
             if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(bigCoverShape(), matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp, tall = true)
         }
-        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(48.dp).padding(bottom = 6.dp))
+        if (S.view == "both") Box(Modifier.bleedX(24.dp)) { ExtraBars(Modifier.fillMaxWidth().height(64.dp).padding(bottom = 6.dp)) }   // (edge to edge, out of the margins; 48 dp tall until 0.46.1)
         SongInfo(big = true, note = noLyricsNote)
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column { Transport(big = true); if (S.b("volshow")) VolumeRow(); BottomBar() }
@@ -260,7 +260,7 @@ private fun LyricsWithLyrics() {
                 CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
         }
-        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
+        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp))   // (edge to edge: 12 dp in from the sides until 0.46.1)
         Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true, restCover = rest) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
             Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
@@ -520,7 +520,7 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
 @Composable
 private fun NoticeGap(home: Boolean) {
     val on = E.notices(home).isNotEmpty()
-    val h by androidx.compose.animation.core.animateDpAsState(if (on) 56.dp else 0.dp,
+    val h by androidx.compose.animation.core.animateDpAsState(if (on) 60.dp else 0.dp,
         if (S.low || E.reduceMotion()) tween(0) else spring(.85f, Spring.StiffnessMediumLow), label = "noticegap")
     Spacer(Modifier.height(h))
 }
@@ -557,6 +557,10 @@ private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: Im
         }
     }
     val lx = spots[0]; val rx = spots[2]
+    // the outer ends reach out to the screen's sides when a text starts at the row's start or ends at its end (no camera there)
+    val winW = view.width.toFloat()
+    val outerL = if (at != null && lx == 0f) with(dens) { x0.coerceAtLeast(0f).toDp() } else 0.dp
+    val outerR = if (at != null && kotlin.math.abs(rx + spots[3] - ww) < 1f && winW > 0f) with(dens) { (winW - x0 - ww).coerceAtLeast(0f).toDp() } else 0.dp
     val lw = with(dens) { spots[1].coerceAtLeast(1f).toDp() }
     val rw = with(dens) { spots[3].coerceAtLeast(1f).toDp() }
     Box(modifier.fillMaxWidth()
@@ -574,10 +578,10 @@ private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: Im
         .graphicsLayer { alpha = if (at == null) 0f else 1f }) {
         // each in the middle of its side
         AnimatedContent(top to topIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw).then(if (onTopClick != null) Modifier.clickable { E.haptic(); onTopClick() } else Modifier), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { (t, ic) ->
-            TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic)
+            TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic, bleedL = outerL)
         }
         AnimatedContent(dev to devIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(rx.roundToInt(), 0) }.width(rw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { (t, ic) ->
-            if (t.isNotEmpty()) TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic)
+            if (t.isNotEmpty()) TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic, bleedR = outerR)
         }
     }
 }
@@ -587,18 +591,27 @@ private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: Im
  *  Scroll long names off). */
 @Composable
 private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp,
-                    icon: ImageVector? = null, align: Alignment = Alignment.Center) {
+                    icon: ImageVector? = null, align: Alignment = Alignment.Center, bleedL: Dp = 0.dp, bleedR: Dp = 0.dp) {
     var boxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    var textW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
-    val iconW = with(androidx.compose.ui.platform.LocalDensity.current) { if (icon != null) 17.dp.roundToPx() else 0 }
-    val over = boxW > 0 && textW > boxW - iconW
+    var rowW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val over = boxW > 0 && rowW > boxW
     Box(Modifier.fillMaxWidth().onSizeChanged { boxW = it.width }, contentAlignment = align) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        if (!S.b("aMarquee") || S.low) Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) { Icon(icon, null, Modifier.size(12.dp), tint = color); Spacer(Modifier.width(5.dp)) }
-            if (!S.b("aMarquee") || S.low) Text(text, Modifier.weight(1f, fill = false), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            else Text(text, Modifier.weight(1f, fill = false).then(if (over) Modifier.fadeSides(10.dp, 14.dp) else Modifier).basicMarquee(iterations = if (E.settingsPage == null) Int.MAX_VALUE else 0, initialDelayMillis = 2500)
-                .then(if (over) Modifier.padding(start = 10.dp) else Modifier),
-                fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
+            Text(text, Modifier.weight(1f, fill = false), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        } else {
+            // too long: the icon goes along with the words, and at the line's outer ends ([bleedL], [bleedR]: nothing else
+            // there, no camera) the scrolling reaches out to the screen's side, fading out (0.46.1)
+            val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
+            val m = if (over) Modifier.edgeMarquee(bleedL, bleedR, if (bleedL > 0.dp) 12.dp else 10.dp, if (bleedR > 0.dp) 16.dp else 14.dp, iter)
+                .then(if (bleedL > 0.dp) Modifier else Modifier.padding(start = 10.dp))
+                else Modifier.basicMarquee(iterations = iter, initialDelayMillis = 2500)
+            Box(m) {
+                Row(Modifier.onSizeChanged { rowW = it.width }, verticalAlignment = Alignment.CenterVertically) {
+                    if (icon != null) { Icon(icon, null, Modifier.size(12.dp), tint = color); Spacer(Modifier.width(5.dp)) }
+                    Text(text, fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, softWrap = false)
+                }
+            }
         }
     }
 }
@@ -674,6 +687,19 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
 fun NoticeLines(p: E.Prob, row: Boolean = false) {
     val tint = when (p.k) { "err" -> Color(0xFFFFB4AB); "ok" -> Color.White; else -> Color(0xFFFFD27A) }   // red broken, white good news, yellow waiting
     val act: @Composable () -> Unit = {}
+    // each line scrolls across the pill when it's too long, instead of wrapping (0.46.1); with Scroll long names off, or in Low
+    // performance mode, they wrap as before
+    if (S.b("aMarquee") && !S.low) {
+        if (row) NoticeText(androidx.compose.ui.text.buildAnnotatedString {
+            withStyle(androidx.compose.ui.text.SpanStyle(color = tint, fontWeight = FontWeight.Bold)) { append(p.t) }
+            if (p.s.isNotEmpty()) withStyle(androidx.compose.ui.text.SpanStyle(color = dim, fontSize = 12.sp)) { append("  ·  " + p.s) }
+        }, 13.sp)
+        else {
+            NoticeText(androidx.compose.ui.text.AnnotatedString(p.t), 13.sp, FontWeight.Bold, tint)
+            if (p.s.isNotEmpty()) NoticeText(androidx.compose.ui.text.AnnotatedString(p.s), 12.sp, color = dim)
+        }
+        return
+    }
     if (row) Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
         // one text: the title whole first, the detail after it cut short if the room runs out
         Text(androidx.compose.ui.text.buildAnnotatedString {
@@ -686,6 +712,18 @@ fun NoticeLines(p: E.Prob, row: Boolean = false) {
         if (p.s.isNotEmpty()) Text(p.s, fontSize = 12.sp, color = dim, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
         act()
     }
+}
+
+/** One line of a notice: too long for the pill, it scrolls across it, out into the pill's padding and fading there. */
+@Composable
+private fun NoticeText(text: androidx.compose.ui.text.AnnotatedString, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight? = null, color: Color = Color.Unspecified) {
+    var maxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var textW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val over = maxW > 0 && textW > maxW
+    val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
+    Text(text, Modifier.layout { m, c -> if (c.hasBoundedWidth && c.maxWidth != maxW) maxW = c.maxWidth; val pl = m.measure(c); layout(pl.width, pl.height) { pl.place(0, 0) } }
+        .then(if (over) Modifier.edgeMarquee(16.dp, 16.dp, 12.dp, 12.dp, iter) else Modifier.basicMarquee(iterations = iter, initialDelayMillis = 2500)),
+        fontSize = size, fontWeight = weight, color = color, maxLines = 1, softWrap = false, textAlign = TextAlign.Center, onTextLayout = { textW = it.size.width })
 }
 
 @Composable
@@ -712,7 +750,7 @@ private fun AwayNote(modifier: Modifier) {
 @Composable
 private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false, name: Boolean = true, restCover: Boolean = false, seek: Boolean = true) {
     Column(Modifier.fillMaxWidth()) {
-        if (name) TitleRow(big = big, toggles = toggles)
+        if (name) TitleRow(big = big, toggles = toggles, bleed = true)
         else if (toggles && (Lyr.needTr || Lyr.needRom)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
             if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
@@ -752,16 +790,20 @@ private fun MoreButton() {
 }
 
 @Composable
-private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center) {
+private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center, bleed: Boolean = false) {
     val ver = E.trackVer
+    // [bleed] (upright, in the 24 dp margins): long names scroll out to the screen's sides, fading out there; on the right
+    // only when nothing's beside them (translate, romanize, the heart)
+    val busyRight = (toggles && (Lyr.needTr || Lyr.needRom)) || (E.src == "spotify" && like && S.b("aLike"))
+    val bl = if (bleed) 24.dp else 0.dp; val br = if (bleed && !busyRight) 24.dp else 0.dp
     val a = remember { Animatable(1f) }
     LaunchedEffect(ver) { if (!S.low && !E.reduceMotion()) { a.snapTo(0f); a.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
     Row(Modifier.fillMaxWidth().graphicsLayer { alpha = a.value; translationY = (1 - a.value) * 10f * density }, verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f), horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
             val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
-            Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp)
+            Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)
             val by = E.byLine()
-            if (by.isNotEmpty()) Scrolling(by, (if (big) 19f else 15f).times(k).sp, FontWeight.Medium, dim)
+            if (by.isNotEmpty()) Scrolling(by, (if (big) 19f else 15f).times(k).sp, FontWeight.Medium, dim, bleedL = bl, bleedR = br)
         }
         if (toggles) {   // the Lyrics screen: translate and romanize, when the lyrics need them
             if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
@@ -773,7 +815,8 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
 
 /** A name that scrolls on and on when it's too long for its row, fading out at both sides (it rests under Settings). */
 @Composable
-private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp) {
+private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp,
+                      bleedL: Dp = 0.dp, bleedR: Dp = 0.dp) {
     var boxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var textW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
     val over = boxW > 0 && textW > boxW
@@ -781,14 +824,13 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
         Text(text, style = TextStyle(shadow = textShadow), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
         return
     }
-    val m = with(androidx.compose.ui.platform.LocalDensity.current) { 20.dp.roundToPx() }
-    // too long: the scrolling reaches 20 dp into the margin on the left, so the name slides on past where it starts and
-    // fades out there instead of being cut in a hard line; at rest it starts where it always does, its first letter
-    // whole. The right edge fades too, showing there's more. A name that fits isn't moved (a centred one would sit
-    // off centre)
-    val scroll = if (over) Modifier.layout { mm, c -> val p = mm.measure(c.copy(minWidth = 0, maxWidth = c.maxWidth + m)); layout(c.maxWidth, p.height) { p.place(-m, 0) } }
-        .fadeSides(20.dp, 28.dp).basicMarquee(iterations = if (E.settingsPage == null) Int.MAX_VALUE else 0, initialDelayMillis = 2500).padding(start = 20.dp)
-        else Modifier.basicMarquee(iterations = if (E.settingsPage == null) Int.MAX_VALUE else 0, initialDelayMillis = 2500)
+    // too long: the scrolling reaches into the margin on the left (20 dp, or out to the screen's side with [bleedL]), so the
+    // name slides on past where it starts and fades out there instead of being cut in a hard line; at rest it starts where
+    // it always does, its first letter whole. The right edge fades too, showing there's more (at the screen's side with
+    // [bleedR]). A name that fits isn't moved (a centred one would sit off centre)
+    val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
+    val scroll = if (over) Modifier.edgeMarquee(if (bleedL > 0.dp) bleedL else 20.dp, bleedR, if (bleedL > 0.dp) 14.dp else 20.dp, if (bleedR > 0.dp) 18.dp else 28.dp, iter)
+        else Modifier.basicMarquee(iterations = iter, initialDelayMillis = 2500)
     Box(Modifier.onSizeChanged { boxW = it.width }) {
         Text(text, scroll, style = TextStyle(shadow = textShadow),
             fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })

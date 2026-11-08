@@ -18,7 +18,6 @@ object Files {
 
     private val LYR = Regex("\\.(lrc|ttml|xml|txt)$", RegexOption.IGNORE_CASE)
     private val AUD = Regex("\\.(mp3|wav|ogg|m4a|flac|aac|opus|weba|wma|alac|aiff?)$", RegexOption.IGNORE_CASE)
-    private val YEAR = Regex("(19|20)\\d{2}")
     private val VID = Regex("\\.(mp4|webm|mov|m4v)$", RegexOption.IGNORE_CASE)
 
     fun name(u: Uri): String = runCatching {
@@ -61,8 +60,8 @@ object Files {
                 (r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST))?.trim()?.ifEmpty { null },
                 r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)?.trim()?.ifEmpty { null },
                 r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L, r.embeddedPicture,
-                // the year tag, or the date one ("20240101T000000.000Z")
-                listOf(MediaMetadataRetriever.METADATA_KEY_YEAR, MediaMetadataRetriever.METADATA_KEY_DATE).firstNotNullOfOrNull { k -> r.extractMetadata(k)?.let { YEAR.find(it)?.value } })
+                // the year tag, or the date one ("20240101T000000.000Z"; not a format's zero date: 0.46.1)
+                tagYear(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR), r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DATE)))
         } catch (e: Exception) { Tags(null, null, null, 0, null) }
         finally { runCatching { r.release() } }
     }
@@ -100,4 +99,14 @@ object FilePicker {
     var image: (() -> Unit)? = null
     var video: (() -> Unit)? = null
     fun pickAudio() = audio?.invoke()
+}
+
+/** A file's year: its year tag, or else its date tag. A date that's a format's zero (MP4's 1 January 1904, Unix's 1 January 1970,
+ *  what a file without a date gives) is no year: songs showed "· 1904". */
+internal fun tagYear(year: String?, date: String?): String? {
+    val y = Regex("(19|20)\\d{2}")
+    year?.let { y.find(it)?.value }?.let { return it }
+    val d = date?.trim() ?: return null
+    if (d.startsWith("19040101") || d.startsWith("19700101") || d.startsWith("1904-01-01") || d.startsWith("1970-01-01")) return null
+    return y.find(d)?.value
 }

@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -164,6 +166,27 @@ fun Modifier.pressScale(src: androidx.compose.foundation.interaction.Interaction
     val k by androidx.compose.animation.core.animateFloatAsState(if (pressed && !calm) to else 1f,
         androidx.compose.animation.core.spring(.5f, androidx.compose.animation.core.Spring.StiffnessMediumLow), label = "press")
     return this.graphicsLayer { scaleX = k; scaleY = k }
+}
+
+/** A marquee that reaches [bleedStart] and [bleedEnd] past its own box (out to the screen's sides, 0.46.1), fading out over
+ *  [fadeStart] and [fadeEnd] there. At rest what scrolls starts where it would without it, its first letter whole. */
+fun Modifier.edgeMarquee(bleedStart: Dp, bleedEnd: Dp, fadeStart: Dp, fadeEnd: Dp, iterations: Int): Modifier = this
+    .layout { m, c ->
+        val l = bleedStart.roundToPx(); val r = bleedEnd.roundToPx()
+        val p = m.measure(c.copy(minWidth = 0, maxWidth = if (c.hasBoundedWidth) c.maxWidth + l + r else c.maxWidth))
+        val w = if (c.hasBoundedWidth) c.maxWidth else p.width
+        layout(w, p.height) { p.place(-l, 0) }
+    }
+    .fadeSides(fadeStart, fadeEnd)
+    .basicMarquee(iterations = iterations, initialDelayMillis = 2500)
+    .padding(start = bleedStart)
+
+/** Out past the side margins by [by] on each side (the bars, to the screen's edges: 0.46.1). */
+fun Modifier.bleedX(by: Dp): Modifier = this.layout { m, c ->
+    val px = by.roundToPx()
+    if (!c.hasBoundedWidth) return@layout m.measure(c).let { p -> layout(p.width, p.height) { p.place(0, 0) } }
+    val p = m.measure(c.copy(minWidth = c.minWidth + 2 * px, maxWidth = c.maxWidth + 2 * px))
+    layout(c.maxWidth, p.height) { p.place(-px, 0) }
 }
 
 /** Fades the left and right edges (a long title scrolling through), [start] / [end] wide. */
