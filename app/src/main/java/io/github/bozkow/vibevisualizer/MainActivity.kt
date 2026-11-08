@@ -44,6 +44,7 @@ import io.github.bozkow.vibevisualizer.ui.VibeRoot
 import io.github.bozkow.vibevisualizer.ui.toggleRom
 import io.github.bozkow.vibevisualizer.ui.toggleTr
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 
 class MainActivity : ComponentActivity() {
     private val openAudio = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { E.openFiles(it) }
@@ -106,7 +107,10 @@ class MainActivity : ComponentActivity() {
         // down by itself; a touch brings the full rate back. Anywhere lyrics show, it mustn't: no low vote, no mode pinned, and the
         // system's own saving on the refresh rate off, as the owner's S25 dropped to 1 Hz in the lyrics
         lifecycleScope.launch {
-            snapshotFlow { listOf(S.str("fpscap"), S.low, E.ambient && !E.ambientMoves(), E.lyricsVisible() && io.github.bozkow.vibevisualizer.engine.Lyr.lines > 0 && E.settingsPage == null) }.collect { (c, low, clock, words) ->
+            snapshotFlow { listOf(S.str("fpscap"), S.low, E.ambient && !E.ambientMoves(), E.lyricsVisible() && io.github.bozkow.vibevisualizer.engine.Lyr.lines > 0 && E.settingsPage == null) }.collectLatest { (c, low, clock, words) ->
+                // Ambient's clock: down to 10 Hz only once the way into it has finished (the screen fades to black over 1.5 s;
+                // at 10 Hz from the start that fade stuttered, 0.46.4); out of it, back at once (a newer state cancels the wait)
+                if (clock == true) kotlinx.coroutines.delay(2000)
                 refreshRate(if (clock == true) 10f else if (low == true) 60f else (c as String).toFloatOrNull() ?: 0f, pin = clock == true, saving = clock == true || words != true)
             }
         }

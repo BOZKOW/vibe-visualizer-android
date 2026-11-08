@@ -508,7 +508,9 @@ class LyricsRenderer {
             dO = 500.0; eO = Ease.ease; dB = 600.0; eB = Ease.ease
             if (d.fv) { op = 1f; bl = 0f }
             else if (d.fu) { op = 0f; bl = .35f; y = -.34f * screenH; if (duet) x = if (d.opp) .06f * screenW else -.06f * screenW; dO = 450.0; dB = 450.0; dT = 600.0; eT = Ease.fuMove }   // each singer's leave on their own side
-            else if (d.fn) { op = if (d.fs) 1f else .5f; bl = if (d.fs) 0f else .125f }
+            // the next line, coming into focus: as it'll look there, not dimmed and blurred on top of its words' own dimness
+            // (it came in washed out and brightened once in place: "it should stay the same", 0.46.4)
+            else if (d.fn) { op = 1f; bl = 0f }
             else { op = 0f; bl = .35f; y = .6f * screenH; if (duet) x = if (d.opp) .06f * screenW else -.06f * screenW }
             if (d.dots && (!d.fv || d.longBreak)) op = 0f   // a break's dots only while it's the one in focus (a long one has none)
             if (S.low) bl = 0f   // Low performance mode: they move and fade, never blur
