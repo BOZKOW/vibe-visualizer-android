@@ -219,7 +219,7 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         // while music plays untouched, the controls slide away (as in Spicy Lyrics Mobile): the cover, the song and the
         // seek bar stay; a tap brings the rest back
-        TopBar()
+        TopBar(floatNotice = true)
         Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
             // upright it grows to Apple's tall shape while a tall animated cover plays (Spicy Lyrics Mobile 0.19.0)
             if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(bigCoverShape(), matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp, tall = true)
@@ -283,7 +283,7 @@ private fun Tablet() {
     val solo = soloWide()   // no lyrics: Now Playing alone, the cover big
     Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.Center) {
         Column(Modifier.fillMaxHeight().then(if (solo) Modifier.widthIn(max = 560.dp) else Modifier.weight(.42f).widthIn(max = 480.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
-            TopBar(Modifier.ambientOut())
+            TopBar(Modifier.ambientOut(), floatNotice = true)
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
                 if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
@@ -505,10 +505,24 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
                 }
             }
         } else if (S.b("aTopLine")) TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"), onTopClick = toSpotify)
-        // [floatNotice]: over what's under it, taking no room: on the lyrics screen it pushed the lyrics down and back up
-        if (floatNotice) Box(Modifier.fillMaxWidth().layout { m, c -> val p = m.measure(c.copy(minHeight = 0)); layout(p.width, 0) { p.place(0, 0) } }) { NoticeSpace(home, row = side) }
+        // [floatNotice]: the notice floats in a room of a fixed height (NoticeGap): the lyrics and the cover move down by the same
+        // amount whatever its size, one line or two (0.46.1; at its own height a taller notice pushed them further, and on the
+        // lyrics screen in 0.45.4 it took no room at all while the cover screen made room for it)
+        if (floatNotice) {
+            Box(Modifier.fillMaxWidth().layout { m, c -> val p = m.measure(c.copy(minHeight = 0)); layout(p.width, 0) { p.place(0, 0) } }) { NoticeSpace(home, row = side) }
+            NoticeGap(home)
+        }
         else NoticeSpace(home, row = side)
     }
+}
+
+/** The room a notice gets on the upright screens while one shows: always the same, so everything under it moves alike. */
+@Composable
+private fun NoticeGap(home: Boolean) {
+    val on = E.notices(home).isNotEmpty()
+    val h by androidx.compose.animation.core.animateDpAsState(if (on) 56.dp else 0.dp,
+        if (S.low || E.reduceMotion()) tween(0) else spring(.85f, Spring.StiffnessMediumLow), label = "noticegap")
+    Spacer(Modifier.height(h))
 }
 
 /** Where the top's text (and what's wrong under it) ends on screen, in px: the Canvas is blurred down to there. */
