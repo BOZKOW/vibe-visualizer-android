@@ -245,7 +245,9 @@ class LyricsRenderer {
             // line up with the sung ones, otherwise across the whole line
             val lEnd = d.mainTs?.lastOrNull()?.end ?: lines.getOrNull(idx + 1)?.t ?: ((l.t ?: 0.0) + 4)
             fun timed(kind: Int, text: String, words: List<Pair<String, Boolean>>?) {
-                val r = Row(kind, .46f, 1.3f, .22f, if (kind == 3) 600 else 700)
+                // a translation as Spicy Lyric Translator draws one in Spicy Lyrics (0.46.2): extra bold, .45 of the line, a line
+                // height of 1.18; the romanization as before
+                val r = if (kind == 3) Row(kind, .45f, 1.18f, .22f, 900) else Row(kind, .46f, 1.3f, .22f, 700)
                 val lw = l.words
                 if (!sync || l.t == null) r.text = text
                 else if (words != null && lw != null && words.size == lw.size) {
@@ -988,11 +990,12 @@ class LyricsRenderer {
             val ps = r.pieces
             if (ps != null) {
                 val p = paint(fs, r.weight)
-                val (aFill, aEnd) = when (r.kind) { 0 -> .85f to .5f; 1 -> .6f to .3f; 2 -> 1f to .45f; else -> .8f to .35f }
+                // (a translation: filled .85 to .5 while its line is sung, about half bright otherwise, as Spicy Lyric Translator)
+                val (aFill, aEnd) = when (r.kind) { 0 -> .85f to .5f; 1 -> .6f to .3f; 2 -> 1f to .45f; else -> .85f to .5f }
                 val restColor = when {
                     st -> 1f
                     r.kind == 2 -> if (active) 1f else .75f
-                    r.kind == 3 -> .58f
+                    r.kind == 3 -> .5f
                     d.p -> if (r.kind == 1) .6f else .85f
                     else -> if (r.kind == 1) .3f else .5f
                 }
@@ -1043,7 +1046,7 @@ class LyricsRenderer {
                             val gl = d.lineGlowV; if (gl > .01 && !S.low) tpp.setShadowLayer(((4 + 8 * gl) / 40 * F * .87).toFloat(), 0f, 0f, white(gl * .5))
                         }
                         active && r.oneTs != null -> {   // a whole romanized line, or a translation, filled in time
-                            val g = oneGrad[r] ?: -20.0; val (a1, a2) = when (r.kind) { 0 -> .85f to .5f; 2 -> 1f to .45f; else -> .8f to .35f }
+                            val g = oneGrad[r] ?: -20.0; val (a1, a2) = when (r.kind) { 0 -> .85f to .5f; 2 -> 1f to .45f; else -> .85f to .5f }
                             val w = sl.width.toFloat()
                             tpp.color = white(1f); tpp.shader = LinearGradient((w * g / 100).toFloat(), 0f, (w * (g + 20) / 100).toFloat(), 0f, white(a1 * subA), white(a2 * subA), Shader.TileMode.CLAMP)
                         }
@@ -1051,7 +1054,7 @@ class LyricsRenderer {
                             0 -> if (active) .6f else if (d.p) .85f else .35f
                             1 -> if (active) .6f else if (d.p) .6f else .3f
                             2 -> if (active) 1f else .75f
-                            else -> .58f
+                            else -> .5f
                         } * subA)
                     }
                     c.save(); c.translate(if (d.opp) W - padL - padR - sl.width else 0f, ry); sl.draw(c); c.restore()   // the other singer: at the right edge
