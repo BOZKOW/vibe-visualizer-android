@@ -75,6 +75,7 @@ object Defaults {
         "aTopLine" to true,     // the line at the top: where it plays from and on
         "aYear" to true,        // the release year beside the artist
         "aMotionCover" to true, // Apple Music's animated covers, where an album has one
+        "aMotionFirst" to false, // a song with both: its animated cover instead of its Canvas (Spicy Lyrics Mobile 0.19.0)
         "aBgHex" to "",         // the Color background: #RRGGBB, or empty for the cover's
         "ljoinPace" to false,   // Join split words: each syllable's letters at that syllable's own speed
         "cvLyrA" to 25,         // how much of the Canvas video shows behind the lyrics (%; 0: only its soft glow)
@@ -83,6 +84,7 @@ object Defaults {
         "aBar2" to "bars",      //   resync, timing, tr, rom, canvas, like, none
         "aBar3" to "timing",
         "aBar4" to "resync",
+        "aBar5" to "again",     //   (a fifth since 0.46.0: look the lyrics up again; "rotate" turns the screen)
         "aWgSize" to "m",       // the home screen widget: lyrics size (s, m, l)
         "aWgSong" to true,      //   the song under the lyrics
         "aWgCtl" to true,       //   play / pause, previous, next
@@ -119,7 +121,7 @@ class Settings(ctx: Context) {
         }
         v.getValue("lstyle").value = style()   // from Simple lyrics mode and Focus mode as they are (older settings, a backup)
         // the Lyrics and Visualizer buttons are gone with their screens (0.38.0): the bars and Lyrics timing instead
-        for (k in listOf("aBar1", "aBar2", "aBar3", "aBar4")) v.getValue(k).let { st -> when (st.value) { "lyrics" -> st.value = "bars"; "viz" -> st.value = "timing" } }
+        for (k in listOf("aBar1", "aBar2", "aBar3", "aBar4", "aBar5")) v.getValue(k).let { st -> when (st.value) { "lyrics" -> st.value = "bars"; "viz" -> st.value = "timing" } }
     }
 
     /** The lyrics' style as Simple lyrics mode and Focus mode make it (Focus wins when both were on). */

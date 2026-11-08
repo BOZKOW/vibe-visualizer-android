@@ -37,6 +37,7 @@ import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -70,6 +71,8 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Cast
+import androidx.compose.material.icons.rounded.ScreenRotation
+import androidx.compose.material.icons.rounded.YoutubeSearchedFor
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.automirrored.rounded.NoteAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -218,7 +221,8 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
         // seek bar stay; a tap brings the rest back
         TopBar()
         Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
-            if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
+            // upright it grows to Apple's tall shape while a tall animated cover plays (Spicy Lyrics Mobile 0.19.0)
+            if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(bigCoverShape(), matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp, tall = true)
         }
         if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(48.dp).padding(bottom = 6.dp))
         SongInfo(big = true, note = noLyricsNote)
@@ -477,7 +481,10 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
     // where it plays from and on, short enough to stand either side of the camera whole (with "PLAYING FROM …" and
     // "PLAYING ON …" both only ever showed their first words, crawling); an icon says which is which
     val app = io.github.bozkow.vibevisualizer.media.MediaApps.appName().uppercase()
-    val top = when (E.src) { "spotify" -> "SPOTIFY"; "file" -> "THIS PHONE"; "media" -> app; else -> "VIBE VISUALIZER" }
+    // your own files playing with Spotify connected: the line says so and is the way back (a tap: Spotify again, 0.46.0)
+    val back = E.src == "file" && Spotify.connected
+    val toSpotify: (() -> Unit)? = if (back) ({ E.setSource("spotify") }) else null
+    val top = when (E.src) { "spotify" -> "SPOTIFY"; "file" -> if (back) "THIS PHONE · ⇄ SPOTIFY" else "THIS PHONE"; "media" -> app; else -> "VIBE VISUALIZER" }
     val topIcon = when (E.src) { "spotify" -> VIcons.spotify; "file" -> Icons.Rounded.PhoneAndroid; "media" -> Icons.Rounded.MusicNote; else -> null }
     val sd = Spotify.device
     val dev = when (E.src) { "spotify" -> sd?.name ?: if (Spotify.meta == null) "NOTHING PLAYING" else ""; "file" -> Local.position(); else -> "" }.uppercase()
@@ -488,16 +495,16 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
             // on its side, one line with room for the words: "PLAYING FROM SPOTIFY ON <DEVICE>"
             val one = when (E.src) {
                 "spotify" -> "PLAYING FROM SPOTIFY" + (if (sd != null) " ON $dev" else if (dev.isNotEmpty()) " · $dev" else "")
-                "file" -> "PLAYING ON THIS PHONE" + (if (dev.isNotEmpty()) " · $dev" else "")
+                "file" -> "PLAYING ON THIS PHONE" + (if (dev.isNotEmpty()) " · $dev" else "") + (if (back) " · ⇄ SPOTIFY" else "")
                 "media" -> "PLAYING FROM $app"
                 else -> top
             }
-            Box(Modifier.fillMaxWidth().height(26.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().height(26.dp).then(if (toSpotify != null) Modifier.clickable { E.haptic(); toSpotify() } else Modifier), contentAlignment = Alignment.Center) {
                 AnimatedContent(one, Modifier.fillMaxWidth(), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdone") { t ->
                     TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
                 }
             }
-        } else if (S.b("aTopLine")) TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"))
+        } else if (S.b("aTopLine")) TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"), onTopClick = toSpotify)
         // [floatNotice]: over what's under it, taking no room: on the lyrics screen it pushed the lyrics down and back up
         if (floatNotice) Box(Modifier.fillMaxWidth().layout { m, c -> val p = m.measure(c.copy(minHeight = 0)); layout(p.width, 0) { p.place(0, 0) } }) { NoticeSpace(home, row = side) }
         else NoticeSpace(home, row = side)
@@ -511,7 +518,7 @@ private fun Modifier.reportTop() = onGloballyPositioned { TopArea.bottom = it.po
 /** Where it plays from at the left, the device at the right, each in the middle of its side. Beside the camera:
  *  drawn up in the hidden status bar's place, level with the camera and clear of it at both sides. */
 @Composable
-private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: ImageVector?, modifier: Modifier, beside: Boolean = false) {
+private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: ImageVector?, modifier: Modifier, beside: Boolean = false, onTopClick: (() -> Unit)? = null) {
     val view = androidx.compose.ui.platform.LocalView.current
     val dens = androidx.compose.ui.platform.LocalDensity.current
     var at by remember { mutableStateOf<Offset?>(null) }            // where this row starts in the window
@@ -552,7 +559,7 @@ private fun TopLine(top: String, topIcon: ImageVector?, dev: String, devIcon: Im
         } else Modifier.height(32.dp))
         .graphicsLayer { alpha = if (at == null) 0f else 1f }) {
         // each in the middle of its side
-        AnimatedContent(top to topIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { (t, ic) ->
+        AnimatedContent(top to topIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(lx.roundToInt(), 0) }.width(lw).then(if (onTopClick != null) Modifier.clickable { E.haptic(); onTopClick() } else Modifier), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdtop") { (t, ic) ->
             TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp, icon = ic)
         }
         AnimatedContent(dev to devIcon, Modifier.align(Alignment.CenterStart).offset { androidx.compose.ui.unit.IntOffset(rx.roundToInt(), 0) }.width(rw), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdsub") { (t, ic) ->
@@ -808,18 +815,18 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
     }
 }
 
-/** The music app's bottom row: four buttons you pick (Settings → Player screen → Buttons under the controls; by
- *  default where it plays · the bars · Lyrics timing · Resync), then Settings, always last: it's the way into them. */
+/** The music app's bottom row: five buttons you pick (Settings → Player screen → Buttons under the controls; by
+ *  default where it plays · the bars · Lyrics timing · Resync · Look again), then Settings, always last: it's the way into them. */
 @Composable
 private fun BottomBar(big: Boolean = true, mid: Boolean = false) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-    // five that fit with room between them (a narrow phone, or the largest display size), and round when the row gets less
+    // six that fit with room between them (a narrow phone, or the largest display size), and round when the row gets less
     // height than they'd like (on its side: the large song name, a notice of two lines and the controls together)
-    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 32.dp) / 5, (maxHeight - (if (big) 10.dp else 6.dp)).coerceAtLeast(0.dp))
+    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 40.dp) / 6, (maxHeight - (if (big) 10.dp else 6.dp)).coerceAtLeast(0.dp))
     Row(Modifier.fillMaxWidth().padding(top = if (big) 6.dp else 2.dp, bottom = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         // (Lyrics and Visualizer were screens of their own until 0.38.0: a slot saved with Lyrics turns the bars on and
         // off now, one with the Visualizer opens Lyrics timing, so the old default row has no button twice)
-        for (i in 1..4) BarButton(S.str("aBar$i").let { k -> when (k) { "lyrics" -> "bars"; "viz" -> "timing"; else -> k } }, d)
+        for (i in 1..5) BarButton(S.str("aBar$i").let { k -> when (k) { "lyrics" -> "bars"; "viz" -> "timing"; else -> k } }, d)
         BarIcon(Icons.Rounded.Settings, "Settings", false, d) { E.openSettings() }
     }
     }
@@ -846,14 +853,29 @@ private fun BarButton(k: String, d: Dp) {
         }
         "addlyr" -> BarIcon(Icons.AutoMirrored.Rounded.NoteAdd, "Add a lyrics file for this song", false, d) { FilePicker.lyrics?.invoke(true) }
         "songs" -> BarIcon(Icons.Rounded.LibraryMusic, "Play songs from your phone", false, d) { FilePicker.pickAudio() }
+        "again" -> BarIcon(Icons.Rounded.YoutubeSearchedFor, "Look up the lyrics again", false, d) { Lyr.clearSong() }
+        "rotate" -> {
+            // tap: turned on its side (or back upright), and it stays so whatever the phone's tilt; hold: follows the phone again
+            val act = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+            val side = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            BarIcon(Icons.Rounded.ScreenRotation, if (rotLock) "Rotate the screen (hold: follow the phone)" else "Rotate the screen", rotLock, d,
+                onLongClick = { act?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED; rotLock = false }) {
+                act?.requestedOrientation = if (side) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                rotLock = act != null
+            }
+        }
         "none" -> Spacer(Modifier.size(d))
         else -> BarIcon(VIcons.resync, "Resync the lyrics", false, d) { Lyr.resync() }
     }
 }
 
+/** The rotate button turned the screen and holds it there (until it's held, or the app starts again). */
+private var rotLock by mutableStateOf(false)
+
 /** A round outlined button (filled softly while it's the screen you're on). */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp, text: String? = null, enabled: Boolean = true, onClick: () -> Unit) {
+private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp, text: String? = null, enabled: Boolean = true, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val k by animateFloatAsState(if (on) 1f else 0f, tween(260), label = "baron")   // the highlight fades between screens
     val a by animateFloatAsState(if (enabled) 1f else .4f, tween(220), label = "barok")
@@ -861,7 +883,9 @@ private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp
     val fg = androidx.compose.ui.graphics.lerp(Color.White, Color(0xFF111116), k)
     // off: frosted glass (GlassFill and GlassEdge, as the seek bar's track)
     Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).frosted().background(Color.White.copy(alpha = .12f + .8f * k))
-        .border(1.dp, Color.White.copy(alpha = .22f + .7f * k), CircleShape).clickable(src, androidx.compose.material3.ripple(), enabled = enabled) { E.haptic(); onClick() }
+        .border(1.dp, Color.White.copy(alpha = .22f + .7f * k), CircleShape)
+        .then(if (onLongClick == null) Modifier.clickable(src, androidx.compose.material3.ripple(), enabled = enabled) { E.haptic(); onClick() }
+            else Modifier.combinedClickable(src, androidx.compose.material3.ripple(), enabled = enabled, onLongClick = { E.haptic(); onLongClick() }) { E.haptic(); onClick() })
         .semantics { contentDescription = desc; selected = on }, contentAlignment = Alignment.Center) {
         if (icon != null) Icon(icon, null, Modifier.size(d * .42f), tint = fg)
         else Text(text ?: "", fontSize = (d.value * .3f).sp, fontWeight = FontWeight.Bold, color = fg)
@@ -1012,25 +1036,39 @@ private fun Modifier.canvasShrink(): Modifier {
 
 /** The cover, in its frame (the Canvas plays behind the player, not in here). */
 @Composable
-fun CoverArt(modifier: Modifier, corner: Dp, small: Boolean = false) {
+fun CoverArt(modifier: Modifier, corner: Dp, small: Boolean = false, tall: Boolean = false) {
     val shape = RoundedCornerShape(corner * (S.i("aCoverR").coerceIn(0, 40) / 22f))   // Settings → Player screen → Cover corners (22: as designed)
     Box(modifier.then(if (small) Modifier else Modifier.shadow(24.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)).clip(shape).background(Color.White.copy(alpha = .08f))
         .then(if (S.b("aCoverLine")) Modifier.border(1.dp, Color.White.copy(alpha = .22f), shape) else Modifier)) {   // Settings → Player screen → Cover outline
         Cover(Modifier.fillMaxSize())
-        if (!small) MotionCoverLayer()
+        if (!small) MotionCoverLayer(tall)
     }
 }
 
 /** Over the still cover: the album's animated cover from Apple Music, where it has one (it fades in on its first frame;
- *  none, or it fails, and the still cover is simply what shows). Never beside a Canvas: one video at a time. */
+ *  none, or it fails, and the still cover is simply what shows). Never beside a Canvas: one video at a time. [tall]: a
+ *  cover that grows taller for Apple's tall (3:4) stream, where the record has one (Spicy Lyrics Mobile 0.19.0). */
 @Composable
-private fun MotionCoverLayer() {
-    val on = S.b("aMotionCover") && !S.low && !CanvasVideo.active && !E.dj && E.src != "none" && E.title != "Nothing playing"
+private fun MotionCoverLayer(tall: Boolean = false) {
+    val on = motionCoverOn()
     val artist = E.artist; val album = E.album; val title = E.title
-    val url by produceState<String?>(null, on, artist, album, title) { value = null; if (on) value = AnimatedCover.find(artist, album, title) }
+    val url by produceState<String?>(null, on, artist, album, title, tall) {
+        value = null; if (on) value = if (tall) AnimatedCover.findTall(artist, album, title) else AnimatedCover.find(artist, album, title)
+    }
     val u = url ?: return
     val a by animateFloatAsState(if (AnimatedCover.ready) 1f else 0f, tween(600), label = "motioncover")
     AndroidView({ ctx -> TextureView(ctx) }, Modifier.fillMaxSize().graphicsLayer { alpha = a }, update = { AnimatedCover.attach(it, u) }, onRelease = { AnimatedCover.detach(it) })
+}
+
+private fun motionCoverOn() = S.b("aMotionCover") && !S.low && !CanvasVideo.active && !E.dj && E.src != "none" && E.title != "Nothing playing"
+
+/** How wide the upright big cover is for its height: 1 (square), or Apple's tall shape while its tall stream plays. */
+@Composable
+private fun bigCoverShape(): Float {
+    val tall = motionCoverOn() && AnimatedCover.ready && AnimatedCover.aspect < .9f
+    val k by animateFloatAsState(if (tall) AnimatedCover.aspect.coerceIn(.6f, 1f) else 1f,
+        if (S.low || E.reduceMotion()) tween(0) else spring(.85f, Spring.StiffnessLow), label = "tallcover")
+    return k
 }
 
 /** The cover: a new one condenses out of a blur while the old one melts away (swells, sinks and blurs). */

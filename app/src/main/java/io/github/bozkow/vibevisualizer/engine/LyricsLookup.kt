@@ -44,6 +44,7 @@ import io.github.bozkow.vibevisualizer.lyrics.lineLang
 import io.github.bozkow.vibevisualizer.lyrics.nonLatin
 import io.github.bozkow.vibevisualizer.lyrics.parseLRC
 import io.github.bozkow.vibevisualizer.lyrics.parseSpicy
+import io.github.bozkow.vibevisualizer.lyrics.spicyQuery
 import io.github.bozkow.vibevisualizer.lyrics.songKeys
 import io.github.bozkow.vibevisualizer.media.Outputs
 import io.github.bozkow.vibevisualizer.media.PlayerDelays
@@ -153,8 +154,15 @@ object Lyr {
 
     private suspend fun fromSpicy(m: SongMeta): LyricsResult? {
         val base = server("/api/lyrics")
-        val id = Spotify.idFor(m) ?: return null
-        val r = try { Net.fetch("$base?id=" + URLEncoder.encode(id, "UTF-8"), "spicy") } catch (e: NetError) { Ping.kick(); throw Exception("your server could not be reached") }
+        val ask = spicyQuery(m) ?: return null
+        suspend fun get(q: String) = try { Net.fetch("$base?$q", "spicy") } catch (e: NetError) { Ping.kick(); throw Exception("your server could not be reached") }
+        var r = get(ask)
+        // a server from before 2026-11-05 takes only Spotify's ids: then, as before, the song's Spotify id through your
+        // Spotify connection
+        if (r.code == 400 && m.id.isEmpty() && r.json()?.optString("error").orEmpty().contains("22-character")) {
+            val id = Spotify.idFor(m) ?: return null
+            r = get("id=" + URLEncoder.encode(id, "UTF-8"))
+        }
         val j = r.json()
         if (r.code == 404) return null
         if (r.code == 503 && j?.optString("code") == "no_key") throw SkipError("no API key on your server yet")

@@ -51,4 +51,21 @@ class MotionSearchTest {
         assertNull(MotionSearch.ambientVideo("<html>no video here</html>"))
         assertEquals(listOf("123", "456"), MotionSearch.albumIds("""href="https://music.apple.com/us/album/a/123" x music.apple.com/us/album/b/456?i=1 music.apple.com/us/album/a/123"""))
     }
+
+    @Test fun theTallStreamComesFromThePageDataPastItsPreviewFrame() {
+        // Spicy Lyrics Mobile 0.19.0's test page
+        val page = """"videoArtwork":{"dictionary":{"motionDetailSquare":{"previewFrame":{"height":3840},"video":"https://a/square.m3u8"}}},""" +
+            """"tallVideoArtwork":{"dictionary":{"motionDetailTall":{"previewFrame":{"height":2732},"video":"https://a/tall.m3u8"}}}"""
+        assertEquals("https://a/tall.m3u8", MotionSearch.tallVideo(page))
+        assertNull(MotionSearch.tallVideo(""""videoArtwork":{"dictionary":{"motionDetailSquare":{"video":"https://a/square.m3u8"}}}"""))
+    }
+
+    @Test fun aRememberedRecordKeepsItsStreamsAndOldOnesReadTheSame() {
+        val e = MotionSearch.Entry(123L, "https://a/square.m3u8", "https://a/tall.m3u8")
+        assertEquals(e, MotionSearch.parseEntry(MotionSearch.storeEntry(e)))
+        assertEquals(MotionSearch.Entry(5L, "https://a/s.m3u8", ""), MotionSearch.parseEntry(MotionSearch.storeEntry(MotionSearch.Entry(5L, "https://a/s.m3u8", ""))))
+        // saved before tall streams were read: the tall one is unknown, so it's looked for once more
+        assertEquals(MotionSearch.Entry(7L, "https://a/s.m3u8", null), MotionSearch.parseEntry("7|https://a/s.m3u8"))
+        assertEquals(MotionSearch.Entry(9L, "", null), MotionSearch.parseEntry("9|"))
+    }
 }

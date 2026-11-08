@@ -144,11 +144,21 @@ object CanvasVideo {
      *  changes in quick succession only look up the one you stop on. */
     private suspend fun look(m: SongMeta, tok: Int) {
         if (!S.canvasOn) return
-        ahead.remove(aheadKey(m))?.let { (v, spicy) -> set(v); if (spicy) spicyId = m.id; return }
+        ahead.remove(aheadKey(m))?.let { (v, spicy) -> if (!motionInstead(m, tok)) { set(v); if (spicy) spicyId = m.id }; return }
         val quick = wall() - askAt < 1200; askAt = wall()
         if (quick) { delay(650); if (tok != E.coverTok) return }
         val f = find(m) { tok != E.coverTok } ?: return
-        if (tok == E.coverTok && f.first.isNotEmpty()) { set(f.first); if (f.second) spicyId = m.id }
+        if (tok == E.coverTok && f.first.isNotEmpty() && !motionInstead(m, tok)) { set(f.first); if (f.second) spicyId = m.id }
+    }
+
+    /** Animated cover before Canvas (Spicy Lyrics Mobile 0.19.0): a song with an animated cover plays that on the big
+     *  cover instead of its Canvas (one video at a time). True also when another song has started meanwhile: no Canvas
+     *  either way. The cover's lookup is usually remembered; a new one takes a moment, with the still cover meanwhile. */
+    private suspend fun motionInstead(m: SongMeta, tok: Int): Boolean {
+        if (tok != E.coverTok) return true
+        if (!S.b("aMotionFirst") || !S.b("aMotionCover") || S.low || E.dj) return false
+        val motion = AnimatedCover.find(m.artist, m.album, m.title)
+        return tok != E.coverTok || motion != null
     }
 
     /** The next song's Canvas, found ahead and its video downloaded, so it plays the moment the song starts. */

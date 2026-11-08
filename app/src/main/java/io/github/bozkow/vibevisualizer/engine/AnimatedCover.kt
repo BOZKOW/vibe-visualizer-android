@@ -40,6 +40,7 @@ internal object MotionSearch {
     data class AlbumHit(val url: String, val name: String, val artist: String, val explicit: Boolean = false)
 
     private val AMBIENT_VIDEO = Regex("<amp-ambient-video[^>]+src=\"([^\"]+\\.m3u8)\"")
+    private val TALL_VIDEO = Regex("\"motionDetailTall\":\\{.{0,3000}?\"video\":\"([^\"]+\\.m3u8)\"")
     private val ALBUM_LINK = Regex("music\\.apple\\.com/[a-z]{2}/album/[^/\"?]+/(\\d+)")
     private val EDITION = Regex("\\s*(?:[(\\[][^()\\[\\]]*(?:deluxe|edition|version|remaster|expanded|anniversary|special|bonus|explicit|reissue)[^()\\[\\]]*[)\\]]" +
         "|-\\s*(?:single|ep|deluxe\\b.*|.*\\bedition\\b.*|.*\\bversion\\b.*))\\s*$", RegexOption.IGNORE_CASE)
@@ -86,6 +87,15 @@ internal object MotionSearch {
     fun albumIds(html: String) = ALBUM_LINK.findAll(html).map { it.groupValues[1] }.distinct().take(12).toList()
     fun albumId(url: String) = url.substringAfterLast('/')
     fun ambientVideo(html: String) = AMBIENT_VIDEO.find(html)?.groupValues?.get(1)
+
+    /** The record's tall (3:4) stream, in the page's data: its own player only shows the square one (Mobile 0.19.0). */
+    fun tallVideo(html: String) = TALL_VIDEO.find(html)?.groupValues?.get(1)
+
+    /** A record as remembered: when, its square stream ("" none) and its tall one ("" none, null: from before they were read). */
+    data class Entry(val at: Long, val url: String, val tall: String?)
+
+    fun parseEntry(v: String): Entry { val p = v.split('|'); return Entry(p[0].toLongOrNull() ?: 0L, p.getOrElse(1) { "" }, p.getOrNull(2)) }
+    fun storeEntry(e: Entry) = "${e.at}|${e.url}" + (e.tall?.let { "|$it" } ?: "")
 }
 
 /** Apple Music's animated covers: the looping video on an album's page, played over the still cover where an album has
@@ -97,17 +107,23 @@ internal object MotionSearch {
 object AnimatedCover {
     private const val MISS_MS = 30L * 24 * 3600 * 1000   // an album with none is asked about again after a month
     private const val UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-    private val prefs by lazy { Vibe.app.getSharedPreferences("motioncovers", android.content.Context.MODE_PRIVATE) }   // key → "when|video" ("" : none)
+    private val prefs by lazy { Vibe.app.getSharedPreferences("motioncovers", android.content.Context.MODE_PRIVATE) }   // key → "when|video|tall" (MotionSearch.Entry)
     private val http by lazy { Net.http.newBuilder().cache(null).build() }   // album pages are big: not for the small answers' cache
 
     /** The record's stream, or null: none, can't tell now, or another song came first (the caller's cancelled then). */
-    suspend fun find(artists: String, album: String, title: String): String? {
+    suspend fun find(artists: String, album: String, title: String): String? = lookup(artists, album, title, tall = false)?.url?.ifEmpty { null }
+
+    /** For a cover taller than it's wide: the record's tall (3:4) stream where Apple has one, else its square one. */
+    suspend fun findTall(artists: String, album: String, title: String): String? =
+        lookup(artists, album, title, tall = true)?.let { it.tall?.ifEmpty { null } ?: it.url.ifEmpty { null } }
+
+    private suspend fun lookup(artists: String, album: String, title: String, tall: Boolean): MotionSearch.Entry? {
         val artist = MotionSearch.leadArtist(artists)
         val key = MotionSearch.key(artist, album, title) ?: return null
-        prefs.getString(key, null)?.let { v ->
-            val url = v.substringAfter('|')
-            if (url.isNotEmpty()) return url
-            if (wall() - (v.substringBefore('|').toLongOrNull() ?: 0L) < MISS_MS) return null
+        val known = prefs.getString(key, null)?.let(MotionSearch::parseEntry)
+        if (known != null) {
+            if (known.url.isNotEmpty() && (known.tall != null || !tall)) return known
+            if (known.url.isEmpty() && wall() - known.at < MISS_MS) return known
         }
         delay(800)   // skipping through songs: only the one you stop on is asked about
         var failed = false
@@ -130,16 +146,24 @@ object AnimatedCover {
                 if (ids.isEmpty()) emptyList() else get("https://itunes.apple.com/lookup?id=${ids.joinToString(",")}")?.let(MotionSearch::parseAlbums).orEmpty()
             } },
         )
-        val tried = HashSet<String>(); var found: String? = null
+        val tried = HashSet<String>(); var found: Pair<String, String?>? = null
         run search@{
             for (stage in stages) for (u in MotionSearch.rankAlbums(stage(), artist, name)) {
                 if (!tried.add(MotionSearch.albumId(u))) continue
-                found = get(u)?.let(MotionSearch::ambientVideo); if (found != null) return@search
+                val page = get(u) ?: continue
+                val square = MotionSearch.ambientVideo(page) ?: continue
+                found = square to MotionSearch.tallVideo(page); return@search
             }
         }
-        // a failed request isn't "none": asked again next time
-        if (found != null || !failed) { prefs.edit().putString(key, "${wall()}|${found.orEmpty()}").apply(); trim() }
-        return found
+        // a failed request isn't "none": asked again next time (a record already known keeps its stream meanwhile)
+        if (found == null && failed) return known?.takeIf { it.url.isNotEmpty() }
+        val entry = when {
+            found != null -> MotionSearch.Entry(wall(), found!!.first, found!!.second.orEmpty())
+            known != null && known.url.isNotEmpty() -> MotionSearch.Entry(known.at, known.url, "")   // remembered from before tall ones were read
+            else -> MotionSearch.Entry(wall(), "", "")
+        }
+        prefs.edit().putString(key, MotionSearch.storeEntry(entry)).apply(); trim()
+        return entry
     }
 
     private fun trim() {
@@ -151,6 +175,7 @@ object AnimatedCover {
 
     /* ---- the video: one player, playing only while a cover shows it ---- */
     var ready by mutableStateOf(false); private set     // its first frame is drawn: it fades in over the still cover
+    var aspect by mutableStateOf(1f); private set       // width / height of what plays: under 1 for a tall stream
     private var player: ExoPlayer? = null
     private var view: WeakReference<TextureView>? = null
     private var cur: String? = null
@@ -160,11 +185,13 @@ object AnimatedCover {
 
     private val listener = object : Player.Listener {
         override fun onRenderedFirstFrame() { ready = true }
-        override fun onVideoSizeChanged(s: VideoSize) { if (s.width > 0 && s.height > 0) { vw = s.width.toFloat(); vh = s.height.toFloat(); view?.get()?.let(::fit) } }
+        override fun onVideoSizeChanged(s: VideoSize) {
+            if (s.width > 0 && s.height > 0) { vw = s.width.toFloat(); vh = s.height.toFloat(); aspect = vw * s.pixelWidthHeightRatio / vh; view?.get()?.let(::fit) }
+        }
         override fun onPlayerError(error: PlaybackException) {   // remembered, but gone: looked up again next time; the still cover stays
             android.util.Log.w("VV-cover", "can't play: ${error.errorCodeName}")
-            val bad = cur; ready = false; cur = null
-            prefs.all.filterValues { (it as? String)?.endsWith("|$bad") == true }.keys.forEach { prefs.edit().remove(it).apply() }
+            val bad = cur ?: return; ready = false; cur = null
+            prefs.all.filterValues { (it as? String)?.split('|')?.drop(1)?.contains(bad) == true }.keys.forEach { prefs.edit().remove(it).apply() }
         }
     }
 
@@ -173,9 +200,10 @@ object AnimatedCover {
         val src = CacheDataSource.Factory().setCache(cache).setUpstreamDataSourceFactory(up).setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
         ExoPlayer.Builder(Vibe.app).setMediaSourceFactory(HlsMediaSource.Factory(src)).build().apply {
             volume = 0f; repeatMode = Player.REPEAT_MODE_ONE   // never asks for audio focus: the music is left alone
-            // Apple offers up to 1080² at 10 Mbit/s: one steady rendition below that keeps a loop to a few MB and caches cleanly
+            // Apple offers up to 1080² (1080 × 1440 tall) at 10 Mbit/s: one steady rendition below that keeps a loop to a few MB
+            // and caches cleanly
             trackSelectionParameters = trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
-                .setMaxVideoSize(1080, 1080).setMaxVideoBitrate(3_600_000).setForceHighestSupportedBitrate(true).build()
+                .setMaxVideoSize(1080, 1440).setMaxVideoBitrate(3_600_000).setForceHighestSupportedBitrate(true).build()
             addListener(listener); player = this
         }
     }
@@ -184,7 +212,7 @@ object AnimatedCover {
     fun attach(tv: TextureView, url: String) {
         val p = ensure()
         if (view?.get() !== tv) { view?.get()?.removeOnLayoutChangeListener(fit); view = WeakReference(tv); ready = false; p.setVideoTextureView(tv); tv.addOnLayoutChangeListener(fit) }
-        if (url != cur) { cur = url; ready = false; p.setMediaItem(MediaItem.fromUri(url)); p.prepare() }
+        if (url != cur) { cur = url; ready = false; aspect = 1f; p.setMediaItem(MediaItem.fromUri(url)); p.prepare() }
         sync()
     }
 
@@ -201,7 +229,7 @@ object AnimatedCover {
         if (view?.get() != null && cur != null && E.visible && !E.ambient && E.playing()) p.play() else p.pause()
     }
 
-    /** object-fit: cover (they're nearly always square). */
+    /** object-fit: cover (square, or 3:4 in a cover grown to it). */
     private fun fit(tv: TextureView) {
         val w = tv.width.toFloat(); val h = tv.height.toFloat(); if (w <= 0 || h <= 0) return
         val s = max(w / vw, h / vh); tv.setTransform(Matrix().apply { setScale(vw * s / w, vh * s / h, w / 2, h / 2) })
