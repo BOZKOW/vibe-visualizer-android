@@ -749,7 +749,7 @@ private fun AwayNote(modifier: Modifier) {
 @Composable
 private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false, name: Boolean = true, restCover: Boolean = false, seek: Boolean = true) {
     Column(Modifier.fillMaxWidth()) {
-        if (name) TitleRow(big = big, toggles = toggles, bleed = true)
+        if (name) TitleRow(big = big, toggles = toggles, bleed = true, cover = lyrics && S.b("aLyrCover") && !restCover)
         else if (toggles && (Lyr.needTr || Lyr.needRom)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
             if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
@@ -789,15 +789,22 @@ private fun MoreButton() {
 }
 
 @Composable
-private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center, bleed: Boolean = false) {
+private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center, bleed: Boolean = false, cover: Boolean = false) {
     val ver = E.trackVer
+    // [cover]: the Lyrics screen upright, where the big cover only shows in long breaks: a small one beside the name, so
+    // it's always in sight; it steps aside while the big one shows
+    val ck by animateFloatAsState(if (cover) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, Spring.StiffnessMediumLow), label = "smallcover")
     // [bleed] (upright, in the 24 dp margins): long names scroll out to the screen's sides, fading out there; on the right
-    // only when nothing's beside them (translate, romanize, the heart)
+    // only when nothing's beside them (translate, romanize, the heart); on the left not past the small cover
     val busyRight = (toggles && (Lyr.needTr || Lyr.needRom)) || (E.src == "spotify" && like && S.b("aLike"))
-    val bl = if (bleed) 24.dp else 0.dp; val br = if (bleed && !busyRight) 24.dp else 0.dp
+    val bl = if (bleed && ck < .01f) 24.dp else 0.dp; val br = if (bleed && !busyRight) 24.dp else 0.dp
     val a = remember { Animatable(1f) }
     LaunchedEffect(ver) { if (!S.low && !E.reduceMotion()) { a.snapTo(0f); a.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
     Row(Modifier.fillMaxWidth().graphicsLayer { alpha = a.value; translationY = (1 - a.value) * 10f * density }, verticalAlignment = Alignment.CenterVertically) {
+        if (ck > .01f) {
+            Box(Modifier.size(52.dp * ck).graphicsLayer { alpha = ck.coerceIn(0f, 1f) }) { CoverArt(Modifier.fillMaxSize(), corner = 10.dp, small = true) }
+            Spacer(Modifier.width(12.dp * ck))
+        }
         Column(Modifier.weight(1f), horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
             val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
             Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)

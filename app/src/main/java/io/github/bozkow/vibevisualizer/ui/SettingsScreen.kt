@@ -190,6 +190,7 @@ private fun pages(): List<Page> = listOf(
         Item.Ch("aHideSec", "Hide them after", listOf("2" to "2 seconds", "3" to "3 seconds", "5" to "5 seconds", "10" to "10 seconds"), "How long untouched while music plays."),
         Item.Sw("volshow", "Volume slider"),
         Item.Sw("aLike", "Like button", "The heart beside a Spotify song’s name, to save it to your Liked Songs."),
+        Item.Sw("aLyrCover", "Small cover beside the song name", "On the Lyrics screen with the phone upright, so the cover is always in sight (it steps aside while the big cover fills a long break)."),
         Item.Sub("Buttons under the controls"),
         Item.Txt("The round buttons under play and pause. Settings is always the last one."),
         Item.Ch("aBar1", "First button", BAR_CHOICES),
