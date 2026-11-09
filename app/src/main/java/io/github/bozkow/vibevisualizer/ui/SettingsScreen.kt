@@ -1,5 +1,7 @@
 package io.github.bozkow.vibevisualizer.ui
 
+import kotlin.math.roundToInt
+import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
@@ -419,50 +421,63 @@ fun SettingsScreen() {
             val topInset = WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)
             val navH = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
             Row(Modifier.fillMaxSize().windowInsetsPadding(cutoutInsets().only(WindowInsetsSides.Horizontal))) {
+                // the header: as it always was at rest; scrolled, what would lie over the list turns into an island (the title
+                // goes, the search floats on its own, solid, with a shadow) and the list runs on behind it to the screen's top,
+                // fading only at the very top and foot (the owner: "keep the same look ... transform to an island")
+                val statusH = topInset.asPaddingValues().calculateTopPadding()
+                val edges = Modifier.fillMaxSize().fadeEdges(statusH + 12.dp, navH + 24.dp)
                 @Composable fun ListPane(m: Modifier) {
-                    var headH by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                    val head = with(androidx.compose.ui.platform.LocalDensity.current) { headH.toDp() }
-                    val under = Modifier.fillMaxSize().underHeader(head, if (short) 62.dp else 72.dp, navH + 24.dp)
+                    val resState = rememberLazyListState()
+                    val k by collapse(if (q.isNotEmpty() && !wide) resState else listState, 64.dp)
+                    var headRest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                    val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
                     val pad = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + (if (short) 12.dp else 22.dp), bottom = navH + 28.dp)
                     Box(m) {
-                    if (q.isNotEmpty() && !wide) SearchResults(all, q, under, head, navH)
-                    else LazyColumn(under, state = listState, contentPadding = pad) {
+                    if (q.isNotEmpty() && !wide) SearchResults(all, q, edges, head, navH, resState)
+                    else LazyColumn(edges, state = listState, contentPadding = pad) {
                         cardPages(all, page, wide) { open(it) }
                     }
-                    Column(Modifier.fillMaxWidth().onSizeChanged { headH = it.height }.windowInsetsPadding(topInset)) {
-                        val search = @Composable { sm: Modifier ->
-                            TextField(q, { q = it }, sm.then(if (S.glass) Modifier.glass(RoundedCornerShape(28.dp)) else Modifier.clip(RoundedCornerShape(28.dp))), singleLine = true,
-                                placeholder = { Text("Search settings", color = Color.White.copy(alpha = .55f)) }, leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = .7f)) },
+                    Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {
+                        val close = @Composable { IconButton(onClick = { E.settingsPage = null }) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
+                        val search = @Composable { sm: Modifier, x: Boolean ->
+                            TextField(q, { q = it }, sm.island(k).then(if (S.glass) Modifier.glass(RoundedCornerShape(28.dp)) else Modifier.clip(RoundedCornerShape(28.dp))), singleLine = true,
+                                placeholder = { Text("Search settings", color = Color.White.copy(alpha = .55f)) },
+                                // (an island: the close button comes into it, the title it was beside being gone)
+                                leadingIcon = { if (x) close() else Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = .7f)) },
                                 trailingIcon = { if (q.isNotEmpty()) IconButton(onClick = { q = "" }) { Icon(Icons.Rounded.Close, "Clear") } },
                                 colors = if (S.glass) TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
                                     else TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent))
                         }
-                        val close = @Composable { IconButton(onClick = { E.settingsPage = null }) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
-                        if (short) Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 14.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) { close(); search(Modifier.weight(1f)) }
+                        if (short) Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 14.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) { close(); search(Modifier.weight(1f), false) }
                         else {
-                            Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.fillMaxWidth().collapseHeight(k).graphicsLayer { alpha = (1f - k * 1.6f).coerceIn(0f, 1f) }.padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                                 close()
                                 Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp)
                             }
-                            search(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
+                            search(Modifier.fillMaxWidth().padding(horizontal = 16.dp + 6.dp * k, vertical = 8.dp), k > .5f)
                         }
                     }
                     }
                 }
                 @Composable fun PagePane(pg: Page) {
-                    var headH by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                    val head = with(androidx.compose.ui.platform.LocalDensity.current) { headH.toDp() }
+                    val st = rememberLazyListState()
+                    val k by collapse(st, 48.dp)
+                    var headRest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                    val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
                     Box(Modifier.fillMaxSize()) {
-                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, Modifier.fillMaxSize().underHeader(head, 10.dp, navH + 24.dp), head, navH)
-                        Row(Modifier.fillMaxWidth().onSizeChanged { headH = it.height }.windowInsetsPadding(topInset).padding(start = 8.dp, end = 16.dp, top = 6.dp).then(if (short) Modifier.defaultMinSize(minHeight = 56.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {   // (level with the search)
-                            if (!wide) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) } else Spacer(Modifier.width(16.dp))
-                            Text(pg.name, fontSize = if (short) 24.sp else 28.sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges, head, navH, st)
+                        // the page's title row: scrolled, an island too (back and the name, smaller, on its own solid pill)
+                        Box(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset).padding(horizontal = 12.dp * k, vertical = 6.dp * k)) {
+                            Row(Modifier.fillMaxWidth().island(k, solid = true).padding(start = 8.dp, end = 16.dp, top = 6.dp * (1 - k)).then(if (short) Modifier.defaultMinSize(minHeight = 56.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {   // (level with the search)
+                                if (!wide) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) } else Spacer(Modifier.width(16.dp))
+                                Text(pg.name, fontSize = ((if (short) 24f else 28f) - 8f * k).sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                 }
                 if (wide) {
                     ListPane(Modifier.width(300.dp).fillMaxHeight())
-                    if (q.isNotEmpty()) SearchResults(all, q, Modifier.weight(1f).underHeader(0.dp, 0.dp, navH + 24.dp), topInset.asPaddingValues().calculateTopPadding(), navH)
+                    if (q.isNotEmpty()) SearchResults(all, q, Modifier.weight(1f).fadeEdges(statusH + 12.dp, navH + 24.dp), statusH, navH)
                     else {
                         val p = all.find { it.id == (page ?: SettingsUi.last) } ?: all[0]   // two panes: the last page you had open beside the list
                         // the new page grows out of the row you tapped; the old one is gone first, nothing overlaps
@@ -489,7 +504,7 @@ fun SettingsScreen() {
 }
 
 @Composable
-private fun SearchResults(all: List<Page>, q: String, modifier: Modifier, head: Dp = 0.dp, foot: Dp = 0.dp) {
+private fun SearchResults(all: List<Page>, q: String, modifier: Modifier, head: Dp = 0.dp, foot: Dp = 0.dp, state: androidx.compose.foundation.lazy.LazyListState? = null) {
     // forgiving: any order, half-typed words, a typo or two; each setting also matches by its section and page.
     // The pages with the closest matches come first, and the closest settings first in each
     val words = remember(q) { SearchMatch.query(q) }
@@ -507,7 +522,7 @@ private fun SearchResults(all: List<Page>, q: String, modifier: Modifier, head: 
         }.sortedByDescending { it.third }.map { it.first to it.second }
     }
     if (hits.isEmpty()) { Text("No setting matches that.", Modifier.padding(start = 24.dp, end = 24.dp, top = head + 24.dp, bottom = 24.dp), color = Color.White.copy(alpha = .6f)); return }
-    LazyColumn(modifier, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + 22.dp, bottom = foot + 40.dp)) {
+    LazyColumn(modifier, state = state ?: rememberLazyListState(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + 22.dp, bottom = foot + 40.dp)) {
         hits.forEach { (p, its) ->
             item(key = "h" + p.id) { Box(Modifier.animateItem()) { CardLabel(Item.Sub(p.name)) } }
             item(key = "c" + p.id) { Box(Modifier.animateItem()) { SegGroup(its.size) { i -> Box(Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) { ItemView(its[i]) } } } }
@@ -516,32 +531,36 @@ private fun SearchResults(all: List<Page>, q: String, modifier: Modifier, head: 
 }
 
 @Composable
-private fun ItemsList(items: List<Item>, modifier: Modifier, head: Dp = 0.dp, foot: Dp = 0.dp) {
-    val st = rememberLazyListState()
+private fun ItemsList(items: List<Item>, modifier: Modifier, head: Dp = 0.dp, foot: Dp = 0.dp, st: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState()) {
     LazyColumn(modifier, state = st, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + 22.dp, bottom = foot + 48.dp)) {
         cardItems(items)
     }
 }
 
-/** Settings edge to edge: a list goes on under the header over it ([head] tall, its last [lower] the search or the title)
- *  and behind the navigation bar: it fades in through the search (or just under the title), whole just under the header,
- *  and fades out over the last [bottom] at the screen's foot. */
-private fun Modifier.underHeader(head: Dp, lower: Dp, bottom: Dp): Modifier = this
-    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-    .drawWithContent {
-        drawContent()
-        val h = size.height; if (h <= 0f) return@drawWithContent
-        val b = (bottom.toPx() / h).coerceIn(0f, .3f)
-        val stops = if (head <= 0.dp) arrayOf(0f to Color.Transparent, (24.dp.toPx() / h).coerceAtMost(.2f) to Color.Black, (1 - b) to Color.Black, 1f to Color.Transparent)
-        else {
-            // nothing behind the titles; through the see-through search, faintly; whole just under the header
-            val s0 = ((head - lower).toPx() / h).coerceIn(0f, .6f); val s1 = ((head + 18.dp).toPx() / h).coerceIn(s0 + .002f, .7f)
-            val mid = ((head - 8.dp).toPx() / h).coerceIn(s0 + .001f, s1 - .001f)
-            if (lower > 30.dp) arrayOf(0f to Color.Transparent, s0 to Color.Transparent, mid to Color.Black.copy(alpha = .3f), s1 to Color.Black, (1 - b).coerceAtLeast(s1) to Color.Black, 1f to Color.Transparent)
-            else arrayOf(0f to Color.Transparent, s0 to Color.Transparent, s1 to Color.Black, (1 - b).coerceAtLeast(s1) to Color.Black, 1f to Color.Transparent)
-        }
-        drawRect(Brush.verticalGradient(*stops), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
-    }
+/** How far a list has scrolled into its header's height ([by]), 0 at rest to 1: the header becomes an island. */
+@Composable
+private fun collapse(st: androidx.compose.foundation.lazy.LazyListState, by: Dp): androidx.compose.runtime.State<Float> {
+    val px = with(androidx.compose.ui.platform.LocalDensity.current) { by.toPx() }
+    return remember(st, px) { derivedStateOf { if (st.firstVisibleItemIndex > 0) 1f else (st.firstVisibleItemScrollOffset / px).coerceIn(0f, 1f) } }
+}
+
+/** Gone as [k] goes to 1: measured whole, laid out shorter, its foot staying where it was. */
+private fun Modifier.collapseHeight(k: Float): Modifier = this.layout { m, c ->
+    val p = m.measure(c); val h = (p.height * (1f - k)).roundToInt()
+    layout(p.width, h) { p.place(0, h - p.height) }
+}
+
+/** The island a header turns into as the list scrolls under it ([k]): solid, so what scrolls behind it doesn't show through
+ *  its words, with a shadow over the list. [solid]: it has no fill of its own at rest (a title row), so it gets the
+ *  design's own (Glass: dark with the light edge; Android: its tonal container). */
+@Composable
+private fun Modifier.island(k: Float, solid: Boolean = false): Modifier {
+    if (k <= 0f) return this
+    val sh = RoundedCornerShape(28.dp)
+    val fill = if (S.glass || !solid) Color(0xFF15151E) else MaterialTheme.colorScheme.surfaceContainerHigh
+    return this.shadow(10.dp * k, sh, clip = false).background(fill.copy(alpha = .94f * k), sh)
+        .then(if (solid && S.glass) Modifier.border(1.dp, GlassEdge.copy(alpha = GlassEdge.alpha * k), sh).clip(sh) else if (solid) Modifier.clip(sh) else Modifier)
+}
 
 @Composable
 private fun ResetBtn(k: String) {
