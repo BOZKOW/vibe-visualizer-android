@@ -88,11 +88,15 @@ fun TopNotes(modifier: Modifier = Modifier) {
         val q = E.notices().firstOrNull { it.id == "note" + n.id } ?: E.Prob(0, if (n.kind == "err") "err" else if (n.kind == "ok") "ok" else "wait", "note" + n.id, n.msg, n.sub)
         val shape = RoundedCornerShape(18.dp)
         val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-        Box(Modifier.padding(horizontal = 60.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape)
-            // more shade than on the player: here it sits over Settings' own words, which mustn't show through
-            .background(Color(0xFF101018).copy(alpha = .8f)).background(GlassFill).border(1.dp, GlassEdge, shape)
+        // over Settings' title row, clear of its close button, the whole width after it: nearly solid, so the title under it
+        // doesn't show through (it read as two texts on top of each other)
+        Box(Modifier.fillMaxWidth().padding(start = 56.dp, end = 12.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape)
+            .background(Color(0xFF15151E)).background(GlassFill).border(1.dp, GlassEdge, shape)
             .clickable(press, androidx.compose.material3.ripple()) { E.haptic(); E.noticeOpen = q }) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) { NoticeLines(q) }
+            Row(Modifier.padding(start = 10.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                NoticeIcon(q.k, 28.dp)
+                Column(Modifier.weight(1f).padding(start = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) { NoticeLines(q) }
+            }
         }
     }
 }

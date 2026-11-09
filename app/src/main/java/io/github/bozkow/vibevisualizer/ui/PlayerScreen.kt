@@ -1,5 +1,8 @@
 package io.github.bozkow.vibevisualizer.ui
 
+import androidx.compose.material.icons.rounded.HourglassTop
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
 import android.graphics.Matrix
 import android.view.TextureView
 import androidx.activity.compose.BackHandler
@@ -671,8 +674,10 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
                     else (fadeIn(tween(260)) + slideInVertically(spring(.7f, Spring.StiffnessMediumLow)) { it / 2 } + scaleIn(spring(.6f, Spring.StiffnessMediumLow), initialScale = .92f)) togetherWith (fadeOut(tween(160)) + scaleOut(tween(160), targetScale = .96f))
                 }, label = "notice") { q ->
                     // words alone, in the middle of the glass: OK and what fixes it are on the screen tapping opens
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = if (row) 4.dp else 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
+                    Row(Modifier.padding(start = 12.dp, end = 16.dp, top = if (row) 4.dp else 8.dp, bottom = if (row) 4.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (q != null) NoticeIcon(q.k, if (row) 22.dp else 28.dp)
+                        Column(Modifier.weight(1f, fill = false).padding(start = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
+                    }
                 }
             }
             if (all.size > 1) Row(Modifier.padding(bottom = if (row) 2.dp else 4.dp)) {
@@ -682,6 +687,20 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
                 }
             }
         }
+    }
+}
+
+/** What kind of notice it is at a glance (Material 3 Expressive): broken (red), waiting (yellow) or good news (white), its
+ *  icon on a soft round tile of its colour. */
+@Composable
+fun NoticeIcon(k: String, size: Dp = 28.dp) {
+    val (icon, tint) = when (k) {
+        "err" -> Icons.Rounded.ErrorOutline to Color(0xFFFFB4AB)
+        "ok" -> Icons.Rounded.CheckCircle to Color.White
+        else -> Icons.Rounded.HourglassTop to Color(0xFFFFD27A)
+    }
+    Box(Modifier.size(size).clip(CircleShape).background(tint.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
+        Icon(icon, null, Modifier.size(size * .62f), tint = tint)
     }
 }
 
