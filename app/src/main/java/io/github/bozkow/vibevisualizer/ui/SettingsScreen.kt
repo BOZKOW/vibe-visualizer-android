@@ -1,5 +1,6 @@
 package io.github.bozkow.vibevisualizer.ui
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.asPaddingValues
@@ -509,7 +510,7 @@ private fun SearchResults(all: List<Page>, q: String, modifier: Modifier, head: 
     LazyColumn(modifier, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + 22.dp, bottom = foot + 40.dp)) {
         hits.forEach { (p, its) ->
             item(key = "h" + p.id) { Box(Modifier.animateItem()) { CardLabel(Item.Sub(p.name)) } }
-            item(key = "c" + p.id) { Box(Modifier.animateItem()) { CardGroup { its.forEachIndexed { i, x -> if (i > 0) CardDivider(); Box(Modifier.padding(horizontal = 18.dp, vertical = 2.dp)) { ItemView(x) } } } } }
+            item(key = "c" + p.id) { Box(Modifier.animateItem()) { SegGroup(its.size) { i -> Box(Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) { ItemView(its[i]) } } } }
         }
     }
 }
@@ -1047,10 +1048,22 @@ private fun GlassBackdrop() {
 }
 
 /** A card of settings: frosted glass in Glass, a solid card in Android. */
+/** Android 17's grouped rows (Material 3 Expressive, as its Settings): each row a tile of its own, 2 dp apart, the group's
+ *  ends rounder (20 dp) than where its rows meet (4 dp). The same in both looks: Glass's tiles frosted glass with its light
+ *  edge, Android's the brighter tonal surface on the page's darker one. */
 @Composable
-private fun CardGroup(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().widthIn(max = 760.dp).padding(vertical = 6.dp)
-        .then(if (S.glass) Modifier.glass(RoundedCornerShape(24.dp)) else Modifier.clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainer)), content = content)
+private fun SegGroup(n: Int, row: @Composable (Int) -> Unit) {
+    Column(Modifier.fillMaxWidth().widthIn(max = 760.dp).padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        for (i in 0 until n) {
+            val sh = segShape(i, n)
+            Box(Modifier.fillMaxWidth().then(if (S.glass) Modifier.glass(sh) else Modifier.clip(sh).background(MaterialTheme.colorScheme.surfaceBright))) { row(i) }
+        }
+    }
+}
+
+private fun segShape(i: Int, n: Int): RoundedCornerShape {
+    val top = if (i == 0) 20.dp else 4.dp; val bottom = if (i == n - 1) 20.dp else 4.dp
+    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
 }
 
 /** A heading or a note between the cards: white enough, with a soft shadow, to read on any cover. */
@@ -1065,9 +1078,6 @@ private fun CardLabel(it: Item) {
     }
 }
 
-@Composable
-private fun CardDivider() { HorizontalDivider(Modifier.padding(horizontal = 18.dp), thickness = 1.dp, color = Color.White.copy(alpha = .07f)) }
-
 /** A page's items in cards: one for each section, under its heading. */
 private fun LazyListScope.cardItems(items: List<Item>) {
     val groups = ArrayList<Pair<Item?, MutableList<Item>>>()
@@ -1077,7 +1087,7 @@ private fun LazyListScope.cardItems(items: List<Item>) {
     }
     groups.forEachIndexed { gi, (h, its) ->
         if (h != null) item(key = "h$gi") { CardLabel(h) }
-        if (its.isNotEmpty()) item(key = "c$gi") { Box(Modifier.animateItem().staggerIn(gi)) { CardGroup { its.forEachIndexed { i, x -> if (i > 0) CardDivider(); Box(Modifier.padding(horizontal = 18.dp, vertical = 2.dp)) { ItemView(x) } } } } }
+        if (its.isNotEmpty()) item(key = "c$gi") { Box(Modifier.animateItem().staggerIn(gi)) { SegGroup(its.size) { i -> Box(Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) { ItemView(its[i]) } } } }
     }
 }
 
@@ -1086,13 +1096,12 @@ private fun LazyListScope.cardItems(items: List<Item>) {
 private fun LazyListScope.cardPages(all: List<Page>, page: String?, wide: Boolean, pick: (String) -> Unit) {
     all.groupBy { it.group }.toSortedMap().values.forEachIndexed { gi, g ->
         item(key = "g$gi") {
-            Box(Modifier.staggerIn(gi)) { CardGroup {
-                g.forEachIndexed { i, p ->
-                    if (i > 0) CardDivider()
+            Box(Modifier.staggerIn(gi)) { SegGroup(g.size) { i -> val p = g[i]
+                run {
                     val on = wide && (page ?: SettingsUi.last) == p.id
-                    Row(Modifier.fillMaxWidth().background(if (on) Color.White.copy(alpha = .08f) else Color.Transparent).squishClick(androidx.compose.ui.graphics.RectangleShape, .985f) { E.haptic(); pick(p.id) }
-                        .padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(Color.White.copy(alpha = .09f)), contentAlignment = Alignment.Center) {
+                    Row(Modifier.fillMaxWidth().background(if (on) Color.White.copy(alpha = .1f) else Color.Transparent).squishClick(segShape(i, g.size), .985f) { E.haptic(); pick(p.id) }
+                        .heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = .1f)), contentAlignment = Alignment.Center) {
                             Icon(p.icon, null, Modifier.size(20.dp), tint = Color.White.copy(alpha = .92f))
                         }
                         Spacer(Modifier.width(14.dp))
