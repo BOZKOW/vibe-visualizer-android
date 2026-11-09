@@ -327,6 +327,7 @@ private fun pages(): List<Page> = listOf(
         Item.Custom("Client ID redirect URI connect disconnect") { SpotifySection() },
         Item.Sub("The Spotify app on this phone"),
         Item.Sw("aSession", "Exact timing and controls from the Spotify app", "When the Spotify app on this phone plays, the lyrics follow its player exactly, song changes show at once, fewer requests go to Spotify, and play, pause, skip and seek work without Premium."),
+        Item.Sw("spRevive", "Bring Spotify back if Android closes it", "One UI sometimes closes the Spotify app in the background, mid-song. The app starts its player again (as a headphone button would); if that doesn't work, a notice offers to open Spotify."),
         Item.Custom("notification access") { SessionStatus() },
         Item.Sub("Your music"),
         Item.Custom("Play songs from your phone use Spotify connect choose where Spotify plays devices") { YourMusic() },
@@ -468,7 +469,8 @@ fun SettingsScreen() {
                         ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges, head, navH, st)
                         // the page's title row: scrolled, an island too (back and the name, smaller, on its own solid pill)
                         Box(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset).padding(horizontal = 12.dp * k, vertical = 6.dp * k)) {
-                            Row(Modifier.fillMaxWidth().island(k, solid = true).padding(start = 8.dp, end = 16.dp, top = 6.dp * (1 - k)).then(if (short) Modifier.defaultMinSize(minHeight = 56.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {   // (level with the search)
+                            // (a short name: a short island, round its back arrow and name; at rest the row as wide as ever)
+                            Row(Modifier.then(if (k > .001f) Modifier else Modifier.fillMaxWidth()).island(k, solid = true).padding(start = 8.dp, end = 16.dp, top = 6.dp * (1 - k)).then(if (short) Modifier.defaultMinSize(minHeight = 56.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {   // (level with the search)
                                 if (!wide) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) } else Spacer(Modifier.width(16.dp))
                                 Text(pg.name, fontSize = ((if (short) 24f else 28f) - 8f * k).sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
@@ -598,6 +600,7 @@ private fun needs(k: String): String? = when (k) {
     "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
     "cvLyrA" -> if (!S.canvasOn) "Turn on Canvas first" else null
     "aLike" -> if (!Spotify.connected) "Needs Spotify connected" else null
+    "spRevive" -> if (!S.b("aSession")) "Needs Exact timing and controls from the Spotify app" else null
     else -> null
 }
 

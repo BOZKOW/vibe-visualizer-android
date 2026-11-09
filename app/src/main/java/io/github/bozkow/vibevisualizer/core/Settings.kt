@@ -68,6 +68,7 @@ object Defaults {
         // the player screen
         "aHideSec" to "3",      //   seconds untouched before the controls hide
         "aLike" to true,        //   the heart beside a Spotify song
+        "spRevive" to true,     // the Spotify app closed by Android mid-song: started again
         "aLyrCover" to true,    //   upright, the Lyrics screen: a small cover beside the song's name
         "aTitle" to "m",        //   the song name's size: s, m, l
         "aMarquee" to true,     //   long names scroll

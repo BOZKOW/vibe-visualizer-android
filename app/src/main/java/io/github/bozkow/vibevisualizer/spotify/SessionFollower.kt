@@ -65,8 +65,12 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
             state = s; report(s); onState?.invoke()
             if (!active(s)) { main.removeCallbacks(recheck); main.postDelayed(recheck, STICK_MS + 50) }   // another session may play on
         }
-        override fun onSessionDestroyed() { attach(null) }
+        override fun onSessionDestroyed() { lost() }
     }
+
+    /** The app followed is gone ([pkg]) while it played: its session ended without a pause first (Android closed it). */
+    open fun onLost(pkg: String) {}
+    private fun lost() { val was = state?.state == PlaybackState.STATE_PLAYING; val p = pkg; attach(null); if (was && p.isNotEmpty()) onLost(p) }
 
     fun refresh(ctx: Context) {
         val app = ctx.applicationContext
@@ -113,7 +117,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         val best = sp.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: sp.firstOrNull()
         if (cur != null && best?.playbackState?.state != PlaybackState.STATE_PLAYING) return   // paused, and nothing else plays: stay
         stoppedAt = 0
-        if (best?.sessionToken != ctrl?.sessionToken) attach(best)
+        if (best?.sessionToken != ctrl?.sessionToken) { if (best == null && ctrl != null) lost() else attach(best) }
     }
 
     private fun attach(c: MediaController?) {
@@ -241,4 +245,29 @@ object SpotifyApp : SessionFollower({ it == "com.spotify.music" }) {
     fun hasAccess(ctx: Context) = NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
 
     fun installed(ctx: Context) = runCatching { ctx.packageManager.getPackageInfo(PKG, 0); true }.getOrDefault(false)
+
+    /** One UI closes the Spotify app in the background now and then, mid-song (the owner's phone): its player's gone while
+     *  it played. Bring Spotify back (on by default): it gets a media "play" button, as from headphones, which starts its
+     *  player again without bringing it to the front; if it isn't back in 6 s, a notice offers to open it (Android lets
+     *  no app open another from the background). At most once every 2 minutes. */
+    private var revivedAt = 0L
+    override fun onLost(pkg: String) {
+        if (!io.github.bozkow.vibevisualizer.core.S.b("spRevive")) return
+        val now = SystemClock.elapsedRealtime(); if (now - revivedAt < 120_000) return; revivedAt = now
+        val ctx = io.github.bozkow.vibevisualizer.core.Vibe.app
+        fun key(a: Int) = ctx.sendBroadcast(android.content.Intent(android.content.Intent.ACTION_MEDIA_BUTTON).setPackage(PKG)
+            .putExtra(android.content.Intent.EXTRA_KEY_EVENT, android.view.KeyEvent(a, android.view.KeyEvent.KEYCODE_MEDIA_PLAY)))
+        runCatching { key(android.view.KeyEvent.ACTION_DOWN); key(android.view.KeyEvent.ACTION_UP) }
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (connected.value) return@postDelayed
+            io.github.bozkow.vibevisualizer.engine.E.snack(io.github.bozkow.vibevisualizer.engine.E.Snack("Android closed the Spotify app", "wait",
+                io.github.bozkow.vibevisualizer.engine.E.Act("Open Spotify") { open(ctx) }, sub = "It stopped mid-song",
+                steps = listOf("One UI closes apps it thinks you aren't using. To keep Spotify open: Android's Settings → Battery → Background usage limits → Never sleeping apps → add Spotify.",
+                    "Settings → Music apps & Spotify → Bring Spotify back if Android closes it turns this off.")))
+        }, 6000)
+    }
+
+    fun open(ctx: Context) {
+        runCatching { ctx.packageManager.getLaunchIntentForPackage(PKG)?.let { ctx.startActivity(it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+    }
 }
