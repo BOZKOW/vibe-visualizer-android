@@ -1,5 +1,7 @@
 package io.github.bozkow.vibevisualizer.ui
 
+import kotlin.math.max
+import kotlin.math.min
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clipToBounds
@@ -207,9 +209,11 @@ fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 250
     LaunchedEffect(travel, iterations, calm) {
         if (travel <= 0) x.snapTo(0f) else if (x.value != 0f) x.animateTo(0f, androidx.compose.animation.core.tween(500))
         if (travel <= 0 || iterations <= 0 || calm) return@LaunchedEffect
-        // about 36 dp a second, easing in and out at the ends
-        val ms = (travel / with(dens) { 36.dp.toPx() } * 1000).toInt().coerceIn(700, 15000)
-        val ease = androidx.compose.animation.core.tween<Float>(ms, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+        // a short way at about 36 dp a second; past 120 dp slower, 20 dp a second (a long name or notice flew by), with a
+        // gentle ease in and out (a sine's: its fastest is only half again its average)
+        val near = with(dens) { 120.dp.toPx() }
+        val ms = ((min(travel.toFloat(), near) / with(dens) { 36.dp.toPx() } + max(0f, travel - near) / with(dens) { 20.dp.toPx() }) * 1000).toInt().coerceIn(700, 30000)
+        val ease = androidx.compose.animation.core.tween<Float>(ms, easing = androidx.compose.animation.core.CubicBezierEasing(.37f, 0f, .63f, 1f))
         repeat(iterations) {
             kotlinx.coroutines.delay(delayMillis.toLong())
             x.animateTo(-travel.toFloat(), ease)

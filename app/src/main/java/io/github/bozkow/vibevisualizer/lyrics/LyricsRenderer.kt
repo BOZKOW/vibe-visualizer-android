@@ -1,5 +1,6 @@
 package io.github.bozkow.vibevisualizer.lyrics
 
+import androidx.compose.ui.graphics.drawscope.clipRect
 import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
@@ -85,6 +86,7 @@ class LyricsRenderer {
         val opacity = Tween(.51f); val blur = Tween(0f); val fy = Tween(0f); val fx = Tween(0f)
         val bgOpen = Tween(1f); val dotScale = Tween(0f); val dotOp = Tween(0f)
         val dotOff = Tween(0f)   // a break's dots: how far the lines after them still have to slide, their room having come or gone (tops)
+        val pin = Tween(0f)      // held at the top while it's still sung and the lines after it scroll on (place: pinned)
         var activeAt = -1e9; var tapAt = -1e9
         var lineGlow: Spring? = null; var lineGrad = -20.0; var lineGlowV = 0.0
         val dotSp = if (l.dots) Array(3) { DotSprings() } else null
@@ -542,8 +544,11 @@ class LyricsRenderer {
         // (in the Focus style the line in focus is the older one and the newer waits under it: only when it wouldn't fit there and
         // it's being sung too: for one just due, on a phone on its side, the line being sung slid up .2 s before its end, then again)
         val under = if (S.xFocus) lfsSet.maxOrNull()?.takeIf { it > el.i }?.let { k -> lv.firstOrNull { it.i == k } }?.takeIf { it.top + it.h + y > hh * .8f } else null
-        val first = when { lineAtTop() -> null; S.xFocus -> under?.let { el }; else -> lAct.minOrNull()?.takeIf { it < el.i && (pipScroll() || pos >= (el.l.t ?: 0.0)) }?.let { k -> lv.firstOrNull { it.i == k } } }   // (a line on its way isn't sung yet: not two at once)
+        val older = lAct.minOrNull()?.takeIf { it < el.i && (pipScroll() || pos >= (el.l.t ?: 0.0)) }?.let { k -> lv.firstOrNull { it.i == k } }
+        val first = when { lineAtTop() -> null; S.xFocus -> under?.let { el }; else -> older }   // (a line on its way isn't sung yet: not two at once)
         val lower = under ?: el
+        if (older != null && !S.xFocus && pinned(older, lower, hh, t, pos)) return
+        pins(-1, 0f, t)
         if (first != null) {
             val top0 = first.top; val bot = lower.top + lower.h
             val span = bot - top0
@@ -567,6 +572,53 @@ class LyricsRenderer {
         }
         val top = if (lineAtTop()) hh * .06f else hh * .16f; if (el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
         setLyY(fitLine(el, y, pos), t)
+    }
+
+    /** Two lines sung at once that don't fit in view together with the lines between them (a duet's long line under the
+     *  other singer's, a held backing, and in the small window nearly any two): each goes its own way. The one sung
+     *  longest is held at the top while it lasts; the newer one, and the lines after it, scroll on under it as they would
+     *  alone, and the lines in between fade out as they pass under it. When it ends it scrolls on up with the rest.
+     *  When the held line is too tall to go whole with the newer one (the small window), only the row of it being sung
+     *  shows at the top, following the singing down it. False when they'd fit in view anyway, or not even that fits. */
+    private fun pinned(first: LV, lower: LV, hh: Float, t: Double, pos: Double): Boolean {
+        if (!lineAtTop() && lower.top + lower.h - first.top <= hh * .92f) return false   // both in view, with what's between them (the line at the top: the older one's always above it)
+        val small = pipScroll() || lineAtTop()
+        val pt = if (small) max(4 * dens, hh * .03f) else hh * .1f
+        val gap = F * (if (small) .12f else .35f)
+        val whole = first.h + gap + lower.h <= hh * .96f - pt
+        var rowTop = 0f; var rowH = first.h
+        if (!whole) {
+            rowH = F * (if (small) 1.2f else 1.35f)
+            // the small window holds about three rows: the newer line may reach a little into the fade at its foot
+            if (rowH + gap + lower.h > (if (small) hh * 1.08f else hh * .96f) - pt) {
+                if (!small) return false
+                // not even that: the newer line alone (the main voice goes on; the held one shows again when there's room)
+                pins(-1, 0f, t)
+                setLyY(fitLine(lower, if (lineAtTop()) hh * .06f - lower.top else hh * .38f - (lower.top + lower.h / 2), pos), t)
+                return true
+            }
+            rowTop = (sungRow(first, pos) - rowH / 2).coerceIn(0f, max(0f, first.h - rowH))
+        }
+        var y = if (lineAtTop()) pt - lower.top else hh * .38f - (lower.top + lower.h / 2)   // the newer one, as it would be alone
+        y = max(y, pt + rowH + gap - lower.top)                                            // under the one held at the top
+        if (whole && lower.top + y + lower.h > hh * .96f) y = hh * .96f - lower.h - lower.top
+        val by = pt - (first.top + rowTop + y)
+        pinRowTop = if (whole) 0f else rowTop; pinRowH = if (whole) 0f else rowH
+        pins(first.i, if (whole) max(0f, by) else by, t)
+        lyTall = !whole; lyTallAt = t   // (a row at a time: placed again as the singing moves down it)
+        band(max(0f, pt - 2), min(H, max(H * .8f, lower.top + y + lower.h + 2)))
+        setLyY(y, t)
+        return true
+    }
+
+    /** Line [i] held [by] px further down than the scroll puts it (none: -1); the rest let go, gliding with the scroll. */
+    private var pinI = -1
+    private var pinRowTop = 0f; private var pinRowH = 0f   // only this part of it shows (its row being sung), when it's too tall
+    private fun pins(i: Int, by: Float, t: Double) {
+        if (i < 0) { pinRowTop = 0f; pinRowH = 0f }
+        pinI = if (by != 0f) i else -1
+        val ms = if (S.lsmooth && !S.low) 550.0 else 0.0
+        for (d in lv) { val to = if (d.i == i) by else 0f; if (d.pin.target != to) d.pin.set(to, t, ms, Ease.eOut) }
     }
 
     /** The line's rows as they're wrapped, each from when its first word is sung, in order down the line: the words, then
@@ -680,7 +732,9 @@ class LyricsRenderer {
     fun lineAt(y: Float): Int {
         if (isStatic) return -1
         val yy = y - (if (gliding) lyG.v else lyY.v)
-        for (d in lv) if (!d.dots && d.h > 0 && yy >= d.top && yy < d.top + d.h && d.opacity.v > .05f) return d.i
+        lv.getOrNull(pinI)?.let { d -> val a = d.top + d.pin.v + (if (pinRowH > 0f) pinRowTop else 0f)
+            if (d.i == pinI && yy >= a && yy < a + (if (pinRowH > 0f) pinRowH else d.h)) return d.i }   // (held at the top)
+        for (d in lv) if (!d.dots && d.h > 0 && yy >= d.top && yy < d.top + d.h && d.opacity.v > .05f && d.i != pinI) return d.i
         return -1
     }
 
@@ -901,14 +955,23 @@ class LyricsRenderer {
         val cy = baseY + lastBottom + F * .5f; if (abs(cy - creditsY) > .5f) creditsY = cy
         var slide = 0f   // from the breaks above: their room coming or going (tops)
         val hush = quiet()
+        // the line held at the top (pinned): where it is, so the lines passing under it fade out there
+        val held = if (st || lyFree) null else lv.getOrNull(pinI)?.takeIf { it.i == pinI && abs(it.pin.value(t)) > .5f }
+        val clipRow = held != null && pinRowH > 0f
+        val heldTop = held?.let { baseY + it.top + it.fy.value(t) + it.pin.value(t) + (if (clipRow) pinRowTop else 0f) } ?: 0f
+        val heldBot = held?.let { heldTop + (if (clipRow) pinRowH else it.h) } ?: 0f
         for (d in lv) {
             d.shown = false
             val above = slide; if (d.dots) slide += d.dotOff.value(t)
             val op0 = if (st) 1f else d.opacity.value(t)
             val enterK = if (enterAt > 0 && !st) { val delay = min(abs(d.i - enterFrom), 12) * 45.0; Ease.eOut(((t - enterAt - delay) / 700).coerceIn(0.0, 1.0)).toFloat() } else 1f
-            val op = op0 * la * (if (t - enterAt < 1300) enterK else 1f)
+            var op = op0 * la * (if (t - enterAt < 1300) enterK else 1f)
+            val fy = if (st) 0f else d.fy.value(t) + (if (lyFree) 0f else d.pin.value(t)); val fx = if (st) 0f else d.fx.value(t)
+            if (held != null && d !== held) {   // under the held line: gone over most of a line's height as it slides in under it
+                val yt = baseY + d.top + above + fy
+                if (yt < heldBot && yt + d.h > heldTop) op *= ((yt - heldBot) / (F * .8f) + 1f).coerceIn(0f, 1f)
+            }
             if (op <= .004f || d.h <= 0f && !d.dots) continue
-            val fy = if (st) 0f else d.fy.value(t); val fx = if (st) 0f else d.fx.value(t)
             val inView = d.top + above + fy + (if (enterK < 1f) 26 * dens * (1 - enterK) else 0f)
             val y = baseY + inView
             val hh = max(d.h, d.hText)
@@ -933,7 +996,10 @@ class LyricsRenderer {
             layer.scaleX = sc; layer.scaleY = sc
             layer.pivotOffset = androidx.compose.ui.geometry.Offset(if (d.opp) pad + avail else pad.toFloat(), h / 2f)
             val fx2 = effect(blurPx, d.a && !S.low && !st && !hush); if (layer.renderEffect !== fx2) layer.renderEffect = fx2
-            ds.drawLayer(layer)
+            if (d === held && clipRow) {   // too tall to go whole: only its row being sung
+                val top = bleedTop + heldTop - F * .15f
+                ds.clipRect(-W, top, 2 * W + bleedLeft * 2, top + pinRowH + F * .3f) { drawLayer(layer) }
+            } else ds.drawLayer(layer)
             d.px = layer.topLeft.x.toFloat(); d.py = layer.topLeft.y.toFloat(); d.shown = true
         }
         if (enterAt > 0 && t - enterAt > 1300) enterAt = -1e9
