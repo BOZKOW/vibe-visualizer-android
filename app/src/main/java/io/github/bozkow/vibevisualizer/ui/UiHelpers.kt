@@ -145,14 +145,16 @@ fun VSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: M
 }
 
 /** Glass: a scrolling list fades out at its edges instead of being cut off in a hard line where it scrolls under
- *  a header or a search field. top / bottom: how far the fade reaches. */
-fun Modifier.fadeEdges(top: Dp = 28.dp, bottom: Dp = 0.dp): Modifier = this
+ *  a header or a search field. top / bottom: how far the fade reaches; [clear]: how far down from its top nothing shows
+ *  (a list that goes on under the header over it: from there it fades in). */
+fun Modifier.fadeEdges(top: Dp = 28.dp, bottom: Dp = 0.dp, clear: Dp = 0.dp): Modifier = this
     .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()
         val h = size.height; if (h <= 0f) return@drawWithContent
-        val t = (top.toPx() / h).coerceIn(0f, .45f); val b = (bottom.toPx() / h).coerceIn(0f, .45f)
-        drawRect(Brush.verticalGradient(0f to Color.Transparent, t to Color.Black, (1 - b) to Color.Black, 1f to if (b > 0f) Color.Transparent else Color.Black),
+        val c = (clear.toPx() / h).coerceIn(0f, .6f)
+        val t = (c + top.toPx() / h).coerceIn(c, .7f); val b = (bottom.toPx() / h).coerceIn(0f, .45f).coerceAtMost(1f - t)
+        drawRect(Brush.verticalGradient(0f to Color.Transparent, c to Color.Transparent, t to Color.Black, (1 - b) to Color.Black, 1f to if (b > 0f) Color.Transparent else Color.Black),
             blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
     }
 

@@ -1,5 +1,10 @@
 package io.github.bozkow.vibevisualizer.ui
 
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.layout.onSizeChanged
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -406,9 +411,23 @@ fun SettingsScreen() {
         // over the player blurred live (VibeRoot draws it), or the design's own background in Low performance mode
         // over the player as a blurred layer (VibeRoot draws it), or the design's own background in Low performance mode
         Surface(Modifier.fillMaxSize(), color = if (S.glass || SettingsUi.live) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLowest, contentColor = Color.White) {
-            Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)).windowInsetsPadding(cutoutInsets().only(WindowInsetsSides.Horizontal))) {
+            // edge to edge: the lists run from the screen's top to its bottom, under the status bar, the title and the search,
+            // and behind the navigation bar (they were cut off in a hard line a little under the search); the titles keep
+            // clear of the status bar
+            val topInset = WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top)
+            val navH = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
+            Row(Modifier.fillMaxSize().windowInsetsPadding(cutoutInsets().only(WindowInsetsSides.Horizontal))) {
                 @Composable fun ListPane(m: Modifier) {
-                    Column(m) {
+                    var headH by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                    val head = with(androidx.compose.ui.platform.LocalDensity.current) { headH.toDp() }
+                    val under = Modifier.fillMaxSize().underHeader(head, if (short) 62.dp else 72.dp, navH + 24.dp)
+                    val pad = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + (if (short) 12.dp else 22.dp), bottom = navH + 28.dp)
+                    Box(m) {
+                    if (q.isNotEmpty() && !wide) SearchResults(all, q, under, head, navH)
+                    else LazyColumn(under, state = listState, contentPadding = pad) {
+                        cardPages(all, page, wide) { open(it) }
+                    }
+                    Column(Modifier.fillMaxWidth().onSizeChanged { headH = it.height }.windowInsetsPadding(topInset)) {
                         val search = @Composable { sm: Modifier ->
                             TextField(q, { q = it }, sm.then(if (S.glass) Modifier.glass(RoundedCornerShape(28.dp)) else Modifier.clip(RoundedCornerShape(28.dp))), singleLine = true,
                                 placeholder = { Text("Search settings", color = Color.White.copy(alpha = .55f)) }, leadingIcon = { Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = .7f)) },
@@ -425,24 +444,23 @@ fun SettingsScreen() {
                             }
                             search(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
                         }
-                        if (q.isNotEmpty() && !wide) SearchResults(all, q, Modifier.weight(1f))
-                        else LazyColumn(Modifier.weight(1f).navBarsSpace().fadeEdges(20.dp, 28.dp), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = if (short) 12.dp else 22.dp, bottom = 28.dp)) {
-                            cardPages(all, page, wide) { open(it) }
-                        }
+                    }
                     }
                 }
                 @Composable fun PagePane(pg: Page) {
-                    Column(Modifier.fillMaxSize()) {
-                        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 6.dp).then(if (short) Modifier.defaultMinSize(minHeight = 56.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {   // (level with the search)
+                    var headH by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                    val head = with(androidx.compose.ui.platform.LocalDensity.current) { headH.toDp() }
+                    Box(Modifier.fillMaxSize()) {
+                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, Modifier.fillMaxSize().underHeader(head, 10.dp, navH + 24.dp), head, navH)
+                        Row(Modifier.fillMaxWidth().onSizeChanged { headH = it.height }.windowInsetsPadding(topInset).padding(start = 8.dp, end = 16.dp, top = 6.dp).then(if (short) Modifier.defaultMinSize(minHeight = 56.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {   // (level with the search)
                             if (!wide) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) } else Spacer(Modifier.width(16.dp))
                             Text(pg.name, fontSize = if (short) 24.sp else 28.sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, Modifier.weight(1f))
                     }
                 }
                 if (wide) {
                     ListPane(Modifier.width(300.dp).fillMaxHeight())
-                    if (q.isNotEmpty()) SearchResults(all, q, Modifier.weight(1f))
+                    if (q.isNotEmpty()) SearchResults(all, q, Modifier.weight(1f).underHeader(0.dp, 0.dp, navH + 24.dp), topInset.asPaddingValues().calculateTopPadding(), navH)
                     else {
                         val p = all.find { it.id == (page ?: SettingsUi.last) } ?: all[0]   // two panes: the last page you had open beside the list
                         // the new page grows out of the row you tapped; the old one is gone first, nothing overlaps
@@ -469,7 +487,7 @@ fun SettingsScreen() {
 }
 
 @Composable
-private fun SearchResults(all: List<Page>, q: String, modifier: Modifier) {
+private fun SearchResults(all: List<Page>, q: String, modifier: Modifier, head: Dp = 0.dp, foot: Dp = 0.dp) {
     // forgiving: any order, half-typed words, a typo or two; each setting also matches by its section and page.
     // The pages with the closest matches come first, and the closest settings first in each
     val words = remember(q) { SearchMatch.query(q) }
@@ -486,8 +504,8 @@ private fun SearchResults(all: List<Page>, q: String, modifier: Modifier) {
             if (its.isEmpty()) null else Triple(p, its.map { it.first }, its.first().second)
         }.sortedByDescending { it.third }.map { it.first to it.second }
     }
-    if (hits.isEmpty()) { Text("No setting matches that.", Modifier.padding(24.dp), color = Color.White.copy(alpha = .6f)); return }
-    LazyColumn(modifier.navBarsSpace().fadeEdges(20.dp, 28.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 40.dp)) {
+    if (hits.isEmpty()) { Text("No setting matches that.", Modifier.padding(start = 24.dp, end = 24.dp, top = head + 24.dp, bottom = 24.dp), color = Color.White.copy(alpha = .6f)); return }
+    LazyColumn(modifier, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + 22.dp, bottom = foot + 40.dp)) {
         hits.forEach { (p, its) ->
             item(key = "h" + p.id) { Box(Modifier.animateItem()) { CardLabel(Item.Sub(p.name)) } }
             item(key = "c" + p.id) { Box(Modifier.animateItem()) { CardGroup { its.forEachIndexed { i, x -> if (i > 0) CardDivider(); Box(Modifier.padding(horizontal = 18.dp, vertical = 2.dp)) { ItemView(x) } } } } }
@@ -496,12 +514,32 @@ private fun SearchResults(all: List<Page>, q: String, modifier: Modifier) {
 }
 
 @Composable
-private fun ItemsList(items: List<Item>, modifier: Modifier) {
+private fun ItemsList(items: List<Item>, modifier: Modifier, head: Dp = 0.dp, foot: Dp = 0.dp) {
     val st = rememberLazyListState()
-    LazyColumn(modifier.navBarsSpace().fadeEdges(20.dp, 28.dp), state = st, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 48.dp)) {
+    LazyColumn(modifier, state = st, contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + 22.dp, bottom = foot + 48.dp)) {
         cardItems(items)
     }
 }
+
+/** Settings edge to edge: a list goes on under the header over it ([head] tall, its last [lower] the search or the title)
+ *  and behind the navigation bar: it fades in through the search (or just under the title), whole just under the header,
+ *  and fades out over the last [bottom] at the screen's foot. */
+private fun Modifier.underHeader(head: Dp, lower: Dp, bottom: Dp): Modifier = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val h = size.height; if (h <= 0f) return@drawWithContent
+        val b = (bottom.toPx() / h).coerceIn(0f, .3f)
+        val stops = if (head <= 0.dp) arrayOf(0f to Color.Transparent, (24.dp.toPx() / h).coerceAtMost(.2f) to Color.Black, (1 - b) to Color.Black, 1f to Color.Transparent)
+        else {
+            // nothing behind the titles; through the see-through search, faintly; whole just under the header
+            val s0 = ((head - lower).toPx() / h).coerceIn(0f, .6f); val s1 = ((head + 18.dp).toPx() / h).coerceIn(s0 + .002f, .7f)
+            val mid = ((head - 8.dp).toPx() / h).coerceIn(s0 + .001f, s1 - .001f)
+            if (lower > 30.dp) arrayOf(0f to Color.Transparent, s0 to Color.Transparent, mid to Color.Black.copy(alpha = .3f), s1 to Color.Black, (1 - b).coerceAtLeast(s1) to Color.Black, 1f to Color.Transparent)
+            else arrayOf(0f to Color.Transparent, s0 to Color.Transparent, s1 to Color.Black, (1 - b).coerceAtLeast(s1) to Color.Black, 1f to Color.Transparent)
+        }
+        drawRect(Brush.verticalGradient(*stops), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+    }
 
 @Composable
 private fun ResetBtn(k: String) {
