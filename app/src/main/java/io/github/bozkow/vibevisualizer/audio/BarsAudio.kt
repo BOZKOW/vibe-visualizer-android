@@ -39,7 +39,7 @@ object Audio {
     private var bandRate = 0
     var bass = 0f; private set
     var mxv = 0f; private set
-    private var peak = .3f
+    private val autoGain = AutoGain()
     var idleK = 0f; private set
     private var silentFor = 0.0
     var realAudio = false; private set
@@ -148,7 +148,7 @@ object Audio {
             }
             silentFor = if (mx < .004f) silentFor + dt else 0.0   // a source that's connected but silent
             var gain = 1.3f
-            if (S.b("auto")) { peak += (mx - peak) * (1 - exp(-dt / (if (mx > peak) 50 else 2500))).toFloat(); gain = min(8f, .8f / max(peak, .1f)) }
+            if (S.b("auto")) gain = autoGain.gain(raw, N, dt)
             gain *= boost
             for (i in 0 until N) { val v = min(raw[i] * gain, 1.1f); vals[i] += (v - vals[i]) * (if (v > vals[i]) aA else aR).toFloat() }
         } else if (E.playing() && E.src != "file") {
@@ -198,7 +198,7 @@ object Audio {
         if (t - lastOnset > 4000 && onsetGaps.isNotEmpty()) { onsetGaps.clear(); bgTempo = 0f }
     }
 
-    fun dropBars() { vals.fill(0f); peak = .3f }
+    fun dropBars() { vals.fill(0f) }   // (the auto sensitivity keeps its level: the next song is about as loud)
 
     private fun updLabel() {
         val br = bridge.live() || (bridge.on && now() - bridge.at < 1500)
