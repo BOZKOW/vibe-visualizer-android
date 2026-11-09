@@ -179,6 +179,7 @@ class LyricsRenderer {
     /* ================= building (renderLyrics) ================= */
 
     fun set(ls: List<Line>, isSync: Boolean, quiet: Boolean) {
+        linePos = -1.0
         release()
         lines = ls; sync = isSync
         duet = ls.any { it.opp }
@@ -411,7 +412,13 @@ class LyricsRenderer {
         return pos >= end && next - end >= COVER_BREAK
     }
 
-    fun frame(t: Double, pos: Double, viewOn: Boolean) {
+    // the song's time as the lyrics go by it: never a moment back. The Spotify app's reports can put the clock a little back
+    // just after a line has started (a correction); the lyrics went back to the line before for it and on again: they
+    // jumped down and up, in every style (the owner's recording). A seek back is further, and goes back as ever
+    private var linePos = -1.0; private var linePosAt = 0.0
+    fun frame(t: Double, rawPos: Double, viewOn: Boolean) {
+        val pos = if (rawPos < linePos && linePos - rawPos < .4 && t - linePosAt < 2000) linePos else rawPos
+        linePos = pos; linePosAt = t
         posNow = pos
         if (lines.isEmpty() || W <= 0) { rest = false; return }
         if (!laidOut) layoutAll()
