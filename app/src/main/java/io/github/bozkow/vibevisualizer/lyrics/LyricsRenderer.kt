@@ -544,7 +544,10 @@ class LyricsRenderer {
         // (in the Focus style the line in focus is the older one and the newer waits under it: only when it wouldn't fit there and
         // it's being sung too: for one just due, on a phone on its side, the line being sung slid up .2 s before its end, then again)
         val under = if (S.xFocus) lfsSet.maxOrNull()?.takeIf { it > el.i }?.let { k -> lv.firstOrNull { it.i == k } }?.takeIf { it.top + it.h + y > hh * .8f } else null
+        // (not one just ending: a fast song's line often runs a moment past the next one's start, and the lyrics moved on
+        // to the next, pulled back to show both, and moved on again as it ended: they jumped; it ends where it is)
         val older = lAct.minOrNull()?.takeIf { it < el.i && (pipScroll() || pos >= (el.l.t ?: 0.0)) }?.let { k -> lv.firstOrNull { it.i == k } }
+            ?.takeIf { d -> (lineEnd(d.l) ?: Double.POSITIVE_INFINITY) - pos > .8 }
         val first = when { lineAtTop() -> null; S.xFocus -> under?.let { el }; else -> older }   // (a line on its way isn't sung yet: not two at once)
         val lower = under ?: el
         if (older != null && !S.xFocus && pinned(older, lower, hh, t, pos)) return
