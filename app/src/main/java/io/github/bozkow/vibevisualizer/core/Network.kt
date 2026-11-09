@@ -83,10 +83,15 @@ object Net {
 
     fun mark(name: String, ms: Long?, status: Int?) { stats[name] = NetStat(ms, status, System.currentTimeMillis()) }
 
+    // an answer that came as its wait was given up (a timeout, a song change) is closed here, never on the waiter's own
+    // thread: that's often the main thread, and closing an https answer writes to the network (Android stops the app for
+    // that: a crash on the owner's phone, 0.49.1)
+    private val closer = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "vv-close").apply { isDaemon = true } }
+
     suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
         enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) { if (cont.isActive) cont.resumeWithException(e) }
-            override fun onResponse(call: Call, response: Response) { cont.resume(response) { _, _, _ -> response.close() } }
+            override fun onResponse(call: Call, response: Response) { cont.resume(response) { _, _, _ -> closer.execute { runCatching { response.close() } } } }
         })
         cont.invokeOnCancellation { runCatching { cancel() } }
     }
@@ -108,11 +113,14 @@ object Net {
             if (noCache) header("Cache-Control", "no-cache")
         }.build()
         try {
-            http.newCall(req).await().use { r ->
-                val bytes = r.body.bytes()
-                val ms = SystemClock.elapsedRealtime() - t0
-                if (name != null) mark(name, ms, r.code)
-                return Resp(r.code, bytes, r.headers, ms)
+            // the answer read (and closed) off the main thread, wherever it was asked from: reading an https answer is network work
+            return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                http.newCall(req).await().use { r ->
+                    val bytes = r.body.bytes()
+                    val ms = SystemClock.elapsedRealtime() - t0
+                    if (name != null) mark(name, ms, r.code)
+                    Resp(r.code, bytes, r.headers, ms)
+                }
             }
         } catch (e: IOException) {
             if (name != null) mark(name, null, null)

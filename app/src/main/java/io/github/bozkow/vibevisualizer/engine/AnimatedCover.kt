@@ -129,7 +129,7 @@ object AnimatedCover {
         var failed = false
         suspend fun get(u: String): String? = try {
             val req = Request.Builder().url(u).header("User-Agent", UA).header("Accept-Language", "en-US,en;q=0.9").build()
-            http.newCall(req).await().use { r -> if (r.isSuccessful) withContext(Dispatchers.IO) { r.body.string() } else { failed = true; null } }
+            withContext(Dispatchers.IO) { http.newCall(req).await().use { r -> if (r.isSuccessful) r.body.string() else { failed = true; null } } }   // (read and closed off the main thread)
         } catch (e: CancellationException) { throw e } catch (e: Exception) { failed = true; null }
         fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
         fun tidy(s: String) = s.split(Regex("\\s+")).filter { it.isNotEmpty() }.joinToString(" ")
