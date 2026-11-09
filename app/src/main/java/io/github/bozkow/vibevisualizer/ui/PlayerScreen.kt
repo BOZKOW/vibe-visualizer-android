@@ -201,6 +201,9 @@ fun PlayerScreen() {
         androidx.compose.runtime.SideEffect { Frost.upright = !wide }
         when {
             E.src == "none" -> Box(pad) { EmptyState() }
+            // a phone on its side, edge to edge: only the camera's side (and a navigation bar there) keeps its room; the
+            // cover and the lyrics run under the status bar and down to the foot, what's on them kept clear of the bars
+            wide && maxHeight < 560.dp -> Box(Modifier.fillMaxSize().windowInsetsPadding(ins.only(WindowInsetsSides.Horizontal))) { WideLayout() }
             wide -> Box(pad) { WideLayout() }
             // one screen: the cover, the lyrics and the bars together (a song without lyrics: the big cover)
             else -> Box(pad.onGloballyPositioned { Frost.cover = it.boundsInWindow() }, contentAlignment = Alignment.TopCenter) {
@@ -331,8 +334,8 @@ private fun LandscapeCanvas() {
         val start = if (cameraOnLeft()) 48.dp else 20.dp   // (as the cover's, without a Canvas)
         // (the song in its big size, but the seek bar and the buttons at the stage's width: wider, as on 0.45.1, looked worse to the owner)
         val dockW = maxOf(st.solid.dp - start, 220.dp)
-        Row(Modifier.fillMaxSize().padding(start = start, end = maxOf(st.lyricsEndGap.dp, 8.dp), top = 8.dp, bottom = 8.dp)) {
-            Column(Modifier.width(dockW).fillMaxHeight().ambientOut()) {
+        Row(Modifier.fillMaxSize().padding(start = start, top = 8.dp, bottom = 8.dp)) {
+            Column(Modifier.width(dockW).fillMaxHeight().ambientOut().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.navigationBarsIgnoringVisibility).only(WindowInsetsSides.Vertical))) {
                 TopBar(side = true)
                 Spacer(Modifier.weight(1f))
                 TitleRow(big = true, toggles = !barsInstead())
@@ -340,7 +343,7 @@ private fun LandscapeCanvas() {
                 SideControls()
             }
             Spacer(Modifier.width(maxOf(st.lyricsStart.dp - start - dockW, 8.dp)))
-            SideColumn(Modifier.weight(1f))
+            SideColumn(Modifier.weight(1f), endGap = maxOf(st.lyricsEndGap.dp, 8.dp))
         }
     }
 }
@@ -351,7 +354,7 @@ private fun LandscapeCanvas() {
 @Composable
 private fun LandscapeCover() {
     // further in on the camera's side: the owner's phone still had the cover in the hole with the room it reports
-    Row(Modifier.fillMaxSize().padding(start = if (cameraOnLeft()) 48.dp else 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp)) {
+    Row(Modifier.fillMaxSize().padding(start = if (cameraOnLeft()) 48.dp else 20.dp, top = 8.dp, bottom = 8.dp)) {
         Box(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true).ambientOut().onGloballyPositioned { Frost.cover = it.boundsInWindow() }) {
             CoverArt(Modifier.fillMaxSize(), corner = 18.dp)
             var headH by remember { mutableFloatStateOf(0f) }
@@ -368,9 +371,9 @@ private fun LandscapeCover() {
                 drawRect(Brush.verticalGradient(0f to Color.Transparent, f * .35f to Color.Black.copy(alpha = .06f), f * .7f to Color.Black.copy(alpha = .22f), f to Color.Black.copy(alpha = .38f), 1f to Color.Black.copy(alpha = .72f), startY = y, endY = size.height),
                     topLeft = Offset(0f, y), size = androidx.compose.ui.geometry.Size(size.width, footH + up))
             }) {
-                TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.padding(horizontal = 10.dp), side = true)
+                TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)).padding(horizontal = 10.dp), side = true)
                 Spacer(Modifier.weight(1f))
-                Column(Modifier.fillMaxWidth().onSizeChanged { footH = it.height.toFloat() }.padding(start = 18.dp, end = 18.dp, bottom = 6.dp)) {
+                Column(Modifier.fillMaxWidth().onSizeChanged { footH = it.height.toFloat() }.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(start = 18.dp, end = 18.dp, bottom = 6.dp)) {
                     TitleRow(big = true, toggles = !barsInstead())
                     SeekRow()
                     SideControls()
@@ -378,7 +381,7 @@ private fun LandscapeCover() {
             }
         }
         Spacer(Modifier.width(20.dp))
-        SideColumn(Modifier.weight(1f))
+        SideColumn(Modifier.weight(1f), endGap = 20.dp)
     }
 }
 
@@ -397,17 +400,19 @@ private fun SideControls() {
 /** The right side on its side: the lyrics with the whole height (duets and background vocals have room), or the bars,
  *  then the small bars and the credits under them. All the rest is on the left. */
 @Composable
-private fun SideColumn(modifier: Modifier) {
+private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp) {
+    // edge to edge: the column runs to the screen's right side ([endGap] in from it, the lines placed there as before), its
+    // lyrics blurring out to that side and the bars and credits fading there; the credits clear of the navigation bar
     Column(modifier.fillMaxHeight()) {
         val bars = barsInstead()
-        if (bars && E.screen != "viz") NoLyricsNote(Modifier.fillMaxWidth())
+        if (bars && E.screen != "viz") NoLyricsNote(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)).padding(end = endGap))
         var areaH by remember { mutableFloatStateOf(0f) }
         Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }) {
-            if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 8.dp)); AwayNote(Modifier.align(Alignment.Center)) }
-            else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false, behind = true)
+            if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 8.dp).fadeSides(0.dp, 28.dp)); AwayNote(Modifier.align(Alignment.Center)) }
+            else LyricsPane(Modifier.fillMaxSize().padding(end = endGap), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false, behind = true)
         }
-        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(34.dp))
-        SongInfo(big = false, lyrics = !bars, name = false, seek = false)
+        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(34.dp).fadeSides(0.dp, 28.dp))
+        Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }
     }
 }
 
