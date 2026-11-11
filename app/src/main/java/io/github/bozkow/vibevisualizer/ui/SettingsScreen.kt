@@ -152,8 +152,6 @@ object SettingsUi {
     var last = "look"
     /** Settings over the player as a live blurred layer; in Low performance mode they cover it instead. */
     val live get() = !S.low
-    /** All of Settings as drawn, for a notice over them to show blurred behind its glass (TopNotes); null when closed. */
-    var backdrop: Backdrop? = null
 }
 
 /* ---- the settings, declared once: shown in their pages, and found by the search box ---- */
@@ -422,10 +420,7 @@ fun SettingsScreen() {
         // contentColor: on Glass's see-through surface the text and icons defaulted to black
         // over the player blurred live (VibeRoot draws it), or the design's own background in Low performance mode
         // over the player as a blurred layer (VibeRoot draws it), or the design's own background in Low performance mode
-        // all of Settings as drawn, so a notice over them is frosted glass with them blurred behind it (TopNotes)
-        val whole = rememberBackdrop()
-        androidx.compose.runtime.DisposableEffect(whole) { SettingsUi.backdrop = whole; onDispose { if (SettingsUi.backdrop === whole) SettingsUi.backdrop = null } }
-        Surface(Modifier.fillMaxSize().backdropSource(whole), color = Color.Transparent, contentColor = Color.White) {
+        Surface(Modifier.fillMaxSize(), color = Color.Transparent, contentColor = Color.White) {
             // edge to edge: the lists run from the screen's top to its bottom, under the status bar, the title and the search,
             // and behind the navigation bar (they were cut off in a hard line a little under the search); the titles keep
             // clear of the status bar
