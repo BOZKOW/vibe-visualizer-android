@@ -1,5 +1,9 @@
 package io.github.bozkow.vibevisualizer.ui
 
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlin.math.max
 import kotlin.math.min
 import androidx.compose.foundation.combinedClickable
@@ -93,54 +97,49 @@ fun Modifier.glass(shape: Shape, strong: Boolean = false): Modifier {
         .border(1.dp, GlassEdge, shape)
 }
 
-/** Material's tonal button, or in the Glass design a frosted one. */
+/** A frosted button (Glass, the app's one design since 0.50.0). */
 @Composable
 fun VTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape = ButtonDefaults.filledTonalShape, content: @Composable RowScope.() -> Unit) {
-    if (!S.glass) return androidx.compose.material3.FilledTonalButton(onClick, modifier, enabled, shape = shape, content = content)
     androidx.compose.material3.FilledTonalButton(onClick, modifier, enabled, shape = shape, border = BorderStroke(1.dp, if (enabled) GlassEdge else Color.White.copy(alpha = .08f)),
         colors = ButtonDefaults.filledTonalButtonColors(containerColor = GlassFill, contentColor = Color.White, disabledContainerColor = Color.White.copy(alpha = .04f), disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
 
-/** Material's main button, or in the Glass design frosted glass tinted with the cover's colour (still the one to press). */
+/** The main button: frosted glass tinted with the cover's colour (still the one to press). */
 @Composable
 fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-    if (!S.glass) return androidx.compose.material3.Button(onClick, modifier, enabled, content = content)
     val acc = MaterialTheme.colorScheme.primary
     androidx.compose.material3.Button(onClick, modifier, enabled, border = BorderStroke(1.dp, if (enabled) Color.White.copy(alpha = .34f) else Color.White.copy(alpha = .08f)),
         colors = ButtonDefaults.buttonColors(containerColor = acc.copy(alpha = .34f), contentColor = Color.White, disabledContainerColor = Color.White.copy(alpha = .04f), disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
 
-/** Material's outlined button, or in the Glass design a fainter frosted one. */
+/** A fainter frosted button. */
 @Composable
 fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-    if (!S.glass) return androidx.compose.material3.OutlinedButton(onClick, modifier, enabled, content = content)
     androidx.compose.material3.OutlinedButton(onClick, modifier, enabled, border = BorderStroke(1.dp, if (enabled) GlassEdge else Color.White.copy(alpha = .08f)),
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White.copy(alpha = .05f), contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
 
-/** A choice's card (one of several to pick from): the chosen one in the cover's colour. In the Glass design both are
- *  frosted glass, the chosen one tinted and with a brighter edge. */
+/** A choice's card (one of several to pick from): frosted glass, the chosen one tinted with the cover's colour and with
+ *  a brighter edge. */
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun Modifier.choiceCard(on: Boolean, shape: Shape, off: Float = .06f): Modifier {
     val acc = MaterialTheme.colorScheme
-    if (!S.glass) return this.clip(shape).background(if (on) acc.primaryContainer else Color.White.copy(alpha = off))
     return this.clip(shape).background(if (on) acc.primary.copy(alpha = .26f) else GlassFill.copy(alpha = .08f))
         .border(1.dp, if (on) Color.White.copy(alpha = .36f) else GlassEdge, shape)
 }
 
-/** A slider's colours: in the Glass design its track is frosted glass, filled with the cover's colour as far as it goes. */
+/** A slider's colours: its track frosted glass, filled with the cover's colour as far as it goes. */
 @Composable
-fun glassSlider(): SliderColors = if (!S.glass) SliderDefaults.colors() else {
+fun glassSlider(): SliderColors {
     val acc = MaterialTheme.colorScheme.primary
-    SliderDefaults.colors(thumbColor = acc, activeTrackColor = acc, inactiveTrackColor = Color.White.copy(alpha = .16f), activeTickColor = Color.White.copy(alpha = .5f),
+    return SliderDefaults.colors(thumbColor = acc, activeTrackColor = acc, inactiveTrackColor = Color.White.copy(alpha = .16f), activeTickColor = Color.White.copy(alpha = .5f),
         inactiveTickColor = acc, disabledInactiveTrackColor = Color.White.copy(alpha = .05f))
 }
 
-/** Material's switch; in the Glass design an off switch is frosted glass (on, it keeps the cover's colour, so on and
- *  off are told apart at a glance). */
+/** A switch: off, frosted glass; on, the cover's colour (on and off told apart at a glance). */
 @Composable
 fun VSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    if (!S.glass) return androidx.compose.material3.Switch(checked, onCheckedChange, modifier, enabled = enabled)
     androidx.compose.material3.Switch(checked, onCheckedChange, modifier, enabled = enabled, colors = SwitchDefaults.colors(
         uncheckedTrackColor = GlassFill, uncheckedBorderColor = Color.White.copy(alpha = .34f), uncheckedThumbColor = Color.White.copy(alpha = .7f),
         disabledUncheckedTrackColor = Color.White.copy(alpha = .04f), disabledUncheckedBorderColor = Color.White.copy(alpha = .12f)))
@@ -165,6 +164,52 @@ fun Modifier.fadeEdges(top: Dp = 28.dp, bottom: Dp = 0.dp, clear: Dp = 0.dp): Mo
 @Composable fun Modifier.statusBarsSpace(): Modifier = windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
 @Composable fun Modifier.navBarsSpace(): Modifier = windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility)
 
+/** What lies under a floating island (the Settings list, all of Settings under a notice), recorded as it's drawn so the
+ *  island can show it blurred behind its glass ([glassIsland]). */
+class Backdrop(internal val layer: androidx.compose.ui.graphics.layer.GraphicsLayer) { internal var at = Offset.Zero }
+
+@Composable
+fun rememberBackdrop(): Backdrop { val l = androidx.compose.ui.graphics.rememberGraphicsLayer(); return remember(l) { Backdrop(l) } }
+
+/** Records what this draws for the islands over it ([b]; null: nothing to record). */
+fun Modifier.backdropSource(b: Backdrop?): Modifier = if (b == null) this else this
+    .onGloballyPositioned { b.at = it.positionInRoot() }
+    .drawWithContent { b.layer.record { this@drawWithContent.drawContent() }; drawLayer(b.layer) }
+
+/** Frosted glass for a floating island (Settings' header islands, notices over Settings): what's under it ([b]) blurred,
+ *  a tint so its words read on anything ([tint]), Glass's fill, a light edge, a soft highlight along its top and a shadow
+ *  under it. [k]: how much of an island it is (0: none, as the header rests). Without [b], the tint alone. The blur is
+ *  worked out at a quarter of the size, as Settings' own (a full-size one each frame stuttered). */
+@Composable
+fun Modifier.glassIsland(b: Backdrop?, k: Float = 1f, shape: Shape = RoundedCornerShape(28.dp), tint: Float = .42f): Modifier {
+    val blur = androidx.compose.ui.graphics.rememberGraphicsLayer()
+    val at = remember { floatArrayOf(0f, 0f) }
+    val fx = remember { androidx.compose.ui.graphics.BlurEffect(6f, 6f, androidx.compose.ui.graphics.TileMode.Clamp) }
+    if (k <= 0f) return this
+    return this.shadow(10.dp * k, shape, clip = false, ambientColor = Color.Black, spotColor = Color.Black)
+        .onGloballyPositioned { val p = it.positionInRoot(); at[0] = p.x; at[1] = p.y }
+        .clip(shape)
+        .drawBehind {
+            if (b != null && b.layer.size.width > 0) {
+                val f = 4f; val sw = (size.width / f).toInt() + 2; val sh = (size.height / f).toInt() + 2
+                blur.renderEffect = fx; blur.alpha = k
+                blur.record(androidx.compose.ui.unit.IntSize(sw, sh)) {
+                    scale(1f / f, 1f / f, pivot = Offset.Zero) { translate(b.at.x - at[0], b.at.y - at[1]) { drawLayer(b.layer) } }
+                }
+                scale(f, f, pivot = Offset.Zero) { drawLayer(blur) }
+            }
+            drawRect(Color(0xFF0E0E14).copy(alpha = (if (b != null) tint else .8f) * k))
+            drawRect(GlassFill.copy(alpha = GlassFill.alpha * k))
+            drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = .1f * k), .45f to Color.Transparent))   // light along its top edge
+        }
+        .border(1.dp, GlassEdge.copy(alpha = GlassEdge.alpha * k), shape)
+}
+
+/** A round button's symbol on an island: frosted as the island's ([k]: how much of an island it is). */
+fun Modifier.glassChip(k: Float): Modifier = if (k <= 0f) this else this
+    .background(GlassFill.copy(alpha = GlassFill.alpha * k), androidx.compose.foundation.shape.CircleShape)
+    .border(1.dp, GlassEdge.copy(alpha = GlassEdge.alpha * k), androidx.compose.foundation.shape.CircleShape)
+
 /** A click only a quick tap makes. Held past the long-press time, it's let go without doing anything: an accidental touch
  *  (the phone gripped, a palm or a resting thumb lifted off a button) is a long one, and it skipped or paused the song.
  *  [onHold]: what holding it does instead, if anything (with its buzz). */
@@ -184,9 +229,10 @@ fun Modifier.pressScale(src: androidx.compose.foundation.interaction.Interaction
     return this.graphicsLayer { scaleX = k; scaleY = k }
 }
 
-/** Scrolling that reaches [bleedStart] and [bleedEnd] past its own box (out to the screen's sides, 0.46.1), fading out over
- *  [fadeStart] and [fadeEnd] there. At rest what scrolls starts where it would without it, its first letter whole; it goes
- *  there and back ([pingPong]), its last letter coming to rest just before the fade at the end. */
+/** Scrolling that reaches [bleedStart] and [bleedEnd] past its own box (out to the screen's sides, 0.46.1: only where
+ *  nothing else is there; next to a cover or an icon give 0, so the text never slides over it), fading out over [fadeStart]
+ *  and [fadeEnd] there. At rest what scrolls starts where it would without it, its first letter whole; it goes there and
+ *  back ([pingPong]), its last letter coming to rest whole at the end. */
 fun Modifier.edgeMarquee(bleedStart: Dp, bleedEnd: Dp, fadeStart: Dp, fadeEnd: Dp, iterations: Int): Modifier = this
     .layout { m, c ->
         val l = bleedStart.roundToPx(); val r = bleedEnd.roundToPx()
@@ -194,14 +240,15 @@ fun Modifier.edgeMarquee(bleedStart: Dp, bleedEnd: Dp, fadeStart: Dp, fadeEnd: D
         val w = if (c.hasBoundedWidth) c.maxWidth else p.width
         layout(w, p.height) { p.place(-l, 0) }
     }
-    .fadeSides(fadeStart, fadeEnd)
-    .pingPong(iterations, endGap = fadeEnd)
+    .pingPong(iterations, endGap = bleedEnd, fadeStart = fadeStart, fadeEnd = fadeEnd)   // (it rests inside the margin it may slide through)
     .padding(start = bleedStart)
 
-/** Text too long for its room slides left until its end shows ([endGap] short of the edge: clear of a fade there), waits,
- *  and slides back to where it started, again and again ([iterations] times; 0: it stays at its start). Not round and off
- *  the side as a marquee: the start and the end are always on screen, one after the other. Text that fits stays put. */
-fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 2500): Modifier = composed {
+/** Text too long for its room slides left until its end shows ([endGap] short of the edge), waits, and slides back to
+ *  where it started, again and again ([iterations] times; 0: it stays at its start). Not round and off the side as a
+ *  marquee: the start and the end are always on screen, one after the other. Text that fits stays put. The sides fade
+ *  ([fadeStart], [fadeEnd]) only where there's more text past them: at rest the start is whole and the end fades; at
+ *  the end it's the other way round (a fade that stayed put dimmed the first letters, and sat over what was beside it). */
+fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 2500, fadeStart: Dp = 0.dp, fadeEnd: Dp = 0.dp): Modifier = composed {
     val x = remember { androidx.compose.animation.core.Animatable(0f) }
     var travel by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val dens = androidx.compose.ui.platform.LocalDensity.current
@@ -221,14 +268,25 @@ fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 250
             x.animateTo(0f, ease)
         }
     }
-    clipToBounds().layout { m, c ->
-        val p = m.measure(c.copy(minWidth = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
-        val w = (if (c.hasBoundedWidth) p.width.coerceAtMost(c.maxWidth) else p.width).coerceAtLeast(c.minWidth)
-        val t = if (p.width > w) p.width - w + endGap.roundToPx() else 0
-        if (t != travel) travel = t
-        // moved by the layer only: a frame of sliding redraws it, nothing is measured or placed again
-        layout(w, p.height) { p.placeWithLayer(0, 0) { translationX = x.value } }
-    }
+    val fades = fadeStart > 0.dp || fadeEnd > 0.dp
+    this.then(if (!fades) Modifier else Modifier.graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }.drawWithContent {
+            drawContent()
+            val w = size.width; if (travel <= 0 || w <= 0f) return@drawWithContent
+            val moved = (-x.value).coerceIn(0f, travel.toFloat()); val left = travel - moved
+            // each fade as wide as there's text hidden past it, up to its full width
+            val a = (min(moved, fadeStart.toPx()) / w).coerceIn(0f, .45f); val b = (min(left, fadeEnd.toPx()) / w).coerceIn(0f, .45f)
+            if (a <= 0f && b <= 0f) return@drawWithContent
+            drawRect(Brush.horizontalGradient(0f to (if (a > 0f) Color.Transparent else Color.Black), a to Color.Black, (1 - b) to Color.Black, 1f to (if (b > 0f) Color.Transparent else Color.Black)),
+                blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+        })
+        .clipToBounds().layout { m, c ->
+            val p = m.measure(c.copy(minWidth = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
+            val w = (if (c.hasBoundedWidth) p.width.coerceAtMost(c.maxWidth) else p.width).coerceAtLeast(c.minWidth)
+            val t = if (p.width > w) p.width - w + endGap.roundToPx() else 0
+            if (t != travel) travel = t
+            // moved by the layer only: a frame of sliding redraws it, nothing is measured or placed again
+            layout(w, p.height) { p.placeWithLayer(0, 0) { translationX = x.value } }
+        }
 }
 
 /** Out past the side margins by [by] on each side (the bars, to the screen's edges: 0.46.1). */

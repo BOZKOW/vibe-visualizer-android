@@ -88,9 +88,9 @@ import kotlinx.coroutines.launch
 fun Sheets() {
     val close = { E.sheet = null; Ping.open = false; E.poke() }
     // the sheet pops out of the button that opened it
-    PopSheet(E.sheet, close, if (S.glass) Color(0xFF0E0E14).copy(alpha = .62f) else MaterialTheme.colorScheme.surfaceContainer, glass = S.glass) { s ->
+    PopSheet(E.sheet, close, Color(0xFF0E0E14).copy(alpha = .62f), glass = true) { s ->
         // at rest nothing sits in the fades (the title's top was faded): the room they take, above and below
-        Column(Modifier.fillMaxWidth().then(if (S.glass) Modifier.fadeEdges(16.dp, 16.dp) else Modifier).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(top = 12.dp, bottom = 18.dp).navBarsSpace()) {
+        Column(Modifier.fillMaxWidth().fadeEdges(16.dp, 16.dp).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(top = 12.dp, bottom = 18.dp).navBarsSpace()) {
             when (s) {
                 "audio" -> AudioSheet()
                 "net" -> NetSheet()
@@ -106,7 +106,7 @@ fun Sheets() {
 private fun SheetCard(content: @Composable ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(22.dp)
     Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)
-        .then(if (S.glass) Modifier.glass(shape) else Modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)).padding(16.dp), content = content)
+        .glass(shape).padding(16.dp), content = content)
 }
 
 /** A thin line between the parts of a card (as in Settings). */

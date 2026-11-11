@@ -44,6 +44,16 @@ import kotlin.math.sin
  *  change cost nothing but moving and blurring that layer. */
 private val SPACES = Regex("\\s+")   // (kept: a new one for every lyric line added up)
 private val OPEN_BRACKET = Regex("^\\s*[(\\[]")
+private val CLOSE_BRACKET = Regex("[)\\]]\\s*$")
+private val BRACKETED = Regex("^\\s*[(\\[][^()\\[\\]]*[)\\]]\\s*$")   // all of it in one pair of brackets ("(a) and (b)" isn't)
+
+/** Background vocals' words as shown, with Background vocals in brackets [br] on or off: on, as they are (in brackets if
+ *  they have none); off, without the one pair they may come in. */
+internal fun bgBrackets(t: String, br: Boolean): String = when {
+    br && !OPEN_BRACKET.containsMatchIn(t) -> "($t)"
+    !br && BRACKETED.matches(t) -> t.replaceFirst(OPEN_BRACKET, "").replaceFirst(CLOSE_BRACKET, "").trim()
+    else -> t
+}
 
 /** With the Focus style and Cover in long breaks: the cover takes a break's place from this long (s). Every other break
  *  has its dots, however long. */
@@ -199,7 +209,7 @@ class LyricsRenderer {
 
     fun leave() { if (lines.isNotEmpty() && !S.low) { leaving = true; leaveA.set(0f, now(), 350.0, Ease.ease) } }
 
-    fun enter() { if (!S.low) { enterAt = now() + 16; enterFrom = max(0, li) } }
+    fun enter() { if (!S.low && !S.calm) { enterAt = now() + 16; enterFrom = max(0, li) } }   // (Motion sickness: no drift in)
 
     private fun release() { lv.forEach { d -> d.layer?.let { l -> releaser?.invoke(l) }; d.inner?.let { l -> releaser?.invoke(l) }; d.layer = null; d.inner = null } }
     var releaser: ((GraphicsLayer) -> Unit)? = null
@@ -232,16 +242,24 @@ class LyricsRenderer {
                 val romW = romMode == "replace" && l.rom != null && bwds?.any { it.rom != null } == true
                 val romB = romMode == "replace" && l.rom != null && b.rom != null && !romW
                 val r = Row(1, .75f, 1.18f, .1f, 600)
+                // the brackets go by Background vocals in brackets: on, as the lyrics have them (added where they have
+                // none); off, none, even where the lyrics came with them (a TTML file's "(…)": they showed whatever the setting)
+                val enclosed = BRACKETED.matches(b.text)
                 if (sync && bwds != null && bwds.isNotEmpty() && !romB) {
                     val bts = bwds.mapIndexed { k, w -> TS(w.t, w.end ?: if (k + 1 < bwds.size) bwds[k + 1].t else w.t + 1) }
-                    val brk = br && !OPEN_BRACKET.containsMatchIn(b.text); val n = bwds.size
+                    val brk = br && !OPEN_BRACKET.containsMatchIn(b.text); val strip = !br && enclosed; val n = bwds.size
                     r.pieces = bwds.mapIndexed { k, w ->
                         var t = if (romW && w.rom != null) w.rom!! else w.text
                         if (brk && k == 0) t = "($t"; if (brk && k == n - 1) t = t.trimEnd() + ")"
-                        Pc(t + if (w.sp) " " else "", bts[k])
+                        if (strip && k == 0) t = t.replaceFirst(OPEN_BRACKET, "")
+                        if (strip && k == n - 1) t = t.replaceFirst(CLOSE_BRACKET, "")
+                        Pc(t + if (w.sp && t.isNotBlank()) " " else "", bts[k])   // (a bracket that was a part of its own leaves nothing)
                     }
                     splitLetters(r.pieces!!)
-                } else { val t = if (romB) b.rom!! else b.text; r.text = if (br && !OPEN_BRACKET.containsMatchIn(t)) "($t)" else t }
+                } else {
+                    val t = if (romB) b.rom!! else b.text
+                    r.text = bgBrackets(t, br)
+                }
                 d.rows.add(r)
             }
             // romanization and translation under the line fill in time with it: word by word when the romanized words
@@ -383,7 +401,7 @@ class LyricsRenderer {
                     // its room comes and goes at once for where the lyrics are placed; on screen the lines after it slide
                     // over (they jumped by its height in one frame: 133 px at a break's end on a phone on its side)
                     val nh = if (d.a && !d.longBreak) d.hText else 0f
-                    if (nh != d.h && S.lsmooth && !S.low) { d.dotOff.snap(d.dotOff.value(now) + d.h - nh); d.dotOff.set(0f, now, 550.0, Ease.ease) }
+                    if (nh != d.h && S.lsmooth && !S.low && !S.calm) { d.dotOff.snap(d.dotOff.value(now) + d.h - nh); d.dotOff.set(0f, now, 550.0, Ease.ease) }
                     nh
                 }
                 S.xBgPop && !isStatic && d.bgH > 0 -> d.hText - d.bgH * (1 - d.bgOpen.value(now))
@@ -526,13 +544,14 @@ class LyricsRenderer {
         }
         if (d.dots && !focus) op = if (d.a && !d.longBreak) 1f else 0f
         if (free) { bl = 0f; if (!d.a && !d.fv) op = .55f; y = 0f; x = 0f; dO = 300.0 }
+        if (S.calm) { y = 0f; x = 0f }   // Motion sickness: the Focus style's lines fade in and out where they are, never fly
         d.opacity.set(op, t, if (d.dots) 140.0 else dO, eO)
         d.blur.set(bl, t, dB, eB)
         d.fy.set(y, t, dT, eT); d.fx.set(x, t, dT, eT)
         // (Low performance mode: no fades, no flights)
         if (snap || S.low) { d.opacity.snap(op); d.blur.snap(bl); d.fy.snap(y); d.fx.snap(x) }
-        if (S.xBgPop) { if (S.low) d.bgOpen.snap(if (d.a) 1f else 0f) else d.bgOpen.set(if (d.a) 1f else 0f, t, 500.0, Ease.eOut) } else d.bgOpen.snap(1f)
-        if (d.dots) { if (S.low) d.dotOp.snap(if (d.a && !d.longBreak) 1f else 0f) else d.dotOp.set(if (d.a && !d.longBreak) 1f else 0f, t, 140.0, Ease.linear) }
+        if (S.xBgPop) { if (S.low || S.calm) d.bgOpen.snap(if (d.a) 1f else 0f) else d.bgOpen.set(if (d.a) 1f else 0f, t, 500.0, Ease.eOut) } else d.bgOpen.snap(1f)
+        if (d.dots) { if (S.low || S.calm) d.dotOp.snap(if (d.a && !d.longBreak) 1f else 0f) else d.dotOp.set(if (d.a && !d.longBreak) 1f else 0f, t, 140.0, Ease.linear) }
     }
 
     /* ---- where the lyrics sit (place / fitLine) ---- */
@@ -627,7 +646,7 @@ class LyricsRenderer {
     private fun pins(i: Int, by: Float, t: Double) {
         if (i < 0) { pinRowTop = 0f; pinRowH = 0f }
         pinI = if (by != 0f) i else -1
-        val ms = if (S.lsmooth && !S.low) 550.0 else 0.0
+        val ms = if (S.lsmooth && !S.low && !S.calm) 550.0 else 0.0
         for (d in lv) { val to = if (d.i == i) by else 0f; if (d.pin.target != to) d.pin.set(to, t, ms, Ease.eOut) }
     }
 
@@ -706,6 +725,14 @@ class LyricsRenderer {
 
     private fun setLyY(y: Float, t: Double) {
         if (lyFree) return
+        if (S.calm && !S.low) {   // Motion sickness: no scroll; a soft fade out and in around the move (draw)
+            if (gliding) { lyY.snap(lyG.value(t)); gliding = false }
+            if (abs(y - (calmTo ?: lyY.target)) < 1f) return
+            if (calmTo == null) calmAt = t   // (a new place while fading out: the same fade, to the newer place)
+            calmTo = y
+            return
+        }
+        calmTo = null
         // on its side, and a tall line anywhere but the small window: they glide instead of snapping into place, on the
         // words' timing (frame, fitLine); it keeps its speed when the target moves on
         if (S.lsmooth && !S.low && !pipScroll() && ((softScroll() && !S.xFocus) || lyTall)) {   // (the Focus style's as upright)
@@ -770,14 +797,14 @@ class LyricsRenderer {
         val dt = min(.1, max(0.0, (t - (if (lastWT == 0.0) t else lastWT)) / 1000)); lastWT = t
         if (li >= 0) moving.add(li)
         lAct.forEach { moving.add(it) }
-        val simple = S.low || S.lsimple
+        val simple = S.low || S.lsimple || S.calm   // (Motion sickness: the words fill in place, no lift or bounce)
         val refreshed = S.lsimple && S.xRefSimple && !S.low && !reduceMotion()
         val it = moving.iterator()
         while (it.hasNext()) {
             val k = it.next(); val d = lv.getOrNull(k)
             if (d == null) { it.remove(); continue }
             // Low performance mode: a break's dots simply show, without their breathing and filling
-            if (d.dots && S.low) { val on = if (d.a && !d.longBreak) 1f else 0f; if (d.dotScale.v != on) { d.dotScale.snap(on); restDots(d) }; it.remove(); continue }
+            if (d.dots && (S.low || S.calm)) { val on = if (d.a && !d.longBreak) 1f else 0f; if (d.dotScale.v != on) { d.dotScale.snap(on); restDots(d) }; it.remove(); continue }
             d.dirty = true
             if (d.dots) {
                 if (k > li) { restDots(d); it.remove(); continue }
@@ -951,11 +978,25 @@ class LyricsRenderer {
         }
     }
 
+    // Motion sickness (S.calm): the place the lyrics go to next (setLyY), and when they started to fade out for it
+    private var calmTo: Float? = null; private var calmAt = 0.0; private var calmInAt = -1e9
+    /** How much the lyrics show (Motion sickness): out over 140 ms, put in their new place unseen, in over 260 ms. */
+    private fun calmFade(t: Double): Float {
+        val to = calmTo
+        if (to != null) {
+            val k = (t - calmAt) / 140
+            if (k < 1) return (1 - .9 * Ease.ease(k)).toFloat()
+            lyY.snap(to); calmTo = null; calmInAt = t
+        }
+        val k = (t - calmInAt) / 260
+        return if (k >= 1) 1f else (.1 + .9 * Ease.eOut(k.coerceAtLeast(0.0))).toFloat()
+    }
+
     fun draw(ds: DrawScope, obtain: () -> GraphicsLayer) {
         if (lines.isEmpty() || W <= 0) return
         if (!laidOut) { layoutAll(); tops(now()) }
         val t = now()
-        val la = leaveA.value(t)
+        val la = leaveA.value(t) * calmFade(t)
         val pad = ceil(F * .7f).toInt()
         val baseY = if (isStatic) (if (bleedTop > 0f) 12 * dens else H * .09f) - stScroll else if (gliding) lyG.value(t) else lyY.value(t)
         val st = isStatic
@@ -1002,7 +1043,7 @@ class LyricsRenderer {
             inner.alpha = op.coerceIn(0f, 1f)
             val blurPx = if (st || lyFree || hush) 0f else d.blur.value(t) * F
             val tapK = ((t - d.tapAt) / 260).coerceIn(0.0, 1.0).toFloat()
-            val sc = if (tapK < 1f && !S.low) .97f + .03f * Ease.easeOut(tapK.toDouble()).toFloat() else 1f
+            val sc = if (tapK < 1f && !S.low && !S.calm) .97f + .03f * Ease.easeOut(tapK.toDouble()).toFloat() else 1f
             layer.scaleX = sc; layer.scaleY = sc
             layer.pivotOffset = androidx.compose.ui.geometry.Offset(if (d.opp) pad + avail else pad.toFloat(), h / 2f)
             val fx2 = effect(blurPx, d.a && !S.low && !st && !hush); if (layer.renderEffect !== fx2) layer.renderEffect = fx2
@@ -1078,7 +1119,7 @@ class LyricsRenderer {
                     else -> if (r.kind == 1) .3f else .5f
                 }
                 // how this row moves: springs (Spicy Lyrics), refreshed simple mode, or a plain fill
-                val mode = when { st -> 0; r.kind == 0 && refreshedOn -> 2; S.low || S.lsimple -> 1; else -> 3 }
+                val mode = when { st -> 0; r.kind == 0 && refreshedOn -> 2; S.low || S.lsimple || S.calm -> 1; else -> 3 }
                 val restScale = if (mode != 3 || far) 1.0 else .95
                 val fillOn = active
                 val glowOk = fillOn && (mode == 3 || mode == 2)

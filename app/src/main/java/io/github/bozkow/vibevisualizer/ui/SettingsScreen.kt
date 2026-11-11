@@ -1,5 +1,8 @@
 package io.github.bozkow.vibevisualizer.ui
 
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
 import kotlin.math.roundToInt
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.heightIn
@@ -149,6 +152,8 @@ object SettingsUi {
     var last = "look"
     /** Settings over the player as a live blurred layer; in Low performance mode they cover it instead. */
     val live get() = !S.low
+    /** All of Settings as drawn, for a notice over them to show blurred behind its glass (TopNotes); null when closed. */
+    var backdrop: Backdrop? = null
 }
 
 /* ---- the settings, declared once: shown in their pages, and found by the search box ---- */
@@ -159,7 +164,8 @@ sealed class Item(val search: String) {
     class Sl(val k: String, val t: String, val min: Int, val max: Int, val step: Int = 1, val d: String = "", val fmt: (Int) -> String = { "$it%" }) : Item("$t $d")
     class Ch(val k: String, val t: String, val opts: List<Pair<String, String>>, val d: String = "") : Item("$t $d " + opts.joinToString(" ") { it.second })
     class Txt(val t: String) : Item(t)
-    class Custom(text: String, val c: @Composable () -> Unit) : Item(text)
+    /** [onTap]: what a tap anywhere on its tile does (a row whose one job is a button: the gallery pickers). */
+    class Custom(text: String, val onTap: (() -> Unit)? = null, val shown: () -> Boolean = { true }, val c: @Composable () -> Unit) : Item(text)
 }
 /** A page of Settings: [sub] says what's on it (under its name in the list), [group] which card it's in there. */
 class Page(val id: String, val name: String, val icon: ImageVector, val items: List<Item>, val sub: String = "", val group: Int = 0)
@@ -174,19 +180,17 @@ private val BAR_CHOICES = listOf("where" to "Where it plays (Spotify) / what the
 
 private fun pages(): List<Page> = listOf(
     Page("look", "Look", Icons.Rounded.Palette, listOf(
-        Item.Sub("Design"),
-        Item.Ch("aDesign", "Design", listOf("android" to "Android", "glass" to "Glass"), "Android: Material You, with the colors of the cover. Glass: frosted glass over your cover: Settings, the panels and the sheets let the blurred cover show through."),
         Item.Sub("Colours"),
         Item.Ch("theme", "Theme", listOf("cover" to "Cover colors", "aurora" to "Aurora", "sunset" to "Sunset", "neon" to "Neon", "ice" to "Ice", "mono" to "Mono", "custom" to "Custom"), "Cover colors: from the Canvas while one plays."),
         Item.Custom("Custom colors") { CustomColors() },
         Item.Sub("Background"),
         Item.Ch("bgStyle", "Background", listOf("dynamic" to "Dynamic (animated cover)", "artist" to "Artist image", "cover" to "Cover art", "color" to "Color", "none" to "None"), "Artist image needs Spotify; other songs use the cover art. Color: the cover’s, or one you pick (pure black for OLED screens)."),
-        Item.Custom("background color your own hex code pure black amoled oled") { BgColor() },
+        Item.Custom("background color your own hex code pure black amoled oled", shown = { S.bgStyle == "color" }) { BgColor() },
         Item.Sl("bgblur", "Blur", 0, 100),
         Item.Sl("bri", "Brightness", 20, 140),
         Item.Sl("sat", "Saturation", 0, 300),
         Item.Sl("bgspeed", "Motion speed (0 = still)", 0, 300, fmt = { if (it == 0) "Still" else String.format(java.util.Locale.getDefault(), "%.2g×", it / 100.0) }),
-    ), sub = "Design, colours, background", group = 0),
+    ), sub = "Colours, background", group = 0),
     Page("player", "Player screen", Icons.Rounded.PlayCircle, listOf(
         Item.Sub("Controls"),
         Item.Ch("uiHide", "Controls while music plays", listOf("idle" to "Hide after a few seconds", "never" to "Always visible"), "While music plays untouched, the controls slide away after a few seconds (the song, the seek bar and the lyrics stay); a tap brings them back."),
@@ -213,7 +217,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("aMotionCover", "Animated covers", "Where an album has one on Apple Music, its looping video plays over the still cover (the big cover, on its side, in long breaks). No account or key is needed: the artist and album go to Apple to find it, and a loop is a few MB, kept on the phone. With a Canvas, the Canvas plays instead. From Spicy Lyrics Mobile."),
         Item.Sw("aMotionFirst", "Animated cover before Canvas", "A song with both: its animated cover plays on the big cover, and the Canvas only on songs without one. The Canvas waits a moment while the cover is looked up. From Spicy Lyrics Mobile."),
         Item.Sw("online", "Search cover online for your own files"),
-        Item.Custom("Choose cover image") { Buttons("Choose cover image…" to { FilePicker.image?.invoke() }) },
+        Item.Custom("Choose cover image", onTap = { FilePicker.image?.invoke() }) { Buttons("Choose cover image…" to { FilePicker.image?.invoke() }) },
         Item.Sub("Screen"),
         Item.Sw("aKeepOn", "Keep the screen on while music plays"),
         Item.Sw("aLock", "Show over the lock screen", "The player shows on the lock screen while it’s open (Keep the screen on, docked in a stand). Settings and the other menus ask you to unlock first."),
@@ -247,7 +251,8 @@ private fun pages(): List<Page> = listOf(
         Item.Sl("cvLyrA", "Canvas behind the lyrics", 0, 80, 5, "How much of the video shows behind the lyrics, dimmed so they stay readable. 0: only its soft glow. From Spicy Lyrics Mobile 0.17.", fmt = pct),
         Item.Sub("Where it comes from"),
         Item.Sw("cvSpicy", "Spicy Lyrics’ Canvas service", "When your server has no Canvas for a Spotify song (or no server is set), its Spotify ID goes to Spicy Lyrics’ Canvas service (spicylyrics.org), which asks Spotify. Nothing else is sent. Unofficial: it may stop working."),
-        Item.Custom("Choose canvas video Canvas endpoint") { CanvasSection() },
+        Item.Custom("Choose canvas video", onTap = { FilePicker.video?.invoke() }) { Buttons("Choose canvas video…" to { FilePicker.video?.invoke() }) },
+        Item.Custom("Canvas endpoint") { CanvasSection() },
     ), sub = "Video background, blur, what’s behind the controls", group = 0),
     Page("viz", "Visualizer", VIcons.bars, listOf(
         Item.Sub("What the bars hear"),
@@ -308,7 +313,7 @@ private fun pages(): List<Page> = listOf(
         Item.Custom("this output headphones car speaker this music app player delay this song resync now") { TimingParts() },
         Item.Sub("Desync"),
         Item.Ch("lDesync", "Desync detection", listOf("ask" to "Ask before fixing", "auto" to "Fix automatically", "off" to "Off"), "Listens to the music and checks that the singing lines up with the lyrics. Needs real sound for the bars (phone sound, Vibe Bridge, the microphone or your own file). A fix only applies to the song playing."),
-        Item.Custom("desync status") { if (Desync.stat.isNotEmpty()) Hint(Desync.stat) },
+        Item.Custom("desync status", shown = { Desync.stat.isNotEmpty() }) { if (Desync.stat.isNotEmpty()) Hint(Desync.stat) },
         Item.Sw("lseekFade", "Seek fade-in compensation", "Tapping a line starts Spotify 300 ms before it, so its fade-in doesn’t clip the first word."),
     ), sub = "All songs, this output, this music app, this song, the desync fix", group = 1),
     Page("tr", "Translation", VIcons.translate, listOf(
@@ -338,10 +343,10 @@ private fun pages(): List<Page> = listOf(
     Page("server", "Server & connection", Icons.Rounded.Dns, listOf(
         Item.Sub("With a server, or without one"),
         Item.Custom("with or without a server local no server mode") { ServerChoice() },
-        Item.Custom("without a server what works") { if (Vibe.cfg.local) WithoutServer() },
+        Item.Custom("without a server what works", shown = { Vibe.cfg.local }) { if (Vibe.cfg.local) WithoutServer() },
         Item.Sub("Your server"),
         Item.Custom("Your server address Tailscale") { if (!Vibe.cfg.local) ServerField() else Hint("Not used without a server. Pick With my server above to set or change it.") },
-        Item.Custom("Connection check your server ping") { if (Server.set) Buttons("Check the connection" to { E.settingsPage = null; Ping.open = true; Ping.kick(); E.sheet = "net" }) },
+        Item.Custom("Connection check your server ping", shown = { Server.set }) { if (Server.set) Buttons("Check the connection" to { E.settingsPage = null; Ping.open = true; Ping.kick(); E.sheet = "net" }) },
         Item.Sub("Spicy Lyrics"),
         Item.Custom("Spicy Lyrics status test connection API key") { SpicyStatus() },
         Item.Sub("Your server’s web app"),
@@ -360,6 +365,8 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("low", "Low performance mode", "For a slower or hot phone: no animations, blurs or frost, no moving background, the cover's colours even with a Canvas, 30 frames a second."),
         Item.Sw("aSaverLow", "Low performance mode with Power saving", "Turns on by itself while the phone’s Power saving is on, and off again when it ends (if it came on that way)."),
         Item.Sw("perfAsk", "Suggest Low performance mode when needed", "Watches how smoothly the app runs while a song plays, and how warm the phone is (the battery at 40 °C or more, or Android saying it’s warm: the warning says which). If the phone can’t keep up, gets warm, or the battery is low, a card offers to turn Low performance mode on."),
+        Item.Sub("Comfort"),
+        Item.Sw("aCalm", "Motion sickness", "Less movement on screen. The lyrics stay where they are and change line with a soft fade instead of scrolling, the words fill in without bouncing or lifting, lines don't fly in or out, long names end in “…” instead of sliding, the background holds still and screens change without sliding. The lyrics keep exact time; the bars and the Canvas still move."),
         Item.Sub("Smoothness"),
         Item.Ch("fpscap", "Limit frame rate", listOf("0" to "Off (as fast as the screen)", "30" to "30 fps", "60" to "60 fps", "90" to "90 fps", "120" to "120 fps"), "How often the animations redraw. 60 fps by default: more is smoother on a 120 Hz screen but warms the phone up and uses more battery."),
         Item.Ch("anim", "Animations", listOf("system" to "Follow the system setting", "on" to "Always on", "off" to "Off"), "“Follow the system setting” turns the animations off when Android’s Remove animations is on (Settings → Accessibility)."),
@@ -411,11 +418,14 @@ fun SettingsScreen() {
         // was left; here the close button and the search share one row
         val short = maxHeight < 480.dp
         BackHandler { if (q.isNotEmpty()) q = "" else if (!wide && page != null && E.settingsPage == null) page = null else if (!wide && page != null) { page = null } else E.settingsPage = null }
-        if (S.glass && !SettingsUi.live) GlassBackdrop()   // Glass in Low performance mode: the blurred cover shows through
+        if (!SettingsUi.live) GlassBackdrop()   // Glass in Low performance mode: the blurred cover shows through
         // contentColor: on Glass's see-through surface the text and icons defaulted to black
         // over the player blurred live (VibeRoot draws it), or the design's own background in Low performance mode
         // over the player as a blurred layer (VibeRoot draws it), or the design's own background in Low performance mode
-        Surface(Modifier.fillMaxSize(), color = if (S.glass || SettingsUi.live) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLowest, contentColor = Color.White) {
+        // all of Settings as drawn, so a notice over them is frosted glass with them blurred behind it (TopNotes)
+        val whole = rememberBackdrop()
+        androidx.compose.runtime.DisposableEffect(whole) { SettingsUi.backdrop = whole; onDispose { if (SettingsUi.backdrop === whole) SettingsUi.backdrop = null } }
+        Surface(Modifier.fillMaxSize().backdropSource(whole), color = Color.Transparent, contentColor = Color.White) {
             // edge to edge: the lists run from the screen's top to its bottom, under the status bar, the title and the search,
             // and behind the navigation bar (they were cut off in a hard line a little under the search); the titles keep
             // clear of the status bar
@@ -423,31 +433,31 @@ fun SettingsScreen() {
             val navH = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
             Row(Modifier.fillMaxSize().windowInsetsPadding(cutoutInsets().only(WindowInsetsSides.Horizontal))) {
                 // the header: as it always was at rest; scrolled, what would lie over the list turns into an island (the title
-                // goes, the search floats on its own, solid, with a shadow) and the list runs on behind it to the screen's top,
-                // fading only at the very top and foot (the owner: "keep the same look ... transform to an island")
+                // goes, the search floats on its own: frosted glass over the list, which runs on behind it, blurred there, to the
+                // screen's top), fading only at the very top and foot (the owner: "keep the same look ... transform to an island")
                 val statusH = topInset.asPaddingValues().calculateTopPadding()
                 val edges = Modifier.fillMaxSize().fadeEdges(statusH + 12.dp, navH + 24.dp)
                 @Composable fun ListPane(m: Modifier) {
                     val resState = rememberLazyListState()
+                    val under = rememberBackdrop()   // the list, for the island's glass
                     val k by collapse(if (q.isNotEmpty() && !wide) resState else listState, 64.dp)
                     var headRest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
                     val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
                     val pad = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + (if (short) 12.dp else 22.dp), bottom = navH + 28.dp)
                     Box(m) {
-                    if (q.isNotEmpty() && !wide) SearchResults(all, q, edges, head, navH, resState)
-                    else LazyColumn(edges, state = listState, contentPadding = pad) {
+                    if (q.isNotEmpty() && !wide) SearchResults(all, q, edges.backdropSource(under), head, navH, resState)
+                    else LazyColumn(edges.backdropSource(under), state = listState, contentPadding = pad) {
                         cardPages(all, page, wide) { open(it) }
                     }
                     Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {
-                        val close = @Composable { IconButton(onClick = { E.settingsPage = null }) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
+                        val close = @Composable { IconButton(onClick = { E.settingsPage = null }, Modifier.then(if (k > .5f) Modifier.padding(4.dp).glassChip(k) else Modifier)) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
                         val search = @Composable { sm: Modifier, x: Boolean ->
-                            TextField(q, { q = it }, sm.island(k).then(if (S.glass) Modifier.glass(RoundedCornerShape(28.dp)) else Modifier.clip(RoundedCornerShape(28.dp))), singleLine = true,
+                            TextField(q, { q = it }, sm.glassIsland(under, k).glass(RoundedCornerShape(28.dp)), singleLine = true,
                                 placeholder = { Text("Search settings", color = Color.White.copy(alpha = .55f)) },
                                 // (an island: the close button comes into it, the title it was beside being gone)
                                 leadingIcon = { if (x) close() else Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = .7f)) },
                                 trailingIcon = { if (q.isNotEmpty()) IconButton(onClick = { q = "" }) { Icon(Icons.Rounded.Close, "Clear") } },
-                                colors = if (S.glass) TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent)
-                                    else TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent))
+                                colors = TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent))
                         }
                         if (short) Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 14.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) { close(); search(Modifier.weight(1f), false) }
                         else {
@@ -457,23 +467,29 @@ fun SettingsScreen() {
                             }
                             search(Modifier.fillMaxWidth().padding(horizontal = 16.dp + 6.dp * k, vertical = 8.dp), k > .5f)
                         }
+                        SettingsNote(under, Modifier.padding(horizontal = 6.dp * k))
                     }
                     }
                 }
                 @Composable fun PagePane(pg: Page) {
                     val st = rememberLazyListState()
+                    val under = rememberBackdrop()
                     val k by collapse(st, 48.dp)
                     var headRest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
                     val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
                     Box(Modifier.fillMaxSize()) {
-                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges, head, navH, st)
-                        // the page's title row: scrolled, an island too (back and the name, smaller, on its own solid pill)
-                        Box(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset).padding(horizontal = 12.dp * k, vertical = 6.dp * k)) {
+                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges.backdropSource(under), head, navH, st)
+                        // the page's title row: scrolled, an island too (back and the name, smaller, on frosted glass)
+                        // (the notice under it belongs to the header: the list starts under both)
+                        Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {
+                        Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp * k, vertical = 6.dp * k)) {
                             // (a short name: a short island, round its back arrow and name; at rest the row as wide as ever)
-                            Row(Modifier.then(if (k > .001f) Modifier else Modifier.fillMaxWidth()).island(k, solid = true).padding(start = 8.dp, end = 16.dp, top = 6.dp * (1 - k)).then(if (short) Modifier.defaultMinSize(minHeight = 56.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {   // (level with the search)
-                                if (!wide) IconButton(onClick = { page = null }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) } else Spacer(Modifier.width(16.dp))
+                            Row(Modifier.then(if (k > .001f) Modifier else Modifier.fillMaxWidth()).glassIsland(under, k).padding(start = 8.dp, end = 16.dp, top = 6.dp * (1 - k)).then(if (short) Modifier.defaultMinSize(minHeight = 56.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {   // (level with the search)
+                                if (!wide) IconButton(onClick = { page = null }, Modifier.then(if (k > .5f) Modifier.padding(4.dp).glassChip(k) else Modifier)) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) } else Spacer(Modifier.width(16.dp))
                                 Text(pg.name, fontSize = ((if (short) 24f else 28f) - 8f * k).sp, fontWeight = FontWeight.SemiBold, color = Color.White, letterSpacing = (-.3).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
+                        }
+                        if (!wide) SettingsNote(under, Modifier.padding(horizontal = 6.dp * k))
                         }
                     }
                 }
@@ -527,7 +543,7 @@ private fun SearchResults(all: List<Page>, q: String, modifier: Modifier, head: 
     LazyColumn(modifier, state = state ?: rememberLazyListState(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + 22.dp, bottom = foot + 40.dp)) {
         hits.forEach { (p, its) ->
             item(key = "h" + p.id) { Box(Modifier.animateItem()) { CardLabel(Item.Sub(p.name)) } }
-            item(key = "c" + p.id) { Box(Modifier.animateItem()) { SegGroup(its.size) { i -> Box(Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) { ItemView(its[i]) } } } }
+            item(key = "c" + p.id) { Box(Modifier.animateItem()) { ItemGroup(its) } }
         }
     }
 }
@@ -550,18 +566,6 @@ private fun collapse(st: androidx.compose.foundation.lazy.LazyListState, by: Dp)
 private fun Modifier.collapseHeight(k: Float): Modifier = this.layout { m, c ->
     val p = m.measure(c); val h = (p.height * (1f - k)).roundToInt()
     layout(p.width, h) { p.place(0, h - p.height) }
-}
-
-/** The island a header turns into as the list scrolls under it ([k]): solid, so what scrolls behind it doesn't show through
- *  its words, with a shadow over the list. [solid]: it has no fill of its own at rest (a title row), so it gets the
- *  design's own (Glass: dark with the light edge; Android: its tonal container). */
-@Composable
-private fun Modifier.island(k: Float, solid: Boolean = false): Modifier {
-    if (k <= 0f) return this
-    val sh = RoundedCornerShape(28.dp)
-    val fill = if (S.glass || !solid) Color(0xFF15151E) else MaterialTheme.colorScheme.surfaceContainerHigh
-    return this.shadow(10.dp * k, sh, clip = false).background(fill.copy(alpha = .94f * k), sh)
-        .then(if (solid && S.glass) Modifier.border(1.dp, GlassEdge.copy(alpha = GlassEdge.alpha * k), sh).clip(sh) else if (solid) Modifier.clip(sh) else Modifier)
 }
 
 @Composable
@@ -606,37 +610,51 @@ private fun needs(k: String): String? = when (k) {
 
 /** Greyed (fading) while it can't be changed, with why under it. */
 @Composable
-private fun Needs(k: String, content: @Composable (Boolean) -> Unit) {
+private fun Needs(k: String, h: Dp = 0.dp, content: @Composable (Boolean) -> Unit) {
     val why = needs(k)
     val last = remember { arrayOfNulls<String>(1) }; if (why != null) last[0] = why
     val a by animateFloatAsState(if (why != null) .38f else 1f, tween(220), label = "needs")
     Column(Modifier.fillMaxWidth()) {
         Box(Modifier.graphicsLayer { alpha = a }) { content(why == null) }
         AnimatedVisibility(why != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-            Text(last[0] ?: "", fontSize = 12.5.sp, color = Color(0xFFFFD27A).copy(alpha = .9f), modifier = Modifier.padding(bottom = 6.dp))
+            Text(last[0] ?: "", fontSize = 12.5.sp, color = Color(0xFFFFD27A).copy(alpha = .9f), modifier = Modifier.padding(start = h, end = h, bottom = 6.dp))
         }
     }
 }
 
+/** One setting on its tile: [h] / [v] the tile's padding and [shape] its shape, so a switch, a choice or a one-button row
+ *  takes a tap anywhere on the tile (with its press and ripple there), not only on its text or its control. */
 @Composable
-fun ItemView(it: Item) {
+fun ItemView(it: Item, h: Dp = 0.dp, v: Dp = 0.dp, shape: Shape = RoundedCornerShape(16.dp)) {
     when (it) {
-        is Item.Head -> Text(it.t, Modifier.padding(top = 22.dp, bottom = 6.dp), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        is Item.Sub -> SectionLabel(it.t)
-        is Item.Txt -> Hint(it.t)
+        is Item.Head -> Text(it.t, Modifier.padding(horizontal = h).padding(top = 22.dp + v, bottom = 6.dp + v), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        is Item.Sub -> Box(Modifier.padding(horizontal = h, vertical = v)) { SectionLabel(it.t) }
+        is Item.Txt -> Box(Modifier.padding(horizontal = h, vertical = v)) { Hint(it.t) }
         // a Column, not a Box: rows that put several things one under another (the server field, its Test and save
-        // button and its answer) were drawn over each other
-        is Item.Custom -> Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) { it.c() }
-        is Item.Sw -> Needs(it.k) { on -> Row(Modifier.fillMaxWidth().then(if (on) Modifier.squishClick { S.set(it.k, !S.b(it.k)); E.haptic() } else Modifier).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
-                if (it.d.isNotEmpty()) Text(it.d, fontSize = 13.5.sp, lineHeight = 19.sp, color = Color.White.copy(alpha = .62f), modifier = Modifier.padding(top = 2.dp))
+        // button and its answer) were drawn over each other. With [Item.Custom.onTap] the whole tile does its job (its button
+        // still does too: a tap on it is the button's alone)
+        is Item.Custom -> {
+            val tap = it.onTap
+            Column(Modifier.fillMaxWidth().then(if (tap != null) Modifier.squishClick(shape, .985f) { E.haptic(); tap() } else Modifier)
+                .padding(horizontal = h, vertical = v).padding(vertical = 4.dp)) { it.c() }
+        }
+        // the whole tile is the switch; the switch itself only shows where it is, so a tap never counts twice (and TalkBack
+        // reads the row as one switch)
+        is Item.Sw -> Needs(it.k, h) { on ->
+            val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            Row(Modifier.fillMaxWidth().pressScale(src, .985f).clip(shape)
+                .toggleable(S.b(it.k), src, androidx.compose.material3.ripple(), enabled = on, role = Role.Switch) { x -> S.set(it.k, x); E.haptic() }
+                .padding(horizontal = h, vertical = v).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                    if (it.d.isNotEmpty()) Text(it.d, fontSize = 13.5.sp, lineHeight = 19.sp, color = Color.White.copy(alpha = .62f), modifier = Modifier.padding(top = 2.dp))
+                }
+                if (on) ResetBtn(it.k)
+                Spacer(Modifier.width(8.dp))
+                VSwitch(S.b(it.k), null, enabled = on)
             }
-            if (on) ResetBtn(it.k)
-            Spacer(Modifier.width(8.dp))
-            VSwitch(S.b(it.k), { v -> S.set(it.k, v); E.haptic() }, enabled = on)
-        } }
-        is Item.Sl -> Needs(it.k) { on -> Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        }
+        is Item.Sl -> Needs(it.k, h) { on -> Column(Modifier.fillMaxWidth().padding(horizontal = h, vertical = v).padding(vertical = 6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White, modifier = Modifier.weight(1f))
                 if (on) ResetBtn(it.k)
@@ -646,12 +664,13 @@ fun ItemView(it: Item) {
             Slider((S.i(it.k) - it.min) / range, { f -> S.set(it.k, it.min + (Math.round(f * range / it.step) * it.step)) }, enabled = on, steps = 0, colors = glassSlider())
             if (it.d.isNotEmpty()) Hint(it.d)
         } }
-        is Item.Ch -> Needs(it.k) { on ->
+        // the whole tile (its note too) opens the choices
+        is Item.Ch -> Needs(it.k, h) { on ->
             var open by remember { mutableStateOf(false) }
             val cur = it.opts.find { o -> o.first == S.str(it.k) }?.second ?: S.str(it.k)
-            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Column(Modifier.fillMaxWidth().clip(shape).clickable(enabled = on, role = Role.DropdownList) { open = true }.padding(horizontal = h, vertical = v).padding(vertical = 4.dp)) {
                 Box {
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(enabled = on) { open = true }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
                             // a new choice slides in
@@ -924,8 +943,7 @@ private fun SessionStatus() {
 private fun CanvasSection() {
     var u by remember { mutableStateOf(Vibe.cfg.canvasUrl) }
     Column {
-        Buttons("Choose canvas video…" to { FilePicker.video?.invoke() })
-        OutlinedTextField(u, { u = it; Vibe.cfg.saveCanvasUrl(it) }, Modifier.fillMaxWidth().padding(top = 8.dp), label = { Text("Canvas endpoint") }, placeholder = { Text("/api/canvas?id={id}") }, singleLine = true)
+        OutlinedTextField(u, { u = it; Vibe.cfg.saveCanvasUrl(it) }, Modifier.fillMaxWidth(), label = { Text("Canvas endpoint") }, placeholder = { Text("/api/canvas?id={id}") }, singleLine = true)
         Hint("Spotify’s public API doesn’t include Canvas videos; your server finds them (with its sp_dc cookie). Another source works too: a URL that returns a video, or JSON with a url field. Placeholders: {id} {uri} {title} {artist}. An address starting with / is on your server.")
     }
 }
@@ -1078,9 +1096,18 @@ private fun SegGroup(n: Int, row: @Composable (Int) -> Unit) {
     Column(Modifier.fillMaxWidth().widthIn(max = 760.dp).padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         for (i in 0 until n) {
             val sh = segShape(i, n)
-            Box(Modifier.fillMaxWidth().then(if (S.glass) Modifier.glass(sh) else Modifier.clip(sh).background(MaterialTheme.colorScheme.surfaceBright))) { row(i) }
+            Box(Modifier.fillMaxWidth().glass(sh)) { row(i) }
         }
     }
+}
+
+/** A section's settings, each on its tile ([SegGroup]); a row with nothing to show at the moment has no tile (an empty
+ *  sliver of glass showed, e.g. the background colour picker with another background). */
+@Composable
+private fun ItemGroup(its: List<Item>) {
+    val shown = its.filter { x -> x !is Item.Custom || x.shown() }
+    if (shown.isEmpty()) return
+    SegGroup(shown.size) { i -> ItemView(shown[i], 18.dp, 4.dp, segShape(i, shown.size)) }
 }
 
 private fun segShape(i: Int, n: Int): RoundedCornerShape {
@@ -1091,7 +1118,7 @@ private fun segShape(i: Int, n: Int): RoundedCornerShape {
 /** A heading or a note between the cards: white enough, with a soft shadow, to read on any cover. */
 @Composable
 private fun CardLabel(it: Item) {
-    val sh = androidx.compose.ui.text.TextStyle(shadow = if (S.glass) androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = .6f), androidx.compose.ui.geometry.Offset(0f, 1f), 6f) else null)
+    val sh = androidx.compose.ui.text.TextStyle(shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = .6f), androidx.compose.ui.geometry.Offset(0f, 1f), 6f))
     when (it) {
         is Item.Head -> Text(it.t, Modifier.padding(start = 8.dp, top = 22.dp, bottom = 4.dp), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color.White, style = sh)
         is Item.Sub -> Text(it.t.uppercase(), Modifier.padding(start = 10.dp, top = 18.dp, bottom = 6.dp), fontSize = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = 1.2.sp, color = Color.White.copy(alpha = .7f), style = sh)
@@ -1109,7 +1136,7 @@ private fun LazyListScope.cardItems(items: List<Item>) {
     }
     groups.forEachIndexed { gi, (h, its) ->
         if (h != null) item(key = "h$gi") { CardLabel(h) }
-        if (its.isNotEmpty()) item(key = "c$gi") { Box(Modifier.animateItem().staggerIn(gi)) { SegGroup(its.size) { i -> Box(Modifier.padding(horizontal = 18.dp, vertical = 4.dp)) { ItemView(its[i]) } } } }
+        if (its.isNotEmpty()) item(key = "c$gi") { Box(Modifier.animateItem().staggerIn(gi)) { ItemGroup(its) } }
     }
 }
 

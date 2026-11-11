@@ -68,7 +68,8 @@ object Defaults {
         // the player screen
         "aHideSec" to "3",      //   seconds untouched before the controls hide
         "aLike" to true,        //   the heart beside a Spotify song
-        "spRevive" to true,     // the Spotify app closed by Android mid-song: started again
+        "spRevive" to true,
+        "aCalm" to false,       // Motion sickness: less movement (lyrics fade from line to line, names end in "…", a still background)     // the Spotify app closed by Android mid-song: started again
         "aLyrCover" to true,    //   upright, the Lyrics screen: a small cover beside the song's name
         "aTitle" to "m",        //   the song name's size: s, m, l
         "aMarquee" to true,     //   long names scroll
@@ -94,7 +95,7 @@ object Defaults {
         "aHideStatus" to false, // hide the status bar (swipe down to see it)
         "aHideNav" to false,    // hide the navigation bar (swipe up to see it)
         "aTrSvc" to "google",   // the translation service: google, deepl, libre, openai (any OpenAI-compatible), gemini
-        "aDesign" to "android", // the design: android (Material You, the cover's colors) or glass (frosted glass over the cover)
+        "aDesign" to "glass",   // the design: Glass only since 0.50.0 (kept so old backups still read)
     )
 }
 
@@ -121,6 +122,7 @@ class Settings(ctx: Context) {
             if (s("aDesign") == "oneui") v.getValue("aDesign").value = "glass"
             sp.edit().putString("S", toJson().toString()).putInt("mig", 2).apply()
         }
+        if (s("aDesign") != "glass") v.getValue("aDesign").value = "glass"   // Glass only since 0.50.0 (saved settings or a backup may say "android")
         v.getValue("lstyle").value = style()   // from Simple lyrics mode and Focus mode as they are (older settings, a backup)
         // the Lyrics and Visualizer buttons are gone with their screens (0.38.0): the bars and Lyrics timing instead
         for (k in listOf("aBar1", "aBar2", "aBar3", "aBar4", "aBar5")) v.getValue(k).let { st -> when (st.value) { "lyrics" -> st.value = "bars"; "viz" -> st.value = "timing" } }

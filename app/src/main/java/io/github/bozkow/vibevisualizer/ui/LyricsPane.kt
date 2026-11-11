@@ -117,7 +117,8 @@ private fun bandStops(a: Float, b: Float, rp: Float, ends: Float, middle: Float)
  *  over and under this area (the sibling's zIndex puts them under it), blurred out there; this area stays where the lines are
  *  placed and where they're touched. Not the Focus style's: its lines fly in and out by themselves. */
 @Composable
-fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact: Boolean = false, padStart: Float = 22f, padEnd: Float = 30f, problems: Boolean = true, behind: Boolean = false) {
+fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact: Boolean = false, padStart: Float = 22f, padEnd: Float = 30f, problems: Boolean = true, behind: Boolean = false,
+               startRoom: androidx.compose.ui.unit.Dp = 40.dp) {
     val gc = LocalGraphicsContext.current
     val view = Lyr.view
     val dens = LocalDensity.current
@@ -133,8 +134,9 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
     val out = full && !S.low
     val bleedT = if (out) aboveArea else 0; val bleedB = if (out) underArea else 0
     // room at the sides for the blur to fade by itself: on its side, cut off where this column ends, it showed as a sharp line
+    // ([startRoom]: no further than the gap to what's on the left: on its side the blurred lines reached 20 dp over the cover)
     val sideRoom = with(dens) { 40.dp.roundToPx() }
-    val bleedL = if (out) minOf(leftOf, sideRoom) else 0; val bleedR = if (out) minOf(rightOf, sideRoom) else 0
+    val bleedL = if (out) minOf(leftOf, sideRoom, with(dens) { startRoom.roundToPx() }) else 0; val bleedR = if (out) minOf(rightOf, sideRoom) else 0
     val soft = rememberGraphicsLayer()
     // [soft] on a picture of its own, drawn from there by all that show it: the lyrics here and what's frosted upright over them
     val softDone = rememberGraphicsLayer()

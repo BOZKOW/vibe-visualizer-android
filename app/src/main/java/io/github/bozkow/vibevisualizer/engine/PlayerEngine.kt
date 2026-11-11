@@ -215,7 +215,7 @@ object E {
     /** The artist, with the release year beside it (Settings → Player screen → Release year; Spicy Lyrics Mobile 0.18). */
     fun byLine() = if (S.b("aYear") && year.isNotEmpty()) listOf(artist, year).filter { it.isNotEmpty() }.joinToString(" · ") else artist
 
-    fun reduceMotion(): Boolean = S.str("anim") == "off" || (S.str("anim") != "on" && systemAnimOff())
+    fun reduceMotion(): Boolean = S.calm || S.str("anim") == "off" || (S.str("anim") != "on" && systemAnimOff())   // (Motion sickness: always)
     private fun systemAnimOff() = runCatching { Settings.Global.getFloat(Vibe.app.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
 
     /* ================= sources ================= */
@@ -702,6 +702,7 @@ object E {
             "aSession" -> SpotifyApp.refresh(Vibe.app)
             "volume" -> Local.applyVolume()
             "ljoin", "ljoinPace", "lbgBr", "lsimple", "xRefSimple", "romMode", "lfont" -> Lyr.restyle()
+            "aCalm" -> { Lyr.restyle(); Lyr.relayout(); Background.resume() }   // (Motion sickness: the words' springs at rest, the lines placed anew)
             "lprov" -> Lyr.cacheClear()
             "tr", "trTo", "trSkip", "aTrSvc" -> Lyr.decorate()
             "lnotice" -> Lyr.noticeChanged()

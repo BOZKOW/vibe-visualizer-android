@@ -1,5 +1,7 @@
 package io.github.bozkow.vibevisualizer.ui
 
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
@@ -73,30 +75,49 @@ private class SnackLook(val s: E.Snack) : SnackbarVisuals {
 }
 
 /** One-off errors and warnings, one at a time: each stays a few seconds (ten with a button) unless its button is
- *  pressed. On the player they're in the top bar, where "Playing from …" goes; over Settings, a sheet or the setup
- *  guide they come down from the top here. */
+ *  pressed. On the player they're in the top bar, where "Playing from …" goes; in Settings, in their header under the
+ *  search (SettingsNote); over a sheet or the setup guide they come down from the top here. */
 @Composable
 fun TopNotes(modifier: Modifier = Modifier) {
     val cur = E.notes.firstOrNull()   // it stays until OK (or its detail screen's OK)
     val last = remember { arrayOfNulls<E.Snack>(1) }   // still shown while it slides away
     if (cur != null) last[0] = cur
-    val over = E.settingsPage != null || E.wizard || E.sheet != null
+    val over = E.wizard || E.sheet != null
     AnimatedVisibility(cur != null && over && !E.inPip, modifier, enter = slideInVertically { -it } + fadeIn(), exit = slideOutVertically { -it } + fadeOut()) {
         val n = last[0] ?: return@AnimatedVisibility
-        // the same glass as the player's notices: clear white with a light edge, its words in the middle (the kind's
-        // colour), clear of the close button on either side; tapped, its detail screen, whose OK puts it away
-        val q = E.notices().firstOrNull { it.id == "note" + n.id } ?: E.Prob(0, if (n.kind == "err") "err" else if (n.kind == "ok") "ok" else "wait", "note" + n.id, n.msg, n.sub)
-        val shape = RoundedCornerShape(18.dp)
-        val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-        // over Settings' title row, clear of its close button, the whole width after it: nearly solid, so the title under it
-        // doesn't show through (it read as two texts on top of each other)
-        Box(Modifier.fillMaxWidth().padding(start = 56.dp, end = 12.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape)
-            .background(Color(0xFF15151E)).background(GlassFill).border(1.dp, GlassEdge, shape)
-            .clickable(press, androidx.compose.material3.ripple()) { E.haptic(); E.noticeOpen = q }) {
-            Row(Modifier.padding(start = 10.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                NoticeIcon(q.k, 28.dp)
-                Column(Modifier.weight(1f).padding(start = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) { NoticeLines(q) }
-            }
+        // centred on the screen, clear of a close button on both sides alike, as long as its words
+        Box(Modifier.fillMaxWidth().padding(horizontal = 56.dp), contentAlignment = Alignment.TopCenter) {
+            NotePill(n, null, Modifier.widthIn(max = 560.dp))
+        }
+    }
+}
+
+/** Settings' notice: in their header, under the search (or a page's title), as wide as the search, frosted glass over what
+ *  scrolls behind it ([under]). As an overlay at the top it sat on Settings' title, or on the search when scrolled, and
+ *  left of the middle (far left on a wide screen). */
+@Composable
+fun SettingsNote(under: Backdrop?, modifier: Modifier = Modifier) {
+    val cur = E.notes.firstOrNull()
+    val last = remember { arrayOfNulls<E.Snack>(1) }
+    if (cur != null) last[0] = cur
+    AnimatedVisibility(cur != null && !E.wizard && E.sheet == null && !E.inPip, modifier, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
+        val n = last[0] ?: return@AnimatedVisibility
+        NotePill(n, under, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
+    }
+}
+
+/** A one-off notice on frosted glass ([under] blurred behind it, when given): its kind's icon, its words in the middle in the
+ *  kind's colour; tapped, its detail screen, whose OK puts it away. */
+@Composable
+private fun NotePill(n: E.Snack, under: Backdrop?, modifier: Modifier) {
+    val q = E.notices().firstOrNull { it.id == "note" + n.id } ?: E.Prob(0, if (n.kind == "err") "err" else if (n.kind == "ok") "ok" else "wait", "note" + n.id, n.msg, n.sub)
+    val shape = RoundedCornerShape(18.dp)
+    val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Box(modifier.pressScale(press, .97f).glassIsland(under, 1f, shape, tint = .5f)
+        .clickable(press, androidx.compose.material3.ripple()) { E.haptic(); E.noticeOpen = q }, contentAlignment = Alignment.Center) {
+        Row(Modifier.padding(start = 10.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            NoticeIcon(q.k, 28.dp)
+            Column(Modifier.weight(1f, fill = false).padding(start = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) { NoticeLines(q) }
         }
     }
 }

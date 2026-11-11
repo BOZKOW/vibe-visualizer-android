@@ -68,7 +68,7 @@ fun VibeRoot() {
             val sK by animateFloatAsState(if (live && E.settingsPage != null) 1f else 0f, tween(if (E.settingsPage != null) 320 else 240), label = "sblur")
             androidx.compose.runtime.SideEffect { E.quiet = live && sK >= .99f && E.settingsPage != null && !E.inPip }
             // Glass: the player blurs behind the sheets (and behind the heat warning)
-            val qK by animateFloatAsState(if ((S.glass && E.sheet != null || io.github.bozkow.vibevisualizer.engine.Perf.warn > 0 || E.noticeOpen != null) && !S.low) 1f else 0f, tween(260), label = "qblur")
+            val qK by animateFloatAsState(if ((E.sheet != null || io.github.bozkow.vibevisualizer.engine.Perf.warn > 0 || E.noticeOpen != null) && !S.low) 1f else 0f, tween(260), label = "qblur")
             if (E.inPip) { BackgroundLayer(); PipCanvas(); PipScreen(); PipHeat() }
             else {
                 if (!covered) Box(Modifier.fillMaxSize().cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) { BackgroundLayer(); PlayerScreen() }

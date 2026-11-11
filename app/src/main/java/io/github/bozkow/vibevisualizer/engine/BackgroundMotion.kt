@@ -24,7 +24,7 @@ object Background {
     private var stillTok = 0
 
     // (not under Ambient mode's black: it redrew there for nothing, and every redraw keeps a variable-rate screen from idling)
-    fun live() = S.bgStyle == "dynamic" && !S.low && !CanvasVideo.cvlive && E.visible && E.settingsPage == null && !E.wizard && !(E.ambient && S.str("aAmbBg") != "dim")
+    fun live() = S.bgStyle == "dynamic" && !S.low && !S.calm && !CanvasVideo.cvlive && E.visible && E.settingsPage == null && !E.wizard && !(E.ambient && S.str("aAmbBg") != "dim")
 
     fun tick(t: Double, dt: Double) {
         if (!live()) return

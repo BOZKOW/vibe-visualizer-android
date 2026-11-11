@@ -66,7 +66,10 @@ object S {
     val bars get() = s.i("bars")
     val design get() = s.s("design")
     /** Settings → Appearance → Design: Glass (frosted glass over the blurred cover) instead of Android's plain look. */
-    val glass get() = s.s("aDesign") == "glass"
+    /** Motion sickness (Settings → Performance & battery): the lyrics change lines with a soft fade instead of scrolling, no
+     *  bouncing words or flying lines, names end in "…", the background holds still, the screens change without sliding. */
+    val calm get() = s.b("aCalm")
+    val glass get() = true   // Glass is the app's one design since 0.50.0 (the Android design was removed)
     val credPos get() = s.s("credPos")
     val canvasOn get() = s.b("canvasOn")
 }

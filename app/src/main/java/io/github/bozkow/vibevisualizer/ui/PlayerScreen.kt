@@ -345,8 +345,9 @@ private fun LandscapeCanvas() {
                 SeekRow()
                 SideControls()
             }
-            Spacer(Modifier.width(maxOf(st.lyricsStart.dp - start - dockW, 8.dp)))
-            SideColumn(Modifier.weight(1f), endGap = maxOf(st.lyricsEndGap.dp, 8.dp))
+            val gap = maxOf(st.lyricsStart.dp - start - dockW, 8.dp)
+            Spacer(Modifier.width(gap))
+            SideColumn(Modifier.weight(1f), endGap = maxOf(st.lyricsEndGap.dp, 8.dp), startRoom = gap * .8f)
         }
     }
 }
@@ -356,9 +357,19 @@ private fun LandscapeCanvas() {
  *  cover. When the controls hide, the cover has its middle back. */
 @Composable
 private fun LandscapeCover() {
+  BoxWithConstraints(Modifier.fillMaxSize()) {
+    // the cover's size goes by the screen: the height there is (8 dp clear above and below), but no more than 40% of the
+    // width, so the lyrics, the bars and the credits keep most of it (as tall as the screen, it took nearly half a wide
+    // phone: "too large"); never so small its buttons get cramped. Centred in the height
+    val dn = androidx.compose.ui.platform.LocalDensity.current
+    val side = minOf(maxHeight - 16.dp, maxOf(maxWidth * .4f, 280.dp)).coerceAtLeast(160.dp)
+    val gapY = (maxHeight - side) / 2
+    // only what of the status and navigation bars lies over the cover keeps its words clear of them
+    val headIn = (with(dn) { WindowInsets.statusBarsIgnoringVisibility.getTop(dn).toDp() } - gapY).coerceAtLeast(0.dp)
+    val footIn = (with(dn) { WindowInsets.navigationBarsIgnoringVisibility.getBottom(dn).toDp() } - gapY).coerceAtLeast(0.dp)
     // further in on the camera's side: the owner's phone still had the cover in the hole with the room it reports
-    Row(Modifier.fillMaxSize().padding(start = if (cameraOnLeft()) 48.dp else 20.dp, top = 8.dp, bottom = 8.dp)) {
-        Box(Modifier.fillMaxHeight().aspectRatio(1f, matchHeightConstraintsFirst = true).ambientOut().onGloballyPositioned { Frost.cover = it.boundsInWindow() }) {
+    Row(Modifier.fillMaxSize().padding(start = if (cameraOnLeft()) 48.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(side).ambientOut().onGloballyPositioned { Frost.cover = it.boundsInWindow() }) {
             CoverArt(Modifier.fillMaxSize(), corner = 18.dp)
             var headH by remember { mutableFloatStateOf(0f) }
             var footH by remember { mutableFloatStateOf(0f) }
@@ -374,9 +385,9 @@ private fun LandscapeCover() {
                 drawRect(Brush.verticalGradient(0f to Color.Transparent, f * .35f to Color.Black.copy(alpha = .06f), f * .7f to Color.Black.copy(alpha = .22f), f to Color.Black.copy(alpha = .38f), 1f to Color.Black.copy(alpha = .72f), startY = y, endY = size.height),
                     topLeft = Offset(0f, y), size = androidx.compose.ui.geometry.Size(size.width, footH + up))
             }) {
-                TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)).padding(horizontal = 10.dp), side = true)
+                TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.padding(top = headIn).padding(horizontal = 10.dp), side = true)
                 Spacer(Modifier.weight(1f))
-                Column(Modifier.fillMaxWidth().onSizeChanged { footH = it.height.toFloat() }.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(start = 18.dp, end = 18.dp, bottom = 6.dp)) {
+                Column(Modifier.fillMaxWidth().onSizeChanged { footH = it.height.toFloat() }.padding(bottom = footIn).padding(start = 18.dp, end = 18.dp, bottom = 6.dp)) {
                     TitleRow(big = true, toggles = !barsInstead())
                     SeekRow()
                     SideControls()
@@ -384,8 +395,9 @@ private fun LandscapeCover() {
             }
         }
         Spacer(Modifier.width(20.dp))
-        SideColumn(Modifier.weight(1f), endGap = 20.dp)
+        SideColumn(Modifier.weight(1f).padding(vertical = 8.dp), endGap = 20.dp, startRoom = 16.dp)
     }
+  }
 }
 
 /** On its side, the bars take the lyrics' place: the Visualizer, or a song without lyrics. */
@@ -403,18 +415,20 @@ private fun SideControls() {
 /** The right side on its side: the lyrics with the whole height (duets and background vocals have room), or the bars,
  *  then the small bars and the credits under them. All the rest is on the left. */
 @Composable
-private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp) {
-    // edge to edge: the column runs to the screen's right side ([endGap] in from it, the lines placed there as before), its
-    // lyrics blurring out to that side and the bars and credits fading there; the credits clear of the navigation bar
+private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 40.dp) {
+    // the column runs to the screen's right side, its lyrics blurring out there; the lines, the bars and the credits stay
+    // [endGap] in from it, as until 0.47.0 (0.48.0 ran the bars to the edge, faded there: too far right, clipped); the
+    // lyrics' blur reaches no further left than [startRoom] (it lay over the cover's edge); the credits clear of the
+    // navigation bar
     Column(modifier.fillMaxHeight()) {
         val bars = barsInstead()
         if (bars && E.screen != "viz") NoLyricsNote(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)).padding(end = endGap))
         var areaH by remember { mutableFloatStateOf(0f) }
         Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }) {
-            if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 8.dp).fadeSides(0.dp, 28.dp)); AwayNote(Modifier.align(Alignment.Center)) }
-            else LyricsPane(Modifier.fillMaxSize().padding(end = endGap), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false, behind = true)
+            if (bars) { BarsView(Modifier.fillMaxSize().padding(top = 8.dp, bottom = 8.dp, end = endGap)); AwayNote(Modifier.align(Alignment.Center)) }
+            else LyricsPane(Modifier.fillMaxSize().padding(end = endGap), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false, behind = true, startRoom = startRoom)
         }
-        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(34.dp).fadeSides(0.dp, 28.dp))
+        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = endGap).height(34.dp))
         Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }
     }
 }
@@ -603,7 +617,7 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
     var rowW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
     val over = boxW > 0 && rowW > boxW
     Box(Modifier.fillMaxWidth().onSizeChanged { boxW = it.width }, contentAlignment = align) {
-        if (!S.b("aMarquee") || S.low) Row(verticalAlignment = Alignment.CenterVertically) {
+        if (!S.b("aMarquee") || S.low || S.calm) Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) { Icon(icon, null, Modifier.size(12.dp), tint = color); Spacer(Modifier.width(5.dp)) }
             Text(text, Modifier.weight(1f, fill = false), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
@@ -699,7 +713,7 @@ fun NoticeIcon(k: String, size: Dp = 28.dp) {
         "ok" -> Icons.Rounded.CheckCircle to Color.White
         else -> Icons.Rounded.HourglassTop to Color(0xFFFFD27A)
     }
-    Box(Modifier.size(size).clip(CircleShape).background(tint.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(size).clip(CircleShape).background(tint.copy(alpha = .16f)).border(1.dp, tint.copy(alpha = .28f), CircleShape), contentAlignment = Alignment.Center) {   // (glass: its light edge)
         Icon(icon, null, Modifier.size(size * .62f), tint = tint)
     }
 }
@@ -712,7 +726,7 @@ fun NoticeLines(p: E.Prob, row: Boolean = false) {
     val act: @Composable () -> Unit = {}
     // each line scrolls across the pill when it's too long, instead of wrapping (0.46.1); with Scroll long names off, or in Low
     // performance mode, they wrap as before
-    if (S.b("aMarquee") && !S.low) {
+    if (S.b("aMarquee") && !S.low && !S.calm) {
         if (row) NoticeText(androidx.compose.ui.text.buildAnnotatedString {
             withStyle(androidx.compose.ui.text.SpanStyle(color = tint, fontWeight = FontWeight.Bold)) { append(p.t) }
             if (p.s.isNotEmpty()) withStyle(androidx.compose.ui.text.SpanStyle(color = dim, fontSize = 12.sp)) { append("  ·  " + p.s) }
@@ -745,7 +759,7 @@ private fun NoticeText(text: androidx.compose.ui.text.AnnotatedString, size: and
     val over = maxW > 0 && textW > maxW
     val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
     Text(text, Modifier.layout { m, c -> if (c.hasBoundedWidth && c.maxWidth != maxW) maxW = c.maxWidth; val pl = m.measure(c); layout(pl.width, pl.height) { pl.place(0, 0) } }
-        .then(if (over) Modifier.edgeMarquee(16.dp, 16.dp, 12.dp, 12.dp, iter) else Modifier.pingPong(iter)),
+        .then(if (over) Modifier.edgeMarquee(0.dp, 16.dp, 12.dp, 12.dp, iter) else Modifier.pingPong(iter)),   // (not into the icon at its start)
         fontSize = size, fontWeight = weight, color = color, maxLines = 1, softWrap = false, textAlign = TextAlign.Center, onTextLayout = { textW = it.size.width })
 }
 
@@ -850,16 +864,16 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
     var boxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var textW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
     val over = boxW > 0 && textW > boxW
-    if (!S.b("aMarquee") || S.low) {   // Settings → Player screen → Scroll long names, off (or Low performance mode): it ends in "…"
+    if (!S.b("aMarquee") || S.low || S.calm) {   // Settings → Player screen → Scroll long names, off (or Low performance mode, or Motion sickness): it ends in "…"
         Text(text, style = TextStyle(shadow = textShadow), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
         return
     }
-    // too long: the scrolling reaches into the margin on the left (20 dp, or out to the screen's side with [bleedL]), so the
-    // name slides on past where it starts and fades out there instead of being cut in a hard line; at rest it starts where
-    // it always does, its first letter whole. The right edge fades too, showing there's more (at the screen's side with
-    // [bleedR]). A name that fits isn't moved (a centred one would sit off centre)
+    // too long: it slides within its own row, or out to the screen's side where [bleedL] / [bleedR] say nothing else is
+    // there; never over what's beside it (it slid 20 dp over the small cover, and in landscape past the cover's edge).
+    // Each side fades while there's more of the name past it; at rest it starts where it always does, its first letter
+    // whole. A name that fits isn't moved (a centred one would sit off centre)
     val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
-    val scroll = if (over) Modifier.edgeMarquee(if (bleedL > 0.dp) bleedL else 20.dp, bleedR, if (bleedL > 0.dp) 14.dp else 20.dp, if (bleedR > 0.dp) 18.dp else 28.dp, iter)
+    val scroll = if (over) Modifier.edgeMarquee(bleedL, bleedR, 14.dp, if (bleedR > 0.dp) 18.dp else 24.dp, iter)
         else Modifier.pingPong(iter)
     Box(Modifier.onSizeChanged { boxW = it.width }) {
         Text(text, scroll, style = TextStyle(shadow = textShadow),
@@ -943,7 +957,7 @@ private fun BarButton(k: String, d: Dp) {
         "again" -> BarIcon(Icons.Rounded.YoutubeSearchedFor, "Look up the lyrics again", false, d) { Lyr.clearSong() }
         "rotate" -> {
             // tap: turned on its side (or back upright), and it stays so whatever the phone's tilt; hold: follows the phone again
-            val act = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+            val act = androidx.activity.compose.LocalActivity.current
             val side = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             BarIcon(Icons.Rounded.ScreenRotation, if (rotLock) "Rotate the screen (hold: follow the phone)" else "Rotate the screen", rotLock, d,
                 onLongClick = { act?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED; rotLock = false }) {

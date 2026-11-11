@@ -175,8 +175,7 @@ fun PopDialog(open: Boolean, onDismiss: () -> Unit, title: String, text: String,
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(Modifier.fillMaxSize().animateEnterExit(enter = fadeIn(tween(200)), exit = fadeOut(tween(200))).background(Color.Black.copy(alpha = .45f))
                 .clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss))
-            Column(Modifier.animateEnterExit(enter = popIn(o, .2f), exit = popOut(o, .2f)).padding(32.dp).widthIn(min = 280.dp, max = 560.dp).then(if (io.github.bozkow.vibevisualizer.core.S.glass) Modifier.glass(RoundedCornerShape(28.dp), strong = true).background(Color(0xFF101018).copy(alpha = .4f))
-                else Modifier.clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh))
+            Column(Modifier.animateEnterExit(enter = popIn(o, .2f), exit = popOut(o, .2f)).padding(32.dp).widthIn(min = 280.dp, max = 560.dp).glass(RoundedCornerShape(28.dp), strong = true).background(Color(0xFF101018).copy(alpha = .4f))
                 .clickable(remember { MutableInteractionSource() }, null) {}.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 18.dp)) {
                 Text(last.t, fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text(last.x, Modifier.padding(top = 16.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

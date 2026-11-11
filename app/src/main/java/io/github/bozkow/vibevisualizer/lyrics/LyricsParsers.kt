@@ -76,6 +76,12 @@ private fun allByLocal(root: Node, name: String, out: MutableList<Element> = Arr
     return out
 }
 
+/** A word part that runs straight on into the next: one ending in a hyphen ("la-"), or before one starting with one. */
+internal fun joinsNext(text: String, next: String?): Boolean {
+    val a = text.trimEnd(); val b = next?.trimStart() ?: return false
+    return a.endsWith('-') || a.endsWith('‐') || b.startsWith('-') || b.startsWith('‐')
+}
+
 fun parseTTML(x0: String): Parsed {
     val f = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = false; isValidating = false }
     // a file starting with a byte-order mark or spaces, or using &nbsp; (HTML's, not XML's), reads too (Spicy Lyrics Mobile 0.16.1)
@@ -102,8 +108,11 @@ fun parseTTML(x0: String): Parsed {
             } else if (n.nodeType == Node.TEXT_NODE && n.nodeValue.any { it.isWhitespace() } && words.isNotEmpty()) words.last().sp = true
         }
     }
+    // a file with no spaces between its words at all: each gets one, but not inside a hyphenated word ("la-" "la-" "la"
+    // is "la-la-la", not "la- la- la") nor before a part that starts with a hyphen
     fun fix(ws: MutableList<Word>): MutableList<Word> {
-        if (ws.isNotEmpty() && ws.none { it.sp || it.text.lastOrNull()?.isWhitespace() == true }) ws.forEach { it.sp = true }
+        if (ws.isNotEmpty() && ws.none { it.sp || it.text.lastOrNull()?.isWhitespace() == true })
+            ws.forEachIndexed { i, w -> w.sp = !joinsNext(w.text, ws.getOrNull(i + 1)?.text) }
         return ws
     }
     // a word-synced file (its timing="Word", or lines with several timed words): a line of one word ("Oh") is
