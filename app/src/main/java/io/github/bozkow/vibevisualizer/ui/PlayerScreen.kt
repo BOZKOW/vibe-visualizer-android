@@ -415,7 +415,7 @@ private fun SideControls() {
 /** The right side on its side: the lyrics with the whole height (duets and background vocals have room), or the bars,
  *  then the small bars and the credits under them. All the rest is on the left. */
 @Composable
-private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 40.dp) {
+private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 40.dp, lyricsEnd: Dp = 6.dp) {
     // the column runs to the screen's right side, its lyrics blurring out there; the lines, the bars and the credits stay
     // [endGap] in from it, as until 0.47.0 (0.48.0 ran the bars to the edge, faded there: too far right, clipped); the
     // lyrics' blur reaches no further left than [startRoom] (it lay over the cover's edge); the credits clear of the
@@ -426,7 +426,9 @@ private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 4
         var areaH by remember { mutableFloatStateOf(0f) }
         Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }) {
             if (bars) { BarsView(Modifier.fillMaxSize().padding(top = 8.dp, bottom = 8.dp, end = endGap)); AwayNote(Modifier.align(Alignment.Center)) }
-            else LyricsPane(Modifier.fillMaxSize().padding(end = endGap), areaHeightPx = areaH, padStart = 4f, padEnd = 8f, problems = false, behind = true, startRoom = startRoom)
+            // the lyrics nearer the side than the bars ([lyricsEnd]): the other singer's lines, set at the right, end close to
+            // the screen's edge (28 dp in, they sat towards the middle: "move the duet vocals more to the right")
+            else LyricsPane(Modifier.fillMaxSize().padding(end = lyricsEnd), areaHeightPx = areaH, padStart = 4f, padEnd = 6f, problems = false, behind = true, startRoom = startRoom)
         }
         if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = endGap).height(34.dp))
         Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }

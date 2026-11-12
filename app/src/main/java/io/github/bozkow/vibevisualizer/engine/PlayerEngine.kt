@@ -52,6 +52,11 @@ object E {
     var trackVer by mutableIntStateOf(0)           // bumps on every new song (the title animates in)
     var coverTok = 0
         private set
+    /** A new song: its token, and whether it came hard on the last (within 1.2 s: skipping through songs), when what's
+     *  looked up for it waits a moment and gives up if another comes ([quickChange]). */
+    private var tokAt = 0L
+    var quickChange = false; private set
+    private fun newTok(): Int { val n = android.os.SystemClock.uptimeMillis(); quickChange = n - tokAt < 1200; tokAt = n; return ++coverTok }
     var curArtistId = ""
     var playingState by mutableStateOf(false)
         internal set
@@ -269,7 +274,7 @@ object E {
         val nt = tn.title.ifEmpty { t0 }; val na = tn.artist.ifEmpty { MediaApps.artist }
         if (!force && nt == title && na == artist) return
         curArtistId = ""
-        val tok = ++coverTok
+        val tok = newTok()
         CanvasVideo.clear(false); Audio.dropBars()
         title = nt; artist = na; year = ""; album = MediaApps.album; status = ""; trackVer++
         val meta = SongMeta(title = nt, artist = na, album = MediaApps.album, duration = MediaApps.durMs / 1000.0)
@@ -311,7 +316,7 @@ object E {
         // while the DJ talks: the app's name for it and its picture, if any. The lyrics wait for the Web API to name a song: from
         // here they went on "loading" until it did, as onSpDj has nothing more to do once in the DJ
         if (dj) { title = t; artist = a; album = SpotifyApp.album; trackVer++; appShown = t; appArt = art != null && setCoverBitmap(art, "From the Spotify app", coverTok); return }
-        val tok = ++coverTok
+        val tok = newTok()
         Audio.dropBars(); CanvasVideo.clear(true); Lyr.loading()
         title = t; artist = a; year = ""; album = SpotifyApp.album; status = "Spotify"; trackVer++
         appShown = t; earlyId = ""
@@ -326,7 +331,7 @@ object E {
     private var aheadId = ""
     private fun showAhead(m: SongMeta) {
         if (m.id.isEmpty() || m.title.isEmpty()) return
-        val tok = ++coverTok
+        val tok = newTok()
         Audio.dropBars(); CanvasVideo.clear(true)
         title = m.title; artist = m.artist; year = m.year; album = m.album; status = "Spotify"; trackVer++
         aheadId = m.id; appShown = ""; appArt = false; earlyId = ""
@@ -348,7 +353,7 @@ object E {
     var dj = false; private set
     fun onSpDj() {
         if (dj) { updPlay(); return }
-        dj = true; ++coverTok; aheadId = ""; appShown = ""; earlyId = ""
+        dj = true; newTok(); aheadId = ""; appShown = ""; earlyId = ""
         Audio.dropBars(); CanvasVideo.clear(false)
         val named = SpotifyApp.title.isNotEmpty() && SpotifyApp.title != title   // the Spotify app's name for it, when it has moved on
         title = if (named) SpotifyApp.title else "DJ"; artist = if (named) SpotifyApp.artist else "Spotify"; year = ""; album = ""; status = "Spotify"; trackVer++
@@ -371,7 +376,7 @@ object E {
         val early = ahead || (same && earlyId == m.id)   // its lyrics and Canvas are already on their way: they carry on
         appShown = ""; appArt = false; earlyId = ""; aheadId = ""
         if (!same) Audio.dropBars()   // the bars drop and grow back with the new song
-        val tok = if (early) coverTok else ++coverTok
+        val tok = if (early) coverTok else newTok()
         if (!early) CanvasVideo.clear(true)
         title = m.title; artist = m.artist; year = m.year; album = m.album; status = "Spotify"; if (!same) trackVer++
         Vibe.scope.launch {
@@ -409,7 +414,7 @@ object E {
     /** A song of your own starts: title from the file name until its tags are read, then cover and lyrics. */
     fun onFileItem(uri: Uri, name: String) {
         curArtistId = ""
-        val tok = ++coverTok
+        val tok = newTok()
         CanvasVideo.clear(false); Audio.dropBars()   // (the last cover stays until this song's is read: at the end, the default colours if it has none)
         val fn = fileSong(name, null)
         title = fn.title; artist = fn.artist; year = ""; album = ""; status = ""; trackVer++
@@ -450,6 +455,8 @@ object E {
     /* ================= cover pipeline ================= */
 
     suspend fun setCover(url: String, label: String, tok: Int, fresh: Boolean = false, quiet: Boolean = false): Boolean {
+        // skipping through songs: only the cover of the one you stop on is loaded and its colours worked out
+        if (quickChange && tok == coverTok && !fresh) { kotlinx.coroutines.delay(400); if (tok != coverTok) return false }
         val bm = Images.load(url, fresh = fresh) ?: return false
         return setCoverBitmap(bm, label, tok, quiet)
     }
@@ -525,8 +532,19 @@ object E {
         }
     }
 
-    fun prev() { when (src) { "spotify" -> Spotify.previous(); "file" -> Local.previous(); "media" -> MediaApps.previous() } }
+    /** Skipping too fast (the buttons, headphones, a keyboard, the small window): a skip at most every 350 ms and five in
+     *  4 s; more are let go (each asked Spotify again, and started a song's lookups over: rate limits, heat). */
+    private val skips = ArrayDeque<Long>()
+    private fun skipOk(): Boolean {
+        val n = android.os.SystemClock.uptimeMillis()
+        while (skips.isNotEmpty() && n - skips.first() > 4000) skips.removeFirst()
+        if ((skips.isNotEmpty() && n - skips.last() < 350) || skips.size >= 5) return false
+        skips.addLast(n); return true
+    }
+
+    fun prev() { if (!skipOk()) return; when (src) { "spotify" -> Spotify.previous(); "file" -> Local.previous(); "media" -> MediaApps.previous() } }
     fun next() {
+        if (!skipOk()) return
         when (src) {
             "spotify" -> { Spotify.next(); if (S.b("aPreload")) Preload.skip()?.let { showAhead(it) } }
             "file" -> Local.next(); "media" -> MediaApps.next()
