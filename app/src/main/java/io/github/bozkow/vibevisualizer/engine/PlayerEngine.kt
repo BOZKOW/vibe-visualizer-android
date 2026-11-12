@@ -83,6 +83,11 @@ object E {
     var fpsText by mutableStateOf("")
     val barsTick = mutableLongStateOf(0)
     val bgTick = mutableLongStateOf(0)
+    /** One more each frame the engine draws (at the frame limit, Settings → Performance & battery): what moves by the clock
+     *  (the seek bar, a sliding name) reads it, so it moves on the app's frames, never on frames of its own. An animation
+     *  of Compose's runs at the screen's rate (120 Hz) whatever the limit, and the seek bar's never stopped: the whole app
+     *  was drawn 120 times a second all the time (heat). */
+    val drawTick = mutableLongStateOf(0)
     val sec = mutableIntStateOf(0)                 // ticks every second (countdowns)
     private var actRef: WeakReference<Activity>? = null
     val activity: Activity? get() = actRef?.get()
@@ -622,6 +627,7 @@ object E {
         fAcc += min(t - (if (fPrev == 0.0) t else fPrev), 100.0); fPrev = t
         if (fAcc < iv - .5) return
         fAcc = min(fAcc - iv, iv)
+        drawTick.longValue++
         val dt = min(t - (if (last == 0.0) t else last), 50.0); last = t
         if (wall() - secAt >= 1000) { secAt = wall(); sec.intValue++ }
         // Settings over the player: it goes on under their blur 15 to 30 times a second, not at the screen's rate,

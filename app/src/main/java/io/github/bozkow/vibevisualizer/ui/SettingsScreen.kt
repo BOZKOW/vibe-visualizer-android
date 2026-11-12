@@ -441,8 +441,8 @@ fun SettingsScreen() {
                     val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
                     val pad = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + (if (short) 12.dp else 22.dp), bottom = navH + 28.dp)
                     Box(m) {
-                    if (q.isNotEmpty() && !wide) SearchResults(all, q, edges.backdropSource(under), head, navH, resState)
-                    else LazyColumn(edges.backdropSource(under), state = listState, contentPadding = pad) {
+                    if (q.isNotEmpty() && !wide) SearchResults(all, q, edges.backdropSource(under, k > 0f), head, navH, resState)
+                    else LazyColumn(edges.backdropSource(under, k > 0f), state = listState, contentPadding = pad) {
                         cardPages(all, page, wide) { open(it) }
                     }
                     Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {
@@ -474,7 +474,7 @@ fun SettingsScreen() {
                     var headRest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
                     val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
                     Box(Modifier.fillMaxSize()) {
-                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges.backdropSource(under), head, navH, st)
+                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges.backdropSource(under, k > 0f), head, navH, st)
                         // the page's title row: scrolled, an island too (back and the name, smaller, on frosted glass)
                         // (the notice under it belongs to the header: the list starts under both)
                         Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {

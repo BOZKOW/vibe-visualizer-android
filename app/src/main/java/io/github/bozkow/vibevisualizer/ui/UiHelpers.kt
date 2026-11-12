@@ -171,8 +171,8 @@ class Backdrop(internal val layer: androidx.compose.ui.graphics.layer.GraphicsLa
 @Composable
 fun rememberBackdrop(): Backdrop { val l = androidx.compose.ui.graphics.rememberGraphicsLayer(); return remember(l) { Backdrop(l) } }
 
-/** Records what this draws for the islands over it ([b]; null: nothing to record). */
-fun Modifier.backdropSource(b: Backdrop?): Modifier = if (b == null) this else this
+/** Records what this draws for the islands over it ([b]; null, or [on] false while no island shows: nothing recorded). */
+fun Modifier.backdropSource(b: Backdrop?, on: Boolean = true): Modifier = if (b == null || !on) this else this
     .onGloballyPositioned { b.at = it.positionInRoot() }
     .drawWithContent { b.layer.record { this@drawWithContent.drawContent() }; drawLayer(b.layer) }
 
@@ -250,31 +250,39 @@ fun Modifier.edgeMarquee(bleedStart: Dp, bleedEnd: Dp, fadeStart: Dp, fadeEnd: D
  *  the end it's the other way round (a fade that stayed put dimmed the first letters, and sat over what was beside it). */
 fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 2500, fadeStart: Dp = 0.dp, fadeEnd: Dp = 0.dp,
                       onRead: ((Long) -> Unit)? = null): Modifier = composed {
-    val x = remember { androidx.compose.animation.core.Animatable(0f) }
     var travel by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val dens = androidx.compose.ui.platform.LocalDensity.current
     val calm = S.low || io.github.bozkow.vibevisualizer.engine.E.reduceMotion()
-    LaunchedEffect(travel, iterations, calm) {
-        if (travel <= 0) x.snapTo(0f) else if (x.value != 0f) x.animateTo(0f, androidx.compose.animation.core.tween(500))
-        if (travel <= 0 || iterations <= 0 || calm) { onRead?.invoke(0L); return@LaunchedEffect }
-        // a short way at about 36 dp a second; past 120 dp slower, 20 dp a second (a long name or notice flew by), with a
-        // gentle ease in and out (a sine's: its fastest is only half again its average)
-        val near = with(dens) { 120.dp.toPx() }
-        val ms = ((min(travel.toFloat(), near) / with(dens) { 36.dp.toPx() } + max(0f, travel - near) / with(dens) { 20.dp.toPx() }) * 1000).toInt().coerceIn(700, 30000)
-        val ease = androidx.compose.animation.core.tween<Float>(ms, easing = androidx.compose.animation.core.CubicBezierEasing(.37f, 0f, .63f, 1f))
-        onRead?.invoke(delayMillis + ms + 1500L)   // ([onRead]: how long until its end has been read: a notice stays that long)
-        repeat(iterations) {
-            kotlinx.coroutines.delay(delayMillis.toLong())
-            x.animateTo(-travel.toFloat(), ease)
-            kotlinx.coroutines.delay(1800)
-            x.animateTo(0f, ease)
+    val on = travel > 0 && iterations > 0 && !calm
+    // a short way at about 36 dp a second; past 120 dp slower, 20 dp a second (a long name or notice flew by), with a
+    // gentle ease in and out (a sine's: its fastest is only half again its average)
+    val ms = if (travel <= 0) 0L else with(dens) { val near = 120.dp.toPx(); ((min(travel.toFloat(), near) / 36.dp.toPx() + max(0f, travel - near) / 20.dp.toPx()) * 1000).toLong().coerceIn(700L, 30000L) }
+    val start = remember(travel, iterations, calm) { android.os.SystemClock.uptimeMillis() }   // (starts over for new text or room)
+    LaunchedEffect(on, ms) { onRead?.invoke(if (on) delayMillis + ms + 1500L else 0L) }   // ([onRead]: how long until its end has been read)
+    // where it is, worked out from the time on the app's own frames (E.drawTick, at the frame limit): an animation of
+    // its own ran at the screen's rate (120 Hz) the whole time a long name slid, whatever the limit
+    val offset = {
+        if (!on) 0f else {
+            io.github.bozkow.vibevisualizer.engine.E.drawTick.longValue
+            val cycle = delayMillis + ms + 1800 + ms
+            val e = android.os.SystemClock.uptimeMillis() - start
+            if (iterations != Int.MAX_VALUE && e / cycle >= iterations) 0f else {
+                val k = e % cycle
+                val f = when {
+                    k < delayMillis -> 0f
+                    k < delayMillis + ms -> SLIDE_EASE.transform((k - delayMillis).toFloat() / ms)
+                    k < delayMillis + ms + 1800 -> 1f
+                    else -> 1f - SLIDE_EASE.transform((k - delayMillis - ms - 1800).toFloat() / ms)
+                }
+                -travel * f
+            }
         }
     }
     val fades = fadeStart > 0.dp || fadeEnd > 0.dp
     this.then(if (!fades) Modifier else Modifier.graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }.drawWithContent {
             drawContent()
             val w = size.width; if (travel <= 0 || w <= 0f) return@drawWithContent
-            val moved = (-x.value).coerceIn(0f, travel.toFloat()); val left = travel - moved
+            val moved = (-offset()).coerceIn(0f, travel.toFloat()); val left = travel - moved
             // each fade as wide as there's text hidden past it, up to its full width
             val a = (min(moved, fadeStart.toPx()) / w).coerceIn(0f, .45f); val b = (min(left, fadeEnd.toPx()) / w).coerceIn(0f, .45f)
             if (a <= 0f && b <= 0f) return@drawWithContent
@@ -287,9 +295,10 @@ fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 250
             val t = if (p.width > w) p.width - w + endGap.roundToPx() else 0
             if (t != travel) travel = t
             // moved by the layer only: a frame of sliding redraws it, nothing is measured or placed again
-            layout(w, p.height) { p.placeWithLayer(0, 0) { translationX = x.value } }
+            layout(w, p.height) { p.placeWithLayer(0, 0) { translationX = offset() } }
         }
 }
+private val SLIDE_EASE = androidx.compose.animation.core.CubicBezierEasing(.37f, 0f, .63f, 1f)
 
 /** Out past the side margins by [by] on each side (the bars, to the screen's edges: 0.46.1). */
 fun Modifier.bleedX(by: Dp): Modifier = this.layout { m, c ->

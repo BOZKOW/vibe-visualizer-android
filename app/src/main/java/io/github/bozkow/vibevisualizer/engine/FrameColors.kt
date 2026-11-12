@@ -1,7 +1,6 @@
 package io.github.bozkow.vibevisualizer.engine
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.view.TextureView
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.core.Vibe
@@ -14,7 +13,7 @@ import kotlinx.coroutines.launch
  *  a second, and the lyrics stuttered). The first looks come quickly (many videos fade in from black, and black frames don't
  *  count), then one every 5 s while it moves, so the bars follow a video whose colours change; the last three lit frames
  *  count together. [set] gets them all side by side, or null for none (the cover's colours again). */
-class FrameColors(private val view: () -> TextureView?, private val moving: () -> Boolean, private val set: (Bitmap?) -> Unit) {
+class FrameColors(private val view: () -> TextureView?, private val moving: () -> Boolean, private val set: (List<IntArray>?) -> Unit) {
     private var job: Job? = null
     val running get() = job?.isActive == true
 
@@ -23,7 +22,7 @@ class FrameColors(private val view: () -> TextureView?, private val moving: () -
         job?.cancel()
         if (S.low) return
         job = Vibe.scope.launch {
-            val w = 48; val h = 85; val frames = ArrayDeque<Bitmap>()
+            val w = 48; val h = 85
             var n = 0
             while (true) {
                 // quick to take the video's colours (a quarter second in, then twice more as it fades in from black), then
@@ -32,10 +31,8 @@ class FrameColors(private val view: () -> TextureView?, private val moving: () -
                 if (n > 3 && !moving()) continue   // held still (paused, or not on screen): nothing new to see
                 val f = view()?.takeIf { it.isAvailable }?.getBitmap(w, h) ?: continue
                 if (!litEnough(f)) continue
-                frames.addLast(f); while (frames.size > 1) frames.removeFirst()   // (what's on screen now, not mixed with before)
-                val all = Bitmap.createBitmap(w * frames.size, h, Bitmap.Config.ARGB_8888)
-                Canvas(all).let { c -> frames.forEachIndexed { i, b -> c.drawBitmap(b, (i * w).toFloat(), 0f, null) } }
-                set(all)
+                // its colours worked out off the main thread (what's on screen now, not mixed with before)
+                set(kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Visuals.barsFrom(f) } ?: continue)
             }
         }
     }

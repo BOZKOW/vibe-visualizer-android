@@ -115,17 +115,23 @@ object Visuals {
      *  cover. [img]: a frame or a few together; null when there's none (back to the cover's). */
     private var canvasBars: List<IntArray>? = null
     val hasCanvasColors get() = canvasBars != null
-    fun setCanvasColors(img: Bitmap?) {
-        val c = img?.let { i -> runCatching { extract(i).second }.getOrNull() }
+    /** A video frame's bar colours (worked out off the main thread: FrameColors), or null. */
+    fun barsFrom(img: Bitmap): List<IntArray>? = runCatching { extract(img).second }.getOrNull()
+    /** [c]: the video's bar colours (barsFrom), or null for none. A frame much like the last changes nothing: every sample
+     *  set the palette blending and the app's accent changing, and with them all of the app redrawing (heat, 0.51.0). */
+    fun setCanvasColors(c: List<IntArray>?) {
         if (c == null && canvasBars == null) return
+        if (c != null && canvasBars?.let { near(it, c) } == true) return
         canvasBars = c; palDirty = true; palMsNext = 300.0
     }
+    private fun near(a: List<IntArray>, b: List<IntArray>): Boolean =
+        a.size == b.size && a.indices.all { i -> (0..2).all { x -> abs(a[i][x] - b[i][x]) < 20 } }
 
     /** The same from an animated cover that plays (under the Canvas's: that's what's behind everything when it plays). */
     private var motionBars: List<IntArray>? = null
-    fun setMotionColors(img: Bitmap?) {
-        val c = img?.let { i -> runCatching { extract(i).second }.getOrNull() }
+    fun setMotionColors(c: List<IntArray>?) {
         if (c == null && motionBars == null) return
+        if (c != null && motionBars?.let { near(it, c) } == true) return
         motionBars = c; palDirty = true; palMsNext = 300.0
     }
 
@@ -150,14 +156,27 @@ object Visuals {
             val a = st[j]; val b = st[min(j + 1, st.size - 1)]
             FloatArray(3) { x -> (a[x] + (b[x] - a[x]) * u).toFloat() }
         }
+        val video = palMsNext < 900.0
         if (palRGB.size == n && !S.low) { palFrom = palRGB; palTo = to; palT0 = now(); palMs = palMsNext } else { palRGB = to; palFrom = null; palTo = null }
         palMsNext = 900.0
         palShow(); palDirty = false
+        to.getOrNull(min(1, to.size - 1))?.let { c -> accentTo(rgb(c), video) }
     }
 
-    private fun palShow() {
-        pal = IntArray(palRGB.size) { i -> val c = palRGB[i]; (0xFF shl 24) or (c[0].roundToInt().coerceIn(0, 255) shl 16) or (c[1].roundToInt().coerceIn(0, 255) shl 8) or c[2].roundToInt().coerceIn(0, 255) }
-        val a = pal.getOrNull(min(1, pal.size - 1)); if (a != null) accent = Color(a)
+    private fun rgb(c: FloatArray) = (0xFF shl 24) or (c[0].roundToInt().coerceIn(0, 255) shl 16) or (c[1].roundToInt().coerceIn(0, 255) shl 8) or c[2].roundToInt().coerceIn(0, 255)
+    private fun palShow() { pal = IntArray(palRGB.size) { i -> rgb(palRGB[i]) } }
+
+    /** The app's accent (the theme's main colour), set once for each new palette, not on every frame of its blend: each
+     *  change has the theme blend over 0.9 s, and every frame of that redraws the whole app. A video's ([video]) only on
+     *  a clear change, at most every 6 s; a new cover's at once. */
+    private var accentAt = 0.0
+    private fun accentTo(a: Int, video: Boolean) {
+        val c = Color(a); val n = now()
+        if (video) {
+            val d = maxOf(abs(c.red - accent.red), abs(c.green - accent.green), abs(c.blue - accent.blue))
+            if (d < .16f || n - accentAt < 6000) return
+        }
+        if (c != accent) { accent = c; accentAt = n }
     }
 
     /** Returns true while the colors are still blending. */

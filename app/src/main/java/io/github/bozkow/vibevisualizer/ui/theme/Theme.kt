@@ -65,10 +65,14 @@ fun VibeTheme(content: @Composable () -> Unit) {
     val base = remember { runCatching { dynamicDarkColorScheme(ctx) }.getOrDefault(darkColorScheme()) }
     val acc by animateColorAsState(Visuals.accent, tween(900), label = "accent")
     val scheme = remember(acc, base) { accentScheme(base, acc) }
-    val typo = typography(inter())
-    MaterialExpressiveTheme(colorScheme = scheme, motionScheme = MotionScheme.expressive(), typography = typo) {
+    // made once: made anew whenever the accent blended (every frame of it), every text in the app was given a new style
+    val fam = inter()
+    val typo = remember(fam) { typography(fam) }
+    val body = remember(typo) { typo.bodyLarge.copy(lineHeight = 1.38.em, letterSpacing = 0.sp) }
+    val motion = remember { MotionScheme.expressive() }
+    MaterialExpressiveTheme(colorScheme = scheme, motionScheme = motion, typography = typo) {
         // text sized by hand everywhere: its line height follows its size, no extra letter spacing
-        CompositionLocalProvider(LocalTextStyle provides typo.bodyLarge.copy(lineHeight = 1.38.em, letterSpacing = 0.sp), content = content)
+        CompositionLocalProvider(LocalTextStyle provides body, content = content)
     }
 }
 

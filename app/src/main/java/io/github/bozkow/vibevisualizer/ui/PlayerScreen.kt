@@ -1054,9 +1054,10 @@ private fun PlayButton(size: Dp) {
 @Composable
 private fun SeekRow(inline: Boolean = false) {
     var drag by remember { mutableStateOf<Float?>(null) }
-    val glide = animateFloatAsState(E.seekFrac, if (E.settingsPage != null) androidx.compose.animation.core.snap() else tween(260, easing = androidx.compose.animation.core.LinearEasing), label = "seek")   // under Settings' blur it steps (a glide re-blurs the screen every frame)
+    // where the song is, worked out as the bar draws, on the app's own frames (E.drawTick): smooth, and never a frame of its
+    // own (its 260 ms glide towards a target that moved every 240 ms never ended, and kept the app drawing at 120 Hz)   // under Settings' blur it steps (a glide re-blurs the screen every frame)
     // read by the bar as it draws: the glide repaints the bar alone instead of rebuilding this whole row every frame
-    val frac = { drag ?: run { val g = glide.value; val s = E.seekFrac; if (kotlin.math.abs(s - g) > .02f) s else g } }   // a jump (seek, new song) isn't glided
+    val frac = { drag ?: if (E.seeking) E.seekFrac else { E.drawTick.longValue; val d = E.curDur(); if (d > 0) (E.curTime() / d).toFloat().coerceIn(0f, 1f) else 0f } }
     val d0 = drag   // while dragging, the times and the bubble follow the finger
     E.timeText   // the row itself is rebuilt with the time ticker (once a second or so): the times and a new song's length
     val dur = E.curDur()
