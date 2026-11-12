@@ -447,7 +447,7 @@ object Lyr {
         if (!fresh && skipS.isEmpty()) soft.remove(softKey(m))?.let { r -> shown = r; note(r.prov ?: "?", "looked up ahead"); apply(r) }
         val place = order.withIndex().associate { it.value to it.index }
         fun usable(r: LyricsResult?) = r != null && r.lines.any { !it.dots } && !SourceParse.placeholder(r.lines)
-        fun canBeat(p: String) = best.let { b -> b == null || rank(b) == 0 || (rank(b) == 1 && p in WORDY) }
+        fun canBeat(p: String) = best.let { b -> b == null || rank(b) == 0 || (rank(b) == 1 && top == 2 && p in WORDY) }
         val resting = order.associateWith { ladder(it).openUntil(wall()) }
         coroutineScope {
             fun ask(p: String): Deferred<Got> = asks.getOrPut(p) { async {
@@ -467,10 +467,10 @@ object Lyr {
                     delay(200)
                 }
             }
-            fun fanOut() { for (q in order) if (resting[q] == null && canBeat(q) && best.let { it == null || rank(it) < 2 }) ask(q) }
+            fun fanOut() { for (q in order) if (resting[q] == null && canBeat(q) && best.let { it == null || rank(it) < top }) ask(q) }
             var fanned = false
             for (p in order) {
-                if (best.let { it != null && rank(it) == 2 }) break
+                if (best.let { it != null && rank(it) == top }) break
                 if (!canBeat(p)) continue
                 resting[p]?.let { until -> note(p, "resting after errors, back at " + java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(until))) }
                 if (resting[p] != null) continue
@@ -500,9 +500,10 @@ object Lyr {
                             best = r
                             if (skipS.isEmpty()) { lcache[key] = r; LyricsCache.put(key, r); refreshCounts() }
                             // on screen unless an early answer is there that this doesn't beat: better timed, or as well timed
-                            // from higher in your order, within 8 s (a late upgrade waits for the next time the song plays)
+                            // from higher in your order, while the lookup lasts (20 s a source: within 8 s, a slow Spicy Lyrics
+                            // through your server lost to a quicker source below it, whatever your order)
                             val s = shown
-                            val beats = s == null || (s !== r && now() - t0 < 8000 && (rank(r) > rank(s) || (rank(r) == rank(s) && (place[p] ?: 99) < (place[s.prov ?: ""] ?: 99))))
+                            val beats = s == null || (s !== r && now() - t0 < 21000 && (rank(r) > rank(s) || (rank(r) == rank(s) && (place[p] ?: 99) < (place[s.prov ?: ""] ?: 99))))
                             if (beats) { shown = r; apply(r) }
                             if (tok != E.coverTok) break
                         }
@@ -534,7 +535,7 @@ object Lyr {
         return r
     }
 
-    private fun keyOf(m: SongMeta) = listOf(m.id, m.artist, m.title, Math.round(m.duration).toString(), provList().filter { it.on }.joinToString(",") { it.k }).joinToString("|").lowercase()
+    private fun keyOf(m: SongMeta) = listOf(m.id, m.artist, m.title, Math.round(m.duration).toString(), provList().filter { it.on }.joinToString(",") { it.k } + (if (S.b("lbetter")) "+w" else "+o")).joinToString("|").lowercase()
     private fun softKey(m: SongMeta) = (m.artist + "|" + m.title).lowercase()
     private val soft = HashMap<String, LyricsResult>()   // looked up ahead for a song whose length wasn't known yet
 
@@ -555,8 +556,8 @@ object Lyr {
         }
         suspend fun ask(p: String): LyricsResult? = try { timed(p, m) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { errs = true; null }
         take(order[0], ask(order[0]))
-        if (best.let { it == null || rank(it) < 2 }) coroutineScope {
-            order.drop(1).filter { p -> best.let { b -> b == null || rank(b) == 0 || (rank(b) == 1 && p in WORDY) } }
+        if (best.let { it == null || rank(it) < top }) coroutineScope {
+            order.drop(1).filter { p -> best.let { b -> b == null || rank(b) == 0 || (rank(b) == 1 && top == 2 && p in WORDY) } }
                 .map { p -> async { p to ask(p) } }.map { it.await() }.forEach { (p, r) -> take(p, r) }
         }
         val r = best
@@ -571,8 +572,12 @@ object Lyr {
         "lrcred" -> fromLrcRed(m); "kugou" -> fromKugou(m); "qq" -> fromQq(m); "kuwo" -> fromKuwo(m); else -> fromNetease(m)
     }
 
-    /** How well timed: 2 word-synced, 1 line-synced, 0 not synced. */
-    private fun rank(r: LyricsResult) = if (!r.sync) 0 else if (r.lines.any { it.words != null }) 2 else 1
+    /** How well timed, for choosing between sources: 2 word-synced, 1 line-synced, 0 not synced. Your order decides
+     *  between synced ones (word and line timing both count as 1): a source lower down was used over Spicy Lyrics'
+     *  community lyrics just for having word timing ("it prefers KuGou"). With Settings → Lyrics → Word timing over your
+     *  order (`lbetter`), word timing beats line timing again, as in Spicy Lyrics Mobile. */
+    private fun rank(r: LyricsResult): Int { val k = if (!r.sync) 0 else if (r.lines.any { it.words != null }) 2 else 1; return if (S.b("lbetter")) k else minOf(k, 1) }
+    private val top get() = if (S.b("lbetter")) 2 else 1   // the best rank there is: no source below can beat it
 
     // a source that fails twice in a row rests a while, longer each time (Spicy Lyrics Mobile's back-off ladder)
     private val ladders = HashMap<String, BackoffLadder>()

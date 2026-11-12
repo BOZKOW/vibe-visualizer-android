@@ -442,7 +442,7 @@ class LyricsRenderer {
         if (!laidOut) layoutAll()
         val wasPlace = placeUntil > 0 && t < placeUntil
         if (wasPlace) place(t, pos)
-        else if (lyTall && !lyFree && t - lyTallAt > (if (pipScroll()) 250 else 40)) { lyTallAt = t; place(t, pos) }   // (often: a row's move starts on time)
+        else if (lyTall && !lyFree && t - lyTallAt > (if (pipScroll() && !pipGlide()) 250 else 40)) { lyTallAt = t; place(t, pos) }   // (often: a row's move starts on time)
         if (!viewOn) return
         if (!sync) { rest = false; staticScroll(t, pos); tops(t); bump(); return }
         val r = S.b("aRestCover") && S.xFocus && restAt(pos)   // one of Focus mode's (Settings greys it without)
@@ -537,7 +537,9 @@ class LyricsRenderer {
             else if (d.fu) { op = 0f; bl = .35f; y = -.34f * screenH; if (duet) x = if (d.opp) .06f * screenW else -.06f * screenW; dO = 450.0; dB = 450.0; dT = 600.0; eT = Ease.fuMove }   // each singer's leave on their own side
             // the next line, coming into focus: as it'll look there, not dimmed and blurred on top of its words' own dimness
             // (it came in washed out and brightened once in place: "it should stay the same", 0.46.4)
-            else if (d.fn) { op = 1f; bl = 0f }
+            // (and it's there at full strength when its first word is sung: from nothing over half a second, starting .2 s
+            // before it, it was still dim and blurred under its first words, sung and filled: "they should be white")
+            else if (d.fn) { op = 1f; bl = 0f; dO = 180.0; eO = Ease.eOut; dB = 180.0; eB = Ease.eOut }
             else { op = 0f; bl = .35f; y = .6f * screenH; if (duet) x = if (d.opp) .06f * screenW else -.06f * screenW }
             if (d.dots && (!d.fv || d.longBreak)) op = 0f   // a break's dots only while it's the one in focus (a long one has none)
             if (S.low) bl = 0f   // Low performance mode: they move and fade, never blur
@@ -721,7 +723,21 @@ class LyricsRenderer {
         return t - el.top
     }
 
-    private fun band(a: Float, b: Float) { val n = now(); val ms = if (S.low) 0.0 else 550.0; bandT.set(a, n, ms, Ease.eOut); bandB.set(b, n, ms, Ease.eOut) }
+    /** The clear band's edges ([a], [b]; -1: the usual, .14 and .8 of the height), moved there over 550 ms. Always between
+     *  real edges: tweened from or to -1, an edge passed through 0 on its way (the bottom swept up the screen, dimming the
+     *  lines being sung, then jumped back to .8): the "white highlight glitch" whenever a second line came in or one of
+     *  two ended, in every style. */
+    private fun band(a: Float, b: Float) {
+        val n = now(); val ms = if (S.low || S.calm) 0.0 else 550.0
+        if (bandT.value(n) < 0f) bandT.snap(H * .14f); if (bandB.value(n) < 0f) bandB.snap(H * .8f)
+        bandT.set(if (a < 0f) H * .14f else a, n, ms, Ease.eOut); bandB.set(if (b < 0f) H * .8f else b, n, ms, Ease.eOut)
+    }
+
+    /** The small window with line-synced lyrics (no word timing): the scroll glides, aimed anew every frame, so a line
+     *  taller than the window goes down with its fill smoothly and a new line comes in without a jolt (re-aimed every
+     *  250 ms with a fresh ease each time it crept in steps: "jittery"). Word-synced lyrics keep 0.41.5's scroll there. */
+    private fun pipGlide(): Boolean = pipScroll() && sync && S.lsmooth && !S.low && !S.calm &&
+        lv.getOrNull(max(if (lsi >= 0) lsi else li, 0))?.l?.words == null
 
     private fun setLyY(y: Float, t: Double) {
         if (lyFree) return
@@ -735,7 +751,7 @@ class LyricsRenderer {
         calmTo = null
         // on its side, and a tall line anywhere but the small window: they glide instead of snapping into place, on the
         // words' timing (frame, fitLine); it keeps its speed when the target moves on
-        if (S.lsmooth && !S.low && !pipScroll() && ((softScroll() && !S.xFocus) || lyTall)) {   // (the Focus style's as upright)
+        if (S.lsmooth && !S.low && ((!pipScroll() && ((softScroll() && !S.xFocus) || lyTall)) || pipGlide())) {   // (the Focus style's as upright)
             if (!gliding) { lyG.snap(lyY.value(t)); gliding = true }
             lyG.set(y, t, stepMs)
             return

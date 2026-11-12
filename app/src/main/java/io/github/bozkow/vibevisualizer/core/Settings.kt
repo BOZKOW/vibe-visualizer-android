@@ -69,7 +69,8 @@ object Defaults {
         "aHideSec" to "3",      //   seconds untouched before the controls hide
         "aLike" to true,        //   the heart beside a Spotify song
         "spRevive" to true,
-        "aCalm" to false,       // Motion sickness: less movement (lyrics fade from line to line, names end in "…", a still background)     // the Spotify app closed by Android mid-song: started again
+        "aCalm" to false,
+        "lbetter" to false,     // lyrics: word timing over your order of sources (Spicy Lyrics Mobile's way); off: your order decides       // Motion sickness: less movement (lyrics fade from line to line, names end in "…", a still background)     // the Spotify app closed by Android mid-song: started again
         "aLyrCover" to true,    //   upright, the Lyrics screen: a small cover beside the song's name
         "aTitle" to "m",        //   the song name's size: s, m, l
         "aMarquee" to true,     //   long names scroll

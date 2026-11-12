@@ -649,7 +649,18 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     val many = all.size > 1
     var byHand by remember { mutableStateOf(false) }   // swiped: no more turns by themselves, until a new one comes
     var dir by remember { androidx.compose.runtime.mutableIntStateOf(0) }   // which way the last swipe went (1: on to the next)
-    LaunchedEffect(many, byHand) { while (many && !byHand) { kotlinx.coroutines.delay(4500); turn++ } }
+    // (each turn 4.5 s, or as long as its words need to slide to their end and be read there)
+    val nowAll by androidx.compose.runtime.rememberUpdatedState(all)
+    LaunchedEffect(many, byHand) {
+        while (many && !byHand) {
+            val t0 = android.os.SystemClock.uptimeMillis(); kotlinx.coroutines.delay(4500)
+            while (true) {
+                val cur = nowAll.getOrNull(((turn % nowAll.size.coerceAtLeast(1)) + nowAll.size.coerceAtLeast(1)) % nowAll.size.coerceAtLeast(1))
+                val left = E.readNeed(cur) - (android.os.SystemClock.uptimeMillis() - t0); if (left <= 0) break; kotlinx.coroutines.delay(left)
+            }
+            turn++
+        }
+    }
     // …and a new one shows first
     val seen = remember { HashSet<String>() }
     LaunchedEffect(ids) { if (ids.any { it !in seen }) { turn = 0; byHand = false; dir = 0 }; seen.clear(); seen.addAll(ids) }
@@ -721,7 +732,7 @@ fun NoticeIcon(k: String, size: Dp = 28.dp) {
 /** What's wrong, in red (broken) or yellow (waiting), or good news in white: words alone (OK, and what fixes it, are
  *  on its detail screen). On its side, where the room is the left column's: one text of two lines at most. */
 @Composable
-fun NoticeLines(p: E.Prob, row: Boolean = false) {
+fun NoticeLines(p: E.Prob, row: Boolean = false, live: Boolean = false) {
     val tint = when (p.k) { "err" -> Color(0xFFFFB4AB); "ok" -> Color.White; else -> Color(0xFFFFD27A) }   // red broken, white good news, yellow waiting
     val act: @Composable () -> Unit = {}
     // each line scrolls across the pill when it's too long, instead of wrapping (0.46.1); with Scroll long names off, or in Low
@@ -730,10 +741,10 @@ fun NoticeLines(p: E.Prob, row: Boolean = false) {
         if (row) NoticeText(androidx.compose.ui.text.buildAnnotatedString {
             withStyle(androidx.compose.ui.text.SpanStyle(color = tint, fontWeight = FontWeight.Bold)) { append(p.t) }
             if (p.s.isNotEmpty()) withStyle(androidx.compose.ui.text.SpanStyle(color = dim, fontSize = 12.sp)) { append("  ·  " + p.s) }
-        }, 13.sp)
+        }, 13.sp, live = live)
         else {
-            NoticeText(androidx.compose.ui.text.AnnotatedString(p.t), 13.sp, FontWeight.Bold, tint)
-            if (p.s.isNotEmpty()) NoticeText(androidx.compose.ui.text.AnnotatedString(p.s), 12.sp, color = dim)
+            NoticeText(androidx.compose.ui.text.AnnotatedString(p.t), 13.sp, FontWeight.Bold, tint, live)
+            if (p.s.isNotEmpty()) NoticeText(androidx.compose.ui.text.AnnotatedString(p.s), 12.sp, color = dim, live = live)
         }
         return
     }
@@ -753,13 +764,15 @@ fun NoticeLines(p: E.Prob, row: Boolean = false) {
 
 /** One line of a notice: too long for the pill, it scrolls across it, out into the pill's padding and fading there. */
 @Composable
-private fun NoticeText(text: androidx.compose.ui.text.AnnotatedString, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight? = null, color: Color = Color.Unspecified) {
+private fun NoticeText(text: androidx.compose.ui.text.AnnotatedString, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight? = null, color: Color = Color.Unspecified, live: Boolean = false) {
     var maxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var textW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
     val over = maxW > 0 && textW > maxW
-    val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
+    // ([live]: in Settings' header, on top: it slides there too; the player's rest under Settings)
+    val iter = if (live || E.settingsPage == null) Int.MAX_VALUE else 0
+    val key = text.text
     Text(text, Modifier.layout { m, c -> if (c.hasBoundedWidth && c.maxWidth != maxW) maxW = c.maxWidth; val pl = m.measure(c); layout(pl.width, pl.height) { pl.place(0, 0) } }
-        .then(if (over) Modifier.edgeMarquee(0.dp, 16.dp, 12.dp, 12.dp, iter) else Modifier.pingPong(iter)),   // (not into the icon at its start)
+        .then(if (over) Modifier.edgeMarquee(0.dp, 16.dp, 12.dp, 12.dp, iter, onRead = { ms -> E.readMs[key] = ms }) else Modifier.pingPong(iter)),   // (not into the icon at its start)
         fontSize = size, fontWeight = weight, color = color, maxLines = 1, softWrap = false, textAlign = TextAlign.Center, onTextLayout = { textW = it.size.width })
 }
 

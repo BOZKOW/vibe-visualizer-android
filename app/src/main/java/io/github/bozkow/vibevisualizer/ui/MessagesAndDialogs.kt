@@ -117,7 +117,7 @@ private fun NotePill(n: E.Snack, under: Backdrop?, modifier: Modifier) {
         .clickable(press, androidx.compose.material3.ripple()) { E.haptic(); E.noticeOpen = q }, contentAlignment = Alignment.Center) {
         Row(Modifier.padding(start = 10.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             NoticeIcon(q.k, 28.dp)
-            Column(Modifier.weight(1f, fill = false).padding(start = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) { NoticeLines(q) }
+            Column(Modifier.weight(1f, fill = false).padding(start = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) { NoticeLines(q, live = true) }
         }
     }
 }

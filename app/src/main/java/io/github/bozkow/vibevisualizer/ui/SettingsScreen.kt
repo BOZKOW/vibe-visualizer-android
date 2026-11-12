@@ -274,6 +274,7 @@ private fun pages(): List<Page> = listOf(
     Page("lyrics", "Lyrics", VIcons.lyrics, listOf(
         Item.Sub("Sources"),
         Item.Custom("Sources, in priority order Spicy Lyrics LRCLIB NetEase AMLL Spotify your lyrics files") { Sources() },
+        Item.Sw("lbetter", "Word timing over your order", "A source lower in your list is used over a higher one when it has word-by-word timing and the higher one only has line timing (as Spicy Lyrics Mobile does). Off: your order decides; a source lower down is only used when the ones above it have nothing synced."),
         Item.Sub("Your lyrics files"),
         Item.Custom("Add lyrics files use a file for this song remove all import lrc ttml") { MyFiles() },
         Item.Sub("Looking for lyrics"),

@@ -46,6 +46,7 @@ object Visuals {
     var pal: IntArray = IntArray(0); private set
     private var palRGB: Array<FloatArray> = emptyArray()
     private var palFrom: Array<FloatArray>? = null; private var palTo: Array<FloatArray>? = null; private var palT0 = 0.0
+    private var palMs = 900.0; private var palMsNext = 900.0   // the next blend's length: a Canvas's or animated cover's colours come in fast (300 ms)
     var palDirty = true
 
     // the baked background: the cover blurred (128 px), and three soft layers cut from it that drift and spin
@@ -117,7 +118,7 @@ object Visuals {
     fun setCanvasColors(img: Bitmap?) {
         val c = img?.let { i -> runCatching { extract(i).second }.getOrNull() }
         if (c == null && canvasBars == null) return
-        canvasBars = c; palDirty = true
+        canvasBars = c; palDirty = true; palMsNext = 300.0
     }
 
     /** The same from an animated cover that plays (under the Canvas's: that's what's behind everything when it plays). */
@@ -125,7 +126,7 @@ object Visuals {
     fun setMotionColors(img: Bitmap?) {
         val c = img?.let { i -> runCatching { extract(i).second }.getOrNull() }
         if (c == null && motionBars == null) return
-        motionBars = c; palDirty = true
+        motionBars = c; palDirty = true; palMsNext = 300.0
     }
 
     var quietVer = -1; private set   // a cover that changes without its animation (the same picture, sharper)
@@ -149,7 +150,8 @@ object Visuals {
             val a = st[j]; val b = st[min(j + 1, st.size - 1)]
             FloatArray(3) { x -> (a[x] + (b[x] - a[x]) * u).toFloat() }
         }
-        if (palRGB.size == n && !S.low) { palFrom = palRGB; palTo = to; palT0 = now() } else { palRGB = to; palFrom = null; palTo = null }
+        if (palRGB.size == n && !S.low) { palFrom = palRGB; palTo = to; palT0 = now(); palMs = palMsNext } else { palRGB = to; palFrom = null; palTo = null }
+        palMsNext = 900.0
         palShow(); palDirty = false
     }
 
@@ -161,7 +163,7 @@ object Visuals {
     /** Returns true while the colors are still blending. */
     fun palTick(t: Double): Boolean {
         val from = palFrom ?: return false; val to = palTo ?: return false
-        val k = min(1.0, (t - palT0) / 900); val e = if (k < .5) 2 * k * k else 1 - (-2 * k + 2).pow(2) / 2
+        val k = min(1.0, (t - palT0) / palMs); val e = if (k < .5) 2 * k * k else 1 - (-2 * k + 2).pow(2) / 2
         palRGB = Array(to.size) { i -> val o = from.getOrNull(i) ?: to[i]; val c = to[i]; FloatArray(3) { x -> (o[x] + (c[x] - o[x]) * e).toFloat() } }
         palShow()
         if (k >= 1) { palFrom = null; palTo = null }

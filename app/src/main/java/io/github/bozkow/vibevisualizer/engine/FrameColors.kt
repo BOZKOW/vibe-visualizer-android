@@ -26,11 +26,13 @@ class FrameColors(private val view: () -> TextureView?, private val moving: () -
             val w = 48; val h = 85; val frames = ArrayDeque<Bitmap>()
             var n = 0
             while (true) {
-                delay(when (n++) { 0 -> 800L; 1 -> 1700L; 2 -> 2500L; else -> 5000L })
+                // quick to take the video's colours (a quarter second in, then twice more as it fades in from black), then
+                // every 1.5 s while it moves: the bars follow its cuts (every 5 s, three frames mixed, they lagged and blended)
+                delay(when (n++) { 0 -> 250L; 1 -> 500L; 2 -> 750L; else -> 1500L })
                 if (n > 3 && !moving()) continue   // held still (paused, or not on screen): nothing new to see
                 val f = view()?.takeIf { it.isAvailable }?.getBitmap(w, h) ?: continue
                 if (!litEnough(f)) continue
-                frames.addLast(f); if (frames.size > 3) frames.removeFirst()
+                frames.addLast(f); while (frames.size > 1) frames.removeFirst()   // (what's on screen now, not mixed with before)
                 val all = Bitmap.createBitmap(w * frames.size, h, Bitmap.Config.ARGB_8888)
                 Canvas(all).let { c -> frames.forEachIndexed { i, b -> c.drawBitmap(b, (i * w).toFloat(), 0f, null) } }
                 set(all)

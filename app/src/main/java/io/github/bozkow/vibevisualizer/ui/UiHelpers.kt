@@ -233,14 +233,14 @@ fun Modifier.pressScale(src: androidx.compose.foundation.interaction.Interaction
  *  nothing else is there; next to a cover or an icon give 0, so the text never slides over it), fading out over [fadeStart]
  *  and [fadeEnd] there. At rest what scrolls starts where it would without it, its first letter whole; it goes there and
  *  back ([pingPong]), its last letter coming to rest whole at the end. */
-fun Modifier.edgeMarquee(bleedStart: Dp, bleedEnd: Dp, fadeStart: Dp, fadeEnd: Dp, iterations: Int): Modifier = this
+fun Modifier.edgeMarquee(bleedStart: Dp, bleedEnd: Dp, fadeStart: Dp, fadeEnd: Dp, iterations: Int, onRead: ((Long) -> Unit)? = null): Modifier = this
     .layout { m, c ->
         val l = bleedStart.roundToPx(); val r = bleedEnd.roundToPx()
         val p = m.measure(c.copy(minWidth = 0, maxWidth = if (c.hasBoundedWidth) c.maxWidth + l + r else c.maxWidth))
         val w = if (c.hasBoundedWidth) c.maxWidth else p.width
         layout(w, p.height) { p.place(-l, 0) }
     }
-    .pingPong(iterations, endGap = bleedEnd, fadeStart = fadeStart, fadeEnd = fadeEnd)   // (it rests inside the margin it may slide through)
+    .pingPong(iterations, endGap = bleedEnd, fadeStart = fadeStart, fadeEnd = fadeEnd, onRead = onRead)   // (it rests inside the margin it may slide through)
     .padding(start = bleedStart)
 
 /** Text too long for its room slides left until its end shows ([endGap] short of the edge), waits, and slides back to
@@ -248,19 +248,21 @@ fun Modifier.edgeMarquee(bleedStart: Dp, bleedEnd: Dp, fadeStart: Dp, fadeEnd: D
  *  marquee: the start and the end are always on screen, one after the other. Text that fits stays put. The sides fade
  *  ([fadeStart], [fadeEnd]) only where there's more text past them: at rest the start is whole and the end fades; at
  *  the end it's the other way round (a fade that stayed put dimmed the first letters, and sat over what was beside it). */
-fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 2500, fadeStart: Dp = 0.dp, fadeEnd: Dp = 0.dp): Modifier = composed {
+fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 2500, fadeStart: Dp = 0.dp, fadeEnd: Dp = 0.dp,
+                      onRead: ((Long) -> Unit)? = null): Modifier = composed {
     val x = remember { androidx.compose.animation.core.Animatable(0f) }
     var travel by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val dens = androidx.compose.ui.platform.LocalDensity.current
     val calm = S.low || io.github.bozkow.vibevisualizer.engine.E.reduceMotion()
     LaunchedEffect(travel, iterations, calm) {
         if (travel <= 0) x.snapTo(0f) else if (x.value != 0f) x.animateTo(0f, androidx.compose.animation.core.tween(500))
-        if (travel <= 0 || iterations <= 0 || calm) return@LaunchedEffect
+        if (travel <= 0 || iterations <= 0 || calm) { onRead?.invoke(0L); return@LaunchedEffect }
         // a short way at about 36 dp a second; past 120 dp slower, 20 dp a second (a long name or notice flew by), with a
         // gentle ease in and out (a sine's: its fastest is only half again its average)
         val near = with(dens) { 120.dp.toPx() }
         val ms = ((min(travel.toFloat(), near) / with(dens) { 36.dp.toPx() } + max(0f, travel - near) / with(dens) { 20.dp.toPx() }) * 1000).toInt().coerceIn(700, 30000)
         val ease = androidx.compose.animation.core.tween<Float>(ms, easing = androidx.compose.animation.core.CubicBezierEasing(.37f, 0f, .63f, 1f))
+        onRead?.invoke(delayMillis + ms + 1500L)   // ([onRead]: how long until its end has been read: a notice stays that long)
         repeat(iterations) {
             kotlinx.coroutines.delay(delayMillis.toLong())
             x.animateTo(-travel.toFloat(), ease)

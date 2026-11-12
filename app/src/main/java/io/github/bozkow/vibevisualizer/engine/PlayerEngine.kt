@@ -108,8 +108,21 @@ object E {
         notes.add(n); while (notes.size > 4) notes.removeAt(1)
         // good news (white: up to date, in sync, copied…) goes by itself after 5 s, its button unpressed; red and
         // yellow ones stay until OK
-        if (n.kind == "ok" && n.action == null) Vibe.scope.launch { delay(5000); noteDone(n, false) }
+        if (n.kind == "ok" && n.action == null) Vibe.scope.launch {
+            val t0 = android.os.SystemClock.uptimeMillis(); delay(5000)
+            while (true) {   // (longer while its words are still on their way to their end)
+                val need = maxOf(readMs[n.msg] ?: 0L, readMs[n.sub] ?: 0L, readMs[n.msg + "  ·  " + n.sub] ?: 0L)
+                val left = need - (android.os.SystemClock.uptimeMillis() - t0); if (left <= 0) break; delay(left)
+            }
+            noteDone(n, false)
+        }
     }
+
+    /** How long a notice's words need on screen (ms) to slide to their end and be read there (NoticeText tells, by the
+     *  words): its turn at the top, or a good one's time before it goes, lasts at least that ("they disappeared before the
+     *  line scrolled to the end"). */
+    val readMs = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    fun readNeed(p: Prob?): Long = if (p == null) 0L else maxOf(readMs[p.t] ?: 0L, readMs[p.s] ?: 0L, readMs[p.t + "  ·  " + p.s] ?: 0L)
 
     /** A one-off error or warning is done: its button was pressed, or its time is up. */
     fun noteDone(n: Snack, acted: Boolean) {
@@ -703,7 +716,7 @@ object E {
             "volume" -> Local.applyVolume()
             "ljoin", "ljoinPace", "lbgBr", "lsimple", "xRefSimple", "romMode", "lfont" -> Lyr.restyle()
             "aCalm" -> { Lyr.restyle(); Lyr.relayout(); Background.resume() }   // (Motion sickness: the words' springs at rest, the lines placed anew)
-            "lprov" -> Lyr.cacheClear()
+            "lprov", "lbetter" -> Lyr.cacheClear()
             "tr", "trTo", "trSkip", "aTrSvc" -> Lyr.decorate()
             "lnotice" -> Lyr.noticeChanged()
             "lsize", "xFocus", "xBgPop", "lduet", "view", "credPos", "xRefCred", "lcredLast", "lminimal", "xKeep" -> Lyr.relayout()
