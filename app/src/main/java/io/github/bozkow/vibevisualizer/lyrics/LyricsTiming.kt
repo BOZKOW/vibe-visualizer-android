@@ -57,7 +57,7 @@ fun joinWords(ws: List<Word>, ts: List<TS>): Pair<List<Word>, List<TS>> {
             grp.dropLast(1).none { DASH_END.containsMatchIn(it.text) } && grp.none { UNSPACED.containsMatchIn(it.text) } &&
             rt.withIndex().all { (k, x) -> k == 0 || x.t - rt[k - 1].end <= .1 } && evenPace(grp, rt)
         if (ok) {
-            out.add(Word(rt[0].t, null, grp.joinToString("") { it.text }, grp.last().sp, if (grp.any { it.rom != null }) grp.joinToString("") { it.rom ?: it.text } else null))
+            out.add(Word(rt[0].t, null, grp.joinToString("") { it.text }, grp.last().sp, if (grp.any { it.rom != null }) grp.joinToString("") { it.rom ?: it.text } else null).also { it.romSp = grp.last().romSp })
             tout.add(TS(rt[0].t, rt.maxOf { it.end }).also { x -> x.syl = grp.mapIndexed { k, w -> w.text to rt[k].t } })
         } else grp.forEachIndexed { k, w -> out.add(w); tout.add(rt[k]) }
         i = e + 1

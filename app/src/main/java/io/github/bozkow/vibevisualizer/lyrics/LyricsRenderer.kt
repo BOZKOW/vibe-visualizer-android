@@ -230,7 +230,7 @@ class LyricsRenderer {
                 val rw = if (romOnly) l.rom!!.split(SPACES) else null
                 when {
                     !romOnly -> { val (jw, jt) = if (join) joinWords(ws, ts) else ws to ts; main.pieces = jw.mapIndexed { k, w -> Pc(w.text + if (w.sp) " " else "", jt[k]) }; d.mainTs = jt }
-                    l.romSyl && ws.any { it.rom != null } -> { val (jw, jt) = if (join) joinWords(ws, ts) else ws to ts; main.pieces = jw.mapIndexed { k, w -> Pc((w.rom ?: w.text) + if (w.sp) " " else "", jt[k]) }; d.mainTs = jt }   // per-syllable romanization
+                    l.romSyl && ws.any { it.rom != null } -> { val (jw, jt) = if (join) joinWords(ws, ts) else ws to ts; main.pieces = jw.mapIndexed { k, w -> Pc((w.rom ?: w.text) + if (w.sp || w.romSp) " " else "", jt[k]) }; d.mainTs = jt }   // per-syllable romanization
                     rw != null && rw.size == ws.size -> { main.pieces = rw.mapIndexed { k, x -> Pc(x + if (k < rw.size - 1) " " else "", ts[k]) }; d.mainTs = ts }   // romanized words line up 1:1
                     else -> { main.text = l.rom; main.oneTs = TS(ws[0].t, min(ws.last().t + .8, nt)); d.mainTs = listOf(main.oneTs!!) }   // fill the whole romanized line
                 }
@@ -253,7 +253,7 @@ class LyricsRenderer {
                         if (brk && k == 0) t = "($t"; if (brk && k == n - 1) t = t.trimEnd() + ")"
                         if (strip && k == 0) t = t.replaceFirst(OPEN_BRACKET, "")
                         if (strip && k == n - 1) t = t.replaceFirst(CLOSE_BRACKET, "")
-                        Pc(t + if (w.sp && t.isNotBlank()) " " else "", bts[k])   // (a bracket that was a part of its own leaves nothing)
+                        Pc(t + if ((w.sp || (romW && w.romSp)) && t.isNotBlank()) " " else "", bts[k])   // (a bracket that was a part of its own leaves nothing)
                     }
                     splitLetters(r.pieces!!)
                 } else {
@@ -279,7 +279,7 @@ class LyricsRenderer {
             val rom = l.rom
             if (rom != null && romMode == "below") {
                 val lw = l.words
-                timed(2, rom, if (l.romSyl && lw != null) lw.map { (it.rom ?: it.text) to it.sp } else rom.split(SPACES).filter { it.isNotEmpty() }.let { p -> p.mapIndexed { k, x -> x to (k < p.size - 1) } })
+                timed(2, rom, if (l.romSyl && lw != null) lw.map { (it.rom ?: it.text) to (it.sp || it.romSp) } else rom.split(SPACES).filter { it.isNotEmpty() }.let { p -> p.mapIndexed { k, x -> x to (k < p.size - 1) } })
             }
             l.tr?.let { timed(3, it, null) }
         }

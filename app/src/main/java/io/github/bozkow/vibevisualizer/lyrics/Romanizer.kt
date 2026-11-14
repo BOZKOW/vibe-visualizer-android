@@ -9,64 +9,146 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.text.Normalizer
 
-/* ---- romanization the way Spicy Lyrics does it (src/utils/Lyrics/ProcessLyrics.ts, AGPL-3.0) ----
-   Every syllable is romanized on its own, so the romanized text stays timed with the singing. Romanization the lyrics
-   already came with wins; the gaps are filled per script: Japanese with kuromoji (as kuroshiro does in the web app),
-   Chinese with pinyin (Android's own ICU), Korean (Revised Romanization), Cyrillic and Greek with tables. */
+/* ---- romanization the way Spicy Lyrics does it (src/utils/Lyrics/ProcessLyrics.ts, AGPL-3.0; 6.5.0's) ----
+   A line's syllables are romanized together, with the line as context, and each gets its own part, so the romanized
+   text stays timed with the singing: Japanese read a whole line at a time by kuromoji ([JapaneseLine]), Korean by
+   sound across the line ([KoreanLine]), Chinese in pinyin (Android's own ICU), Cyrillic (Russian, or Ukrainian when
+   the song has its letters) and Greek with tables. Romanization the lyrics already came with wins. A romanized line
+   starts with a capital, and where the romaji ends a word the lyrics run together (Japanese, Chinese) it gets a gap. */
 object Romanizer {
     private const val TAG = "VV-rom"
     private val jaLock = Mutex()
     @Volatile private var ja: com.atilika.kuromoji.ipadic.Tokenizer? = null
     private val han by lazy { runCatching { Transliterator.getInstance("Han-Latin") }.getOrNull() }
 
-    private class Job(val word: Word? = null, val bg: Bg? = null, val line: Line? = null, val text: String) {
-        fun put(r: String?) {
-            val x = r?.replace(Regex("\\s+"), " ")?.trim()
-            if (x.isNullOrEmpty()) return
-            when { word != null -> word.rom = x; bg != null -> bg.rom = x; line != null -> line.lineRom = x }
-        }
-        fun has() = when { word != null -> word.rom != null; bg != null -> bg.rom != null; line != null -> line.lineRom != null; else -> true }
+    // once a script is in the song, one of its characters is enough to romanize a syllable (Spicy Lyrics' Item tests)
+    private val ITEM_JA = Regex("[\u3040-\u30FF\u4E00-\u9FFF\u3005\uFF66-\uFF9F]")
+    private val ITEM_HAN = Regex("[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]")
+    private val UKRAINIAN = Regex("[ЄєІіЇїҐґ]")
+    /** Script that reads as nothing may romanize to nothing (a っ sung as a stop, a kanji read by the kana after it). */
+    private val RESIDUAL = Regex("[\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F\u0400-\u052F\u0370-\u03FF\u1F00-\u1FFF]")
+    private val LETTER_OR_DIGIT = Regex("[\\p{L}\\p{N}]")
+
+    /** What the song is written in, for the choices made per song (kanji are Japanese in a song with kana). */
+    class Song(val japanese: Boolean, val ukrainian: Boolean)
+
+    fun songOf(lines: List<Line>): Song {
+        val all = lines.joinToString("\n") { l -> l.text + (l.bg?.joinToString("") { "\n" + it.text } ?: "") }
+        return Song(JA.containsMatchIn(all), UKRAINIAN.containsMatchIn(all))
     }
 
-    suspend fun romanizeLyrics(lines: List<Line>) = withContext(Dispatchers.Default) {
-        // what still needs romanizing: syllables (or whole lines without syllables) the lyrics didn't come romanized
-        val jobs = ArrayList<Job>()
-        for (l in lines) {
-            if (!nonLatin(l.text)) continue
-            val ws = l.words
-            if (!ws.isNullOrEmpty()) ws.forEach { w -> if (w.rom == null && nonLatin(w.text)) jobs.add(Job(word = w, text = w.text)) }
-            else if (l.apiRom == null) jobs.add(Job(line = l, text = l.text))
-            l.bg?.forEach { b ->
-                val bw = b.words
-                if (!bw.isNullOrEmpty()) bw.forEach { w -> if (w.rom == null && nonLatin(w.text)) jobs.add(Job(word = w, text = w.text)) }
-                else if (b.rom == null && nonLatin(b.text)) jobs.add(Job(bg = b, text = b.text))
-            }
-        }
-        if (jobs.isNotEmpty()) {
-            val isJa = JA.containsMatchIn(lines.joinToString("\n") { it.text })
-            // Han characters are Japanese in a song with kana, Chinese otherwise (as Spicy Lyrics decides it)
-            val heavy = jobs.filter { JA.containsMatchIn(it.text) || HAN.containsMatchIn(it.text) }
-            if (heavy.isNotEmpty()) {
-                if (isJa) {
-                    val tk = withTimeoutOrNull(60_000) { japanese() }
-                    if (tk != null) heavy.forEach { j -> runCatching { j.put(jaRomaji(tk, j.text)) } }
-                    else Log.w(TAG, "Japanese dictionary unavailable; Google fills in")
-                } else heavy.forEach { j -> j.put(pinyin(j.text)) }
-            }
-            val rest = jobs.filter { it !in heavy }
-            rest.forEach { j ->
-                when {
-                    KO.containsMatchIn(j.text) -> j.put(korean(j.text))
-                    CYR.containsMatchIn(j.text) && !j.has() -> j.put(cyrillic(j.text))
-                    GR.containsMatchIn(j.text) && !j.has() -> j.put(greek(j.text))
+    /** One unit's syllables romanized ([texts]), and where a word ends after one that runs on into the next ([gaps]). */
+    class Unit(val texts: List<String>, val gaps: BooleanArray)
+
+    /** Romanizes one unit: a line's (or its background vocal's) syllables, [partOfWord] true where a syllable runs
+     *  straight on into the next one; a line without syllables is one. [reader] is kuromoji (null: not loaded, the old
+     *  syllable by syllable spelling then), [pinyin] reads one Han character. */
+    fun romanizeUnit(src: List<String>, partOfWord: List<Boolean>, song: Song, reader: JapaneseLine.Reader?, pinyin: (String) -> String): Unit {
+        val texts = src.toMutableList(); val n = texts.size
+        val gaps = BooleanArray(n)
+        if (song.japanese) {
+            if (texts.any { ITEM_JA.containsMatchIn(it) }) {
+                val res = reader?.let { r -> runCatching { JapaneseLine.romanize(texts.zip(partOfWord), r) }.getOrNull() }
+                for (i in 0 until n) {
+                    val jp = ITEM_JA.containsMatchIn(texts[i])
+                    if (res != null) {
+                        gaps[i] = res[i].gapAfter
+                        // Japanese punctuation (『』, 〜) in a syllable of its own is written out too
+                        if (jp || res[i].text.isNotEmpty()) texts[i] = res[i].text
+                    } else if (jp) reader?.word(texts[i])?.let { texts[i] = it }   // the line didn't tokenize: a syllable at a time
                 }
             }
+        } else if (texts.any { ITEM_HAN.containsMatchIn(it) }) {
+            val orig = texts.toList()
+            for (i in 0 until n) if (ITEM_HAN.containsMatchIn(texts[i])) texts[i] = chinese(texts[i], pinyin)
+            // pinyin reads by character, so a Han syllable is a word of its own
+            for (i in 0 until n) {
+                val next = orig.getOrNull(i + 1) ?: continue
+                if (!LETTER_OR_DIGIT.containsMatchIn(next)) continue
+                if (orig[i].lastOrNull()?.let { isHan(it) } == true || isHan(next[0])) gaps[i] = true
+            }
         }
-        fun join(ws: List<Word>) = ws.joinToString("") { (it.rom ?: it.text) + if (it.sp) " " else "" }.replace(Regex("\\s+"), " ").trim()
+        if (texts.any { KO.containsMatchIn(it) }) {
+            // read across the whole unit, so a final consonant reads by the next block even in the next syllable
+            val line = StringBuilder(); val starts = IntArray(n)
+            for (i in 0 until n) { if (i > 0 && !partOfWord[i - 1]) line.append(' '); starts[i] = line.length; line.append(texts[i]) }
+            val r = KoreanLine.charReadings(line.toString())
+            for (i in 0 until n) if (KO.containsMatchIn(texts[i])) texts[i] = r.subList(starts[i], starts[i] + texts[i].length).joinToString("")
+        }
+        for (i in 0 until n) if (CYR.containsMatchIn(texts[i])) texts[i] = cyrillic(texts[i], song.ukrainian)
+        for (i in 0 until n) if (GR.containsMatchIn(texts[i])) texts[i] = greek(texts[i])
+        // the line starts with a capital when its first word is a romanized one (words in Latin letters stay as written)
+        val first = src.indexOfFirst { t -> t.any { it.isLetter() } }
+        if (first >= 0) {
+            val letter = src[first].first { it.isLetter() }
+            if (Character.UnicodeScript.of(letter.code) != Character.UnicodeScript.LATIN && texts[first] != src[first]) {
+                val t = texts[first]; val k = t.indexOfFirst { it.isLetter() }
+                if (k >= 0) texts[first] = t.substring(0, k) + t.substring(k, k + 1).uppercase() + t.substring(k + 1)
+            }
+        }
+        return Unit(texts, gaps)
+    }
+
+    private fun isHan(c: Char) = ITEM_HAN.matches(c.toString())
+
+    /** Pinyin, one reading per Han character, spaced from each other and from the words beside them. */
+    fun chinese(t: String, pinyin: (String) -> String): String {
+        val out = StringBuilder()
+        for ((i, c) in t.withIndex()) {
+            val prev = t.getOrNull(i - 1)
+            if (prev != null && (isHan(c) || isHan(prev)) && LETTER_OR_DIGIT.matches(prev.toString()) && LETTER_OR_DIGIT.matches(c.toString())) out.append(' ')
+            out.append(if (isHan(c)) pinyin(c.toString()).trim().ifEmpty { c.toString() } else c.toString())
+        }
+        return out.toString()
+    }
+
+    private fun partOfWord(w: Word) = !w.sp && w.text.lastOrNull()?.isWhitespace() != true
+
+    /** Puts a unit's romanization on its syllables: one the lyrics came romanized keeps it, and if any did, the lyrics'
+     *  own word gaps stay too. */
+    private fun apply(ws: List<Word>, u: Unit) {
+        val supplied = ws.any { it.rom != null && !it.romOwn }
+        ws.forEachIndexed { i, w ->
+            if (w.rom != null && !w.romOwn) return@forEachIndexed
+            w.rom = null; w.romOwn = false; w.romSp = false
+            val t = u.texts[i].replace(Regex("\\s+"), " ")
+            if (t == w.text && !nonLatin(w.text)) return@forEachIndexed
+            if (t.isBlank() && !RESIDUAL.containsMatchIn(w.text)) return@forEachIndexed
+            w.rom = t.trim().ifEmpty { "" }; w.romOwn = true
+            if (!supplied && i < ws.size - 1 && u.gaps[i] && partOfWord(w)) w.romSp = true
+        }
+    }
+
+    private fun one(text: String, song: Song, reader: JapaneseLine.Reader?, pinyin: (String) -> String): String? =
+        romanizeUnit(listOf(text), listOf(false), song, reader, pinyin).texts[0].replace(Regex("\\s+"), " ").trim().takeIf { it.isNotEmpty() && it != text }
+
+    suspend fun romanizeLyrics(lines: List<Line>) = withContext(Dispatchers.Default) {
+        val song = songOf(lines)
+        fun needs(t: String) = nonLatin(t)
+        val todo = lines.filter { l -> needs(l.text) || l.bg?.any { needs(it.text) } == true }
+        if (todo.isEmpty()) return@withContext
+        // kuromoji's dictionary, for a song with kana and kanji or kana to read
+        val reader: JapaneseLine.Reader? = if (song.japanese) {
+            val tk = withTimeoutOrNull(60_000) { japanese() }
+            if (tk == null) { Log.w(TAG, "Japanese dictionary unavailable; Google fills in"); null } else JapaneseLine.kuromoji(tk) { t -> jaRomaji(tk, t) }
+        } else null
+        val py: (String) -> String = { c -> han?.transliterate(c) ?: c }
+        fun unit(ws: List<Word>) = runCatching { apply(ws, romanizeUnit(ws.map { it.text }, ws.map(::partOfWord), song, reader, py)) }.onFailure { Log.w(TAG, "line: $it") }
+        for (l in todo) {
+            val ws = l.words
+            if (!ws.isNullOrEmpty()) unit(ws)
+            else if (l.apiRom == null && needs(l.text)) l.lineRom = runCatching { one(l.text, song, reader, py) }.getOrNull()
+            l.bg?.forEach { b ->
+                val bw = b.words
+                if (!bw.isNullOrEmpty()) unit(bw)
+                else if ((b.rom == null || b.romOwn) && needs(b.text)) { b.rom = runCatching { one(b.text, song, reader, py) }.getOrNull(); b.romOwn = b.rom != null }
+            }
+        }
+        fun join(ws: List<Word>) = ws.joinToString("") { (it.rom ?: it.text) + if (it.sp || it.romSp) " " else "" }.replace(Regex("\\s+"), " ").trim()
         for (l in lines) {
             val ws = l.words
             if (!ws.isNullOrEmpty() && nonLatin(l.text) && ws.any { it.rom != null } && ws.none { nonLatin(it.text) && it.rom == null }) l.sylRom = join(ws)
-            l.bg?.forEach { b -> val bw = b.words; if (bw != null && bw.any { it.rom != null } && b.rom == null) b.rom = join(bw) }
+            l.bg?.forEach { b -> val bw = b.words; if (bw != null && bw.any { it.rom != null } && (b.rom == null || b.romOwn)) { b.rom = join(bw); b.romOwn = true } }
         }
     }
 
@@ -75,6 +157,7 @@ object Romanizer {
         ja ?: runCatching { com.atilika.kuromoji.ipadic.Tokenizer() }.onFailure { Log.w(TAG, "kuromoji: $it") }.getOrNull().also { ja = it }
     }
 
+    /** The spelling before 0.52.0, a syllable on its own: the fallback when a line doesn't tokenize. */
     private fun jaRomaji(tk: com.atilika.kuromoji.ipadic.Tokenizer, text: String): String {
         val parts = ArrayList<String>()
         var gem = false   // the last word ended in っ: it doubles this one's first consonant (だっ た → da tta)
@@ -93,19 +176,6 @@ object Romanizer {
             parts.add(r)
         }
         return parts.joinToString(" ")   // kuroshiro's "spaced" mode
-    }
-
-    private fun pinyin(text: String): String {
-        val tr = han ?: return text
-        val items = ArrayList<String>(); val run = StringBuilder()
-        for (ch in text) {
-            if (HAN.matches(ch.toString())) {
-                if (run.isNotEmpty()) { items.add(run.toString()); run.clear() }
-                items.add(tr.transliterate(ch.toString()).trim())
-            } else run.append(ch)
-        }
-        if (run.isNotEmpty()) items.add(run.toString())
-        return items.joinToString("-")
     }
 
     // ---- kana → Hepburn ----
@@ -150,18 +220,6 @@ object Romanizer {
         return out.toString()
     }
 
-    // ---- Korean: Revised Romanization, letter by letter ----
-    private val KO_L = arrayOf("g", "kk", "n", "d", "tt", "r", "m", "b", "pp", "s", "ss", "", "j", "jj", "ch", "k", "t", "p", "h")
-    private val KO_V = arrayOf("a", "ae", "ya", "yae", "eo", "e", "yeo", "ye", "o", "wa", "wae", "oe", "yo", "u", "wo", "we", "wi", "yu", "eu", "ui", "i")
-    private val KO_T = arrayOf("", "k", "kk", "ks", "n", "nj", "nh", "t", "l", "lk", "lm", "lb", "ls", "lt", "lp", "lh", "m", "p", "ps", "t", "ss", "ng", "t", "t", "k", "t", "p", "h")
-
-    fun korean(t: String): String = buildString {
-        for (c in t) {
-            val x = c.code - 0xAC00
-            if (x in 0 until 11172) { append(KO_L[x / 588]); append(KO_V[(x % 588) / 28]); append(KO_T[x % 28]) } else append(c)
-        }
-    }
-
     // ---- Cyrillic ----
     private val CYR_MAP = mapOf(
         'а' to "a", 'б' to "b", 'в' to "v", 'г' to "g", 'д' to "d", 'е' to "e", 'ё' to "yo", 'ж' to "zh", 'з' to "z", 'и' to "i",
@@ -171,10 +229,32 @@ object Romanizer {
         'љ' to "lj", 'њ' to "nj", 'ћ' to "c", 'џ' to "dz", 'ѓ' to "gj", 'ќ' to "kj", 'ѕ' to "dz",
     )
 
-    fun cyrillic(t: String): String = buildString {
-        for (c in t) {
-            val lo = c.lowercaseChar(); val r = CYR_MAP[lo]
-            if (r == null) append(c) else if (c != lo && r.isNotEmpty()) append(r[0].uppercaseChar()).append(r.substring(1)) else append(r)
+    // Ukrainian (its national system): и is y, і is i, г is h, and є ї й ю я start a word as ye yi y yu ya, ie i i iu ia
+    // inside one (Київ → Kyiv, Україна → Ukraina); зг is zgh, so it isn't read as zh
+    private val UK_MAP = mapOf('и' to "y", 'і' to "i", 'г' to "h", 'ґ' to "g", 'х' to "kh", 'щ' to "shch", 'ь' to "", '\'' to "", 'ʼ' to "", '’' to "")
+    private val UK_START = mapOf('є' to "ye", 'ї' to "yi", 'й' to "y", 'ю' to "yu", 'я' to "ya")
+    private val UK_IN = mapOf('є' to "ie", 'ї' to "i", 'й' to "i", 'ю' to "iu", 'я' to "ia")
+
+    /** Cyrillic in Latin letters: Russian (and the other languages' letters), or Ukrainian for a song with its letters. */
+    fun cyrillic(t: String, ukrainian: Boolean = false): String = buildString {
+        for ((i, c) in t.withIndex()) {
+            val lo = c.lowercaseChar()
+            val prev = t.getOrNull(i - 1)
+            val r = if (!ukrainian) CYR_MAP[lo] else {
+                val start = prev == null || !prev.isLetter() && prev !in "'ʼ’"
+                when {
+                    lo == 'г' && prev?.lowercaseChar() == 'з' -> "gh"
+                    lo in UK_START -> if (start) UK_START[lo] else UK_IN[lo]
+                    lo in UK_MAP && (lo !in "'ʼ’" || (prev?.let { CYR.matches(it.toString()) } == true)) -> UK_MAP[lo]
+                    else -> CYR_MAP[lo]
+                }
+            }
+            if (r == null) append(c)
+            else if (c != lo && r.isNotEmpty()) {
+                // a capital written as two letters is capitalized once (Щ → Shch), unless the word is all capitals
+                val caps = t.getOrNull(i + 1)?.let { it.isUpperCase() } == true || (prev?.isUpperCase() == true && t.getOrNull(i + 1)?.isLetter() != true)
+                append(if (caps) r.uppercase() else r[0].uppercaseChar() + r.substring(1))
+            } else append(r)
         }
     }
 

@@ -4,10 +4,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** One timed piece of a line: a word or a syllable (sp: a space follows it). Times in seconds. */
-class Word(var t: Double, var end: Double?, val text: String, var sp: Boolean, var rom: String? = null)
+class Word(var t: Double, var end: Double?, val text: String, var sp: Boolean, var rom: String? = null) {
+    /** [rom] is this app's romanization (made again each time, never saved), not the lyrics' own. */
+    var romOwn = false
+    /** The romanization ends a word here though the lyrics run on (Japanese and Chinese: "kimi no"). */
+    var romSp = false
+}
 
 /** Background vocals under a line, with their own timing when the lyrics have it. */
-class Bg(val text: String, var rom: String?, val words: List<Word>?)
+class Bg(val text: String, var rom: String?, val words: List<Word>?) { var romOwn = false }
 
 class Line(
     var t: Double?,
@@ -57,7 +62,7 @@ class LyricsResult(
 private fun JSONObject.optStr(k: String): String? = if (has(k) && !isNull(k)) optString(k) else null
 private fun JSONObject.optD(k: String): Double? = if (has(k) && !isNull(k)) optDouble(k).takeIf { !it.isNaN() } else null
 
-fun Word.toJson(): JSONObject = JSONObject().put("t", t).put("e", end ?: JSONObject.NULL).put("x", text).put("s", sp).apply { rom?.let { put("r", it) } }
+fun Word.toJson(): JSONObject = JSONObject().put("t", t).put("e", end ?: JSONObject.NULL).put("x", text).put("s", sp).apply { rom?.takeIf { !romOwn }?.let { put("r", it) } }
 fun wordFrom(o: JSONObject) = Word(o.optDouble("t"), o.optD("e"), o.optString("x"), o.optBoolean("s"), o.optStr("r"))
 
 fun List<Word>.toJsonArr() = JSONArray().also { a -> forEach { a.put(it.toJson()) } }
@@ -66,7 +71,7 @@ fun wordsFrom(a: JSONArray?): List<Word>? = a?.let { (0 until it.length()).map {
 fun Line.toJson(): JSONObject = JSONObject().apply {
     put("t", t ?: JSONObject.NULL); put("e", end ?: JSONObject.NULL); put("x", text)
     words?.let { put("w", it.toJsonArr()) }
-    bg?.let { b -> put("b", JSONArray().also { a -> b.forEach { x -> a.put(JSONObject().put("x", x.text).put("r", x.rom ?: JSONObject.NULL).apply { x.words?.let { put("w", it.toJsonArr()) } }) } }) }
+    bg?.let { b -> put("b", JSONArray().also { a -> b.forEach { x -> a.put(JSONObject().put("x", x.text).put("r", x.rom?.takeIf { !x.romOwn } ?: JSONObject.NULL).apply { x.words?.let { put("w", it.toJsonArr()) } }) } }) }
     if (opp) put("o", true); if (dots) put("d", true)
     apiRom?.let { put("ar", it) }; apiTr?.let { put("at", it) }; apiTrLang?.let { put("al", it) }
 }
