@@ -341,6 +341,12 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
                 drawLayer(vs)
                 drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .35f), .08f to Color.Black.copy(alpha = .7f), .2f to Color.Black, .45f to Color.Black, .58f to Color.Black.copy(alpha = .85f),
                     .74f to Color.Black.copy(alpha = .5f), .88f to Color.Black.copy(alpha = .18f), 1f to Color.Transparent, endY = r.height), size = r.size, blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+                // the dark shade at the top and the foot the screen lays over its video (Canvas → What's behind the controls)
+                val behind = S.str("cvBehind")
+                if (behind == "dark" || behind == "both" || (behind == "blur" && S.low)) {
+                    val tf = (Frost.gradeTop / r.height).coerceIn(.02f, .45f)
+                    drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .45f), tf to Color.Transparent, .55f to Color.Transparent, 1f to Color.Black.copy(alpha = .45f), endY = r.height), size = r.size)
+                }
                 drawContext.canvas.restore()
             }
             // (what's behind it is graded; with a Canvas showing the screen has no grade: Liquid glass's clear glass none either)
