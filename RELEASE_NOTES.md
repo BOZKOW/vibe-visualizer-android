@@ -1,3 +1,7 @@
-Vibe Visualizer for Android 0.54.1 (beta). Android 12 or newer; it installs over 0.54.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.55.0 (beta). Android 12 or newer; it installs over 0.54.1 (Settings → Help & about → Update now).
 
-- **On its side, the cover card is back** as it was in 0.53.0: the cover as tall as the screen with the top line, the name, the seek bar and the controls on it, with or without a Canvas. The rest of 0.54.0 stays (the lyrics higher upright, the bars lined up, the DJ).
+- **New glass, everywhere.** Buttons, the round buttons, notices, Settings, sheets and dialogs are now frosted glass with a touch of the song's colour, a sheen from the top, a rim that catches the light and a soft shadow, instead of a flat white film.
+- **No more "Playing from" and "Playing on".** The line at the top saying where the music plays is gone from every screen.
+- **Blurred behind the song at the top.** Upright, the background is shaded (or the Canvas blurred) down past the cover and the name, as behind the controls.
+- **Long breaks:** while the cover is out in the middle, it's bigger now, and the name and artist sit centred above it.
+- **The DJ shows its own cover.** Its picture from the Spotify app is used also when it comes a moment after its name, or when the app only gives its address.
