@@ -85,6 +85,7 @@ object Defaults {
         "ljoinMode" to "off",   // Join split words (Spicy Lyrics 6.5.0): off, full (all words), steady (steadily sung), held (held words); off by default again as in 6.5.10
         "lspace" to true,       // Increased line spacing with Spring (Spicy Lyrics 6.5.0's springLineSpacing)
         "aUpNext" to true,      // Up next: the next song at the lyrics' foot in a song's last 30 s (Spicy Lyrics 6.5.0)
+        "xLiquid" to false,     // Liquid glass (Experiments): the round buttons and notices bend what's behind them at their edges
         "cvLyrA" to 25,         // how much of the Canvas video shows behind the lyrics (%; 0: only its soft glow)
         "aPipTop" to false,     // the small window: the line being sung at the top
         "aBar1" to "where",     //   the four buttons under the controls (Settings always last): where, audio, bars,

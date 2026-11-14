@@ -376,6 +376,7 @@ private fun pages(): List<Page> = listOf(
         Item.Txt("Ideas being tried out. They may change, or go away, in a later version. The lyrics ones (the Focus style, Refined credits, Background vocal pop-out, Keep overlapping lines) are in Lyrics, beside what they go with."),
         Item.Sw("xScrub", "Scrub preview", "While you drag the seek bar, a bubble above your finger shows the time it would jump to (and the volume slider, the level). Off, the times show where the song is until you let go. From Spicy Lyrics 6.4.50."),
         Item.Sw("xSkeleton", "Lyrics loading skeleton", "While lyrics load, faint placeholder lines and a small “Loading lyrics” label instead of the big message. From Spicy Lyrics 6.4.0."),
+        Item.Sw("xLiquid", "Liquid glass", "The round buttons and the notices as liquid glass, as on iOS 26: the blurred picture behind them bends at their edges like a lens, with a faint rainbow at the rim and the light catching it. Android 13 or newer. It uses more of the graphics chip, so the phone may run a little warmer."),
     ), sub = "Ideas being tried out", group = 3),
     Page("help", "Help & about", Icons.AutoMirrored.Rounded.Help, listOf(
         Item.Sub("App updates"),
@@ -598,6 +599,7 @@ private fun needs(k: String): String? = when (k) {
     "aMotionCover" -> if (S.low) "Off in Low performance mode" else null
     "aMotionFirst" -> if (S.low) "Off in Low performance mode" else if (!S.b("aMotionCover")) "Turn on Animated covers first (above)" else if (!S.canvasOn) "Turn on Canvas first" else null
     "ljoinPace" -> if (S.joinMode == "off") "Turn on Join split words first" else null
+    "xLiquid" -> if (android.os.Build.VERSION.SDK_INT < 33) "Needs Android 13 or newer" else if (S.low) "Off in Low performance mode" else if (S.calm) "Off with Motion sickness" else null
     "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
     "cvLyrA" -> if (!S.canvasOn) "Turn on Canvas first" else null
     "aLike" -> if (!Spotify.connected) "Needs Spotify connected" else null

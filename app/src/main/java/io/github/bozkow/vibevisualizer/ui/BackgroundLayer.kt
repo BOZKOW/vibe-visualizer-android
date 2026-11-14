@@ -30,6 +30,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
@@ -339,6 +341,75 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
         drawImage(img, IntOffset(sx, sy), IntSize(sw, sh), IntOffset.Zero, IntSize(size.width.roundToInt() + 1, size.height.roundToInt() + 1), filterQuality = FilterQuality.Low)
     }
     drawRect(Color.Black.copy(alpha = .35f))   // the white on it keeps reading on a bright cover
+}
+
+/* ---- Liquid glass (0.56.0, an experiment the owner asked for: "iOS-like"; Settings → Experiments → Liquid glass) ----
+   The frost behind a piece drawn through a lens: near its rim the blurred picture behind is read from further in, so it
+   bends and magnifies there like the edge of a thick glass, with red and blue read a hair apart for the faint rainbow
+   real glass has at its edge. Android 13 or newer (an AGSL RuntimeShader as the layer's RenderEffect); the shader runs
+   only on the piece's own small layer. Off in Low performance mode and with Motion sickness. */
+private const val LENS = """
+uniform shader content;
+uniform float2 size;
+uniform float radius;
+uniform float rim;
+half4 main(float2 p) {
+    float2 c = size * 0.5;
+    float2 q = abs(p - c) - (c - radius);
+    float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    float t = clamp(1.0 + d / rim, 0.0, 1.0);
+    float bend = t * t;
+    float2 dir = p - c;
+    float2 s = c + dir * (1.0 - 0.32 * bend);
+    float2 off = dir * 0.03 * bend;
+    half4 g = content.eval(s);
+    half r = content.eval(s + off).r;
+    half b = content.eval(s - off).b;
+    return half4(r, g.g, b, g.a);
+}
+"""
+
+/** Liquid glass is on (and can be): the experiment, Android 13+, not in Low performance mode or with Motion sickness. */
+fun liquidOn(): Boolean = Build.VERSION.SDK_INT >= 33 && S.b("xLiquid") && !S.low && !S.calm
+
+/** The frost behind a round button ([radius] null: an oval) or a notice (its corners' [radius]), through the lens when
+ *  Liquid glass is on; plain frost otherwise. */
+fun Modifier.liquidFrost(radius: Dp? = null, inset: Dp = 0.dp): Modifier = composed {
+    if (!liquidOn()) return@composed Modifier.frosted(inset, oval = radius == null)
+    if (!LocalFrost.current) return@composed Modifier
+    var at by remember { mutableStateOf(Offset.Zero) }
+    val paint = frostPainter()
+    val layer = androidx.compose.ui.graphics.rememberGraphicsLayer()
+    val shader = remember { if (Build.VERSION.SDK_INT >= 33) RuntimeShader(LENS) else null }
+    val made = remember { floatArrayOf(-1f, -1f) }
+    Modifier.onGloballyPositioned { at = it.positionInWindow() }.drawBehind {
+        val sh = shader ?: return@drawBehind
+        if (Build.VERSION.SDK_INT < 33) return@drawBehind
+        val w = size.width; val h = size.height
+        if (w < 1f || h < 1f) return@drawBehind
+        // the effect is made again only when the size changes (its numbers are the piece's shape)
+        if (made[0] != w || made[1] != h) {
+            made[0] = w; made[1] = h
+            val r = radius?.toPx()?.coerceAtMost(minOf(w, h) / 2) ?: (minOf(w, h) / 2)
+            sh.setFloatUniform("size", w, h); sh.setFloatUniform("radius", r)
+            sh.setFloatUniform("rim", minOf(minOf(w, h) * .32f, 22.dp.toPx()))
+            layer.renderEffect = android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content").asComposeRenderEffect()
+        }
+        layer.record(IntSize(w.roundToInt(), h.roundToInt())) { paint(at) }
+        if (radius == null) {
+            val i = inset.toPx()
+            val clip = Path().apply { addOval(Rect(i, i, w - i, h - i)) }
+            clipPath(clip) { drawLayer(layer) }
+        } else drawLayer(layer)
+    }
+}
+
+/** Liquid glass's highlight: the light catching the rim brightest at the top left, and a soft glow inside it there. */
+fun DrawScope.liquidShine(shape: androidx.compose.ui.graphics.Shape) {
+    val o = shape.createOutline(size, layoutDirection, this)
+    drawOutline(o, Brush.linearGradient(0f to Color.White.copy(alpha = .75f), .35f to Color.White.copy(alpha = .12f), .7f to Color.Transparent, 1f to Color.White.copy(alpha = .25f),
+        start = Offset.Zero, end = Offset(size.width, size.height)), style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx()))
+    drawOutline(o, Brush.radialGradient(0f to Color.White.copy(alpha = .14f), 1f to Color.Transparent, center = Offset(size.width * .25f, size.height * .15f), radius = maxOf(size.width, size.height) * .6f))
 }
 
 /** Frost behind a round button or a notice, on the player. [inset]: when the button is drawn smaller than it's laid out.
