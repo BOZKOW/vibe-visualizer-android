@@ -609,12 +609,12 @@ object Lyr {
         loadT = Vibe.scope.launch { delay(500); clear("Looking for lyrics…", "", "load"); empty = was }
     }
 
-    fun clear(m: String, sub: String = "", kind: String = "", actions: List<E.Act> = emptyList(), err: Boolean = false) {
+    fun clear(m: String, sub: String = "", kind: String = "", actions: List<E.Act> = emptyList(), err: Boolean = false, always: Boolean = false) {
         loadT?.cancel(); view.freeEnd()
         L = emptyList(); lsync = false; credit = null; label = ""; shownProv = null
         render(null, false)
         empty = kind == "none"
-        msg = if (m.isEmpty() || (kind == "none" && !err && !S.b("lnotice"))) null else Msg(m, sub, kind, actions, err)
+        msg = if (m.isEmpty() || (kind == "none" && !err && !always && !S.b("lnotice"))) null else Msg(m, sub, kind, actions, err)   // ([always]: the DJ's note, not a "no lyrics" one)
     }
 
     private fun apply(r: LyricsResult) {

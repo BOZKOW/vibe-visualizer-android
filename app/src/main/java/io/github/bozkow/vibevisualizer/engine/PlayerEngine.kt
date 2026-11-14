@@ -381,7 +381,11 @@ object E {
         val named = SpotifyApp.title.isNotEmpty() && SpotifyApp.title != title   // the Spotify app's name for it, when it has moved on
         title = if (named) SpotifyApp.title else "DJ"; artist = if (named) SpotifyApp.artist else "Spotify"; year = ""; album = ""; status = "Spotify"; trackVer++
         if (named) appShown = title
-        Lyr.clear("Lyrics aren’t available with the DJ", "The DJ talks between the songs and mixes them together, so there’s nothing to line lyrics up with. They’re back with the next song.", "none")
+        // the DJ's own picture, as the Spotify app shows it (the Web API often names the DJ first, and the app's report of the
+        // same name then changed nothing: the last song's cover stayed, the owner's screenshot); none: the last cover stays
+        SpotifyApp.cover()?.let { appArt = setCoverBitmap(it, "From the Spotify app", coverTok) }
+        // its note shows also with No lyrics notice off: it's about the DJ, not a song without lyrics
+        Lyr.clear("Lyrics aren’t available with the DJ", "The DJ talks between the songs and mixes them together, so there’s nothing to line lyrics up with. They’re back with the next song.", "none", always = true)
         updPlay()
     }
 
