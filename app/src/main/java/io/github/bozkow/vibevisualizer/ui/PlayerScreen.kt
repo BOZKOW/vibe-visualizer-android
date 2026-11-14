@@ -940,15 +940,38 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
             else Box(Modifier.size(52.dp * ck).graphicsLayer { alpha = ck.coerceIn(0f, 1f) }) { CoverArt(Modifier.fillMaxSize(), corner = 10.dp, small = true) }
             Spacer(Modifier.width((if (header) 16.dp else 12.dp) * ck))
         }
+        // [header]: the buttons on the name's line and the heart on the artist's (the owner's sketch), so the artist and Up next
+        // have the column's whole width; the name and the artist still slide in step
+        if (header) {
+            Column(Modifier.weight(1f)) {
+                androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
+                    val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) { Scrolling(E.title, 24f.times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, if (toggles && (Lyr.needTr || Lyr.needRom)) 0.dp else br) }
+                        if (toggles) {
+                            if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
+                            if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
+                        }
+                    }
+                    val by = E.byLine()
+                    val heart = E.src == "spotify" && like && S.b("aLike")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) { if (by.isNotEmpty()) Scrolling(by, 16f.times(k).sp, FontWeight.SemiBold, dim, bleedL = bl, bleedR = if (heart) 0.dp else br) }
+                        if (heart) LikeButton()
+                    }
+                }
+                if (S.b("aUpNext")) UpNextLine()
+            }
+            return@Row
+        }
         // the name and the artist slide in step (Spicy Lyrics 6.5.0's TextScroller): they leave together, the shorter waits
         // at its end, and they come back together
         Column(Modifier.weight(1f), horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
             androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
                 val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
-                Scrolling(E.title, (if (header) 24f else if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)
+                Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)
                 val by = E.byLine()
-                if (by.isNotEmpty()) Scrolling(by, (if (header) 16f else if (big) 19f else 15f).times(k).sp, if (header) FontWeight.SemiBold else FontWeight.Medium, dim, bleedL = bl, bleedR = br)
-                if (header && S.b("aUpNext")) UpNextLine()
+                if (by.isNotEmpty()) Scrolling(by, (if (big) 19f else 15f).times(k).sp, FontWeight.Medium, dim, bleedL = bl, bleedR = br)
             }
         }
         if (toggles) {   // the Lyrics screen: translate and romanize, when the lyrics need them
