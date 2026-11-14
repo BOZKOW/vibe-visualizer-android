@@ -231,7 +231,7 @@ fun NoticeDetail() {
             val short = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 520
             Column(Modifier.animateEnterExit(enter = popIn(o, .3f), exit = popOut(o, .3f))
                 .statusBarsSpace().navBarsSpace().verticalScroll(rememberScrollState()).padding(if (short) 16.dp else 32.dp).widthIn(max = if (short) 560.dp else 420.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val tint = when (q.k) { "err" -> Color(0xFFFF5449); "ok" -> Color.White; else -> Color(0xFFFFD27A) }
+                val tint = when (q.k) { "err" -> Color(0xFFFF5449); "ok", "next" -> Color.White; else -> Color(0xFFFFD27A) }
                 val icon = when (q.id) {
                     "offline" -> androidx.compose.material.icons.Icons.Rounded.WifiOff
                     "spicy" -> androidx.compose.material.icons.Icons.Rounded.CloudOff
@@ -243,12 +243,14 @@ fun NoticeDetail() {
                     "update" -> androidx.compose.material.icons.Icons.Rounded.Download
                     else -> if (q.k == "err") androidx.compose.material.icons.Icons.Rounded.ErrorOutline else if (q.k == "ok") androidx.compose.material.icons.Icons.Rounded.CheckCircleOutline else androidx.compose.material.icons.Icons.Rounded.Info
                 }
-                Box(Modifier.size(if (short) 56.dp else 96.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value; alpha = (pop.value - .5f) * 2f }
+                if (q.k == "next") Box(Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value; alpha = (pop.value - .5f) * 2f }) { NoticeCover(q.img, if (short) 72.dp else 120.dp) }   // Up next: its cover
+                else Box(Modifier.size(if (short) 56.dp else 96.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value; alpha = (pop.value - .5f) * 2f }
                     .clip(CircleShape).background(tint.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
                     Icon(icon, null, Modifier.size(if (short) 32.dp else 52.dp), tint = tint)
                 }
                 Text(q.t, Modifier.part(1).padding(top = if (short) 10.dp else 24.dp), fontSize = if (short) 22.sp else 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
-                if (q.s.isNotEmpty()) Text(q.s, Modifier.part(2).padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint, textAlign = TextAlign.Center)
+                val sub = if (q.k == "next") "Up next" + (if (q.s.isNotEmpty()) " · " + q.s else "") else q.s
+                if (sub.isNotEmpty()) Text(sub, Modifier.part(2).padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint, textAlign = TextAlign.Center)
                 if (q.steps.isNotEmpty()) Column(Modifier.part(3).padding(top = if (short) 10.dp else 18.dp).fillMaxWidth().glassCard().padding(16.dp)) {
                     Text("What to do", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = .6f), letterSpacing = 1.sp)
                     q.steps.forEachIndexed { i, st ->

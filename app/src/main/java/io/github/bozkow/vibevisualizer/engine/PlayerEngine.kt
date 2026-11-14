@@ -105,7 +105,8 @@ object E {
     /** id: offline | server | spotify | wait (its icon); act: the one thing to do about it */
     /** Something the top of the screen says. [steps]: what to do about it (its detail screen lists them); [ok]: what
      *  OK does besides closing that screen (a one-off notice is put away; null: what's still wrong stays). */
-    class Prob(val pr: Int, val k: String, val id: String, val t: String, val s: String, val act: Act? = null, val steps: List<String> = emptyList(), val ok: (() -> Unit)? = null)
+    class Prob(val pr: Int, val k: String, val id: String, val t: String, val s: String, val act: Act? = null, val steps: List<String> = emptyList(),
+               val img: String? = null, val ok: (() -> Unit)? = null)   // ([img]: a picture for its icon, Up next's cover; [ok] last, as a trailing lambda)
     private var noteSeq = 0L
     val snacks = mutableStateListOf<Snack>()       // the first one is on screen, the others wait their turn
     val notes = mutableStateListOf<Snack>()        // the same for errors and warnings, at the top
@@ -132,7 +133,8 @@ object E {
      *  words): its turn at the top, or a good one's time before it goes, lasts at least that ("they disappeared before the
      *  line scrolled to the end"). */
     val readMs = java.util.concurrent.ConcurrentHashMap<String, Long>()
-    fun readNeed(p: Prob?): Long = if (p == null) 0L else maxOf(readMs[p.t] ?: 0L, readMs[p.s] ?: 0L, readMs[p.t + "  ·  " + p.s] ?: 0L)
+    fun readNeed(p: Prob?): Long = if (p == null) 0L else maxOf(readMs[p.t] ?: 0L, readMs[p.s] ?: 0L, readMs[p.t + "  ·  " + p.s] ?: 0L,
+        readMs["UP NEXT  " + p.t + (if (p.s.isNotEmpty()) "  ·  " + p.s else "")] ?: 0L)   // (Up next's one line)
 
     /** A one-off error or warning is done: its button was pressed, or its time is up. */
     fun noteDone(n: Snack, acted: Boolean) {
@@ -163,6 +165,10 @@ object E {
             listOf("Try again, or another source: Settings → Help & about → Last lookup.", "Check which sources are on, and their order: Settings → Lyrics → Sources.")))
         if (Updates.downloading) out.add(Prob(0, "wait", "update", "Downloading the update", (Updates.progress * 100).toInt().toString() + "%",
             steps = listOf("When it's down, Android asks to install it over this version; your settings and saved lyrics stay.")))
+        // Up next (Spicy Lyrics 6.5.0): in a song's last 30 s, the next song, its cover the icon and its name beside it
+        val nx = Preload.shown
+        if (!homeScreen && nx != null && !inPip && !ambient) out.add(Prob(0, "next", "upnext", nx.title, nx.artist,
+            steps = listOf("It plays after this song, as the queue has it now.", "Settings → Lyrics → Up next turns this off."), img = nx.cover.ifEmpty { null }))
         // what's still wrong stays at the top until it's solved: its OK only closes its screen (a one-off notice's OK
         // puts it away)
         return out

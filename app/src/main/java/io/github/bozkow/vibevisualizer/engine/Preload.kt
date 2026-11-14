@@ -6,6 +6,9 @@ import io.github.bozkow.vibevisualizer.lyrics.SongMeta
 import io.github.bozkow.vibevisualizer.media.Local
 import io.github.bozkow.vibevisualizer.media.MediaApps
 import io.github.bozkow.vibevisualizer.spotify.Spotify
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -31,6 +34,10 @@ object Preload {
      *  null while it isn't known. */
     fun upNext(): SongMeta? = if (readFor == E.coverTok) next.getOrNull(at) else null
 
+    /** Up next as the top of the screen shows it (a notice, the cover its icon: `E.notices`): the next song while this
+     *  one has 30 s or less left, else null. */
+    var shown by mutableStateOf<SongMeta?>(null); private set
+
     /** Next pressed in this app: the song found ahead that comes now (pressing again before Spotify answers gives the
      *  one after), or null. */
     fun skip(): SongMeta? = next.getOrNull(at)?.also { at++ }
@@ -54,7 +61,7 @@ object Preload {
 
     /** A song started: in a few seconds (after its own lookups), find the next ones and get them ready. */
     fun songStarted() {
-        job?.cancel()
+        job?.cancel(); shown = null
         val ready = S.b("aPreload"); val upNext = S.b("aUpNext")
         if (!ready && !upNext) return
         val tok = E.coverTok
@@ -63,7 +70,7 @@ object Preload {
             if (tok != E.coverTok) return@launch
             val ms = read()
             if (tok != E.coverTok) return@launch
-            if (upNext) launch { lastLook(tok) }
+            if (upNext) launch { watchEnd(tok) }
             if (ms.isEmpty() || !ready) { if (ms.isNotEmpty()) { next = ms; at = 0; readFor = tok }; return@launch }
             next = ms; at = 0; readFor = tok
             // the nearest first, one song at a time (its lyrics, Canvas and cover together), so the sources aren't asked
@@ -79,16 +86,22 @@ object Preload {
         }
     }
 
-    /** Up next shows in a song's last 30 s: the queue is read once more as they begin (one more request to Spotify),
-     *  so a song you queued meanwhile is the one it names. A seek forwards counts; the wait checks every 2 s. */
-    private suspend fun lastLook(tok: Int) {
-        while (true) {
-            delay(2000)
-            if (tok != E.coverTok) return
+    /** Up next shows in a song's last 30 s (not on repeat-one, not for the DJ): the queue is read once more as they
+     *  begin (one more request to Spotify), so a song you queued meanwhile is the one it names. A seek counts: it looks
+     *  every 2 s, every half second near the end. */
+    private suspend fun watchEnd(tok: Int) {
+        var looked = false
+        while (tok == E.coverTok) {
             val d = E.curDur(); val left = d - E.curTime()
-            if (d > 0 && left in 0.0..36.0) break
+            val on = S.b("aUpNext") && !E.dj && !(E.src == "spotify" && Spotify.repeat == "track")
+            if (on && !looked && d > 0 && left in 0.0..36.0) { looked = true; lastLook(tok) }
+            val s = if (on && d > 0 && left in .5..30.0) upNext() else null
+            if (tok == E.coverTok && s !== shown) shown = s
+            delay(if (d > 0 && left < 40) 500 else 2000)
         }
-        if (E.dj || (E.src == "spotify" && Spotify.repeat == "track")) return
+    }
+
+    private suspend fun lastLook(tok: Int) {
         val ms = read()
         if (tok != E.coverTok || ms.isEmpty()) return
         val first = next.getOrNull(at)?.let { it.id to it.title }

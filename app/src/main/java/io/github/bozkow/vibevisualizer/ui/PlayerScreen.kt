@@ -266,7 +266,6 @@ private fun LyricsWithLyrics() {
                 CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
         }
-        UpNext(Modifier.padding(horizontal = 24.dp))
         if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
         Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true, restCover = rest) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
@@ -432,7 +431,6 @@ private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 4
             // the screen's edge (28 dp in, they sat towards the middle: "move the duet vocals more to the right")
             else LyricsPane(Modifier.fillMaxSize().padding(end = lyricsEnd), areaHeightPx = areaH, padStart = 4f, padEnd = 6f, problems = false, behind = true, startRoom = startRoom)
         }
-        if (!bars) UpNext(Modifier.padding(end = endGap), short = true)
         if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = endGap).height(34.dp))
         Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }
     }
@@ -466,7 +464,6 @@ private fun RightPane(modifier: Modifier) {
             if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 16.dp)); AwayNote(Modifier.align(Alignment.Center)) }
             else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 8f, padEnd = 16f, problems = false)
         }
-        if (!bars) UpNext(Modifier)
         if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(64.dp))
         LyricsCredits()
     }
@@ -526,8 +523,20 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
                 "media" -> "PLAYING FROM $app"
                 else -> top
             }
-            Box(Modifier.fillMaxWidth().height(26.dp).then(if (toSpotify != null) Modifier.clickable { E.haptic(); toSpotify() } else Modifier), contentAlignment = Alignment.Center) {
-                AnimatedContent(one, Modifier.fillMaxWidth(), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdone") { t ->
+            // the words "PLAYING FROM / ON" only where they fit whole: over a Canvas (the controls' narrow panel) they made the
+            // line slide; without them it's the upright line's "THIS PHONE · SONG 1 OF 2", which slides only if even that's long
+            val short = when (E.src) {
+                "spotify" -> "SPOTIFY" + (if (dev.isNotEmpty()) " · $dev" else "")
+                "file" -> "THIS PHONE" + (if (dev.isNotEmpty()) " · $dev" else "") + (if (back) " · ⇄ SPOTIFY" else "")
+                "media" -> app
+                else -> top
+            }
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(26.dp).then(if (toSpotify != null) Modifier.clickable { E.haptic(); toSpotify() } else Modifier), contentAlignment = Alignment.Center) {
+                val tm = androidx.compose.ui.text.rememberTextMeasurer()
+                val style = androidx.compose.material3.LocalTextStyle.current.merge(TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp))
+                val room = constraints.maxWidth - with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.roundToPx() }
+                val fits = remember(one, room, style) { tm.measure(one, style, maxLines = 1, softWrap = false).size.width <= room }
+                AnimatedContent(if (fits) one else short, Modifier.fillMaxWidth(), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdone") { t ->
                     TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
                 }
             }
@@ -669,12 +678,14 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
     }
     // …and a new one shows first
     val seen = remember { HashSet<String>() }
-    LaunchedEffect(ids) { if (ids.any { it !in seen }) { turn = 0; byHand = false; dir = 0 }; seen.clear(); seen.addAll(ids) }
+    LaunchedEffect(ids) { if (ids.any { it !in seen && it != "upnext" }) { turn = 0; byHand = false; dir = 0 }; seen.clear(); seen.addAll(ids) }   // (Up next waits its turn)
     val k = if (all.isEmpty()) 0 else ((turn % all.size) + all.size) % all.size
     val swipe = remember { Animatable(0f) }; val scope = androidx.compose.runtime.rememberCoroutineScope()
     val p = all.getOrNull(k)
     val last = remember { arrayOfNulls<E.Prob>(1) }   // still shown while it slides away
     if (p != null) last[0] = p
+    // Up next is there but quiet ("kinda hidden while also being visible"): one line, its pill and words faded back
+    val quiet by animateFloatAsState(if (p?.k == "next") .7f else 1f, tween(300), label = "quiet")
     AnimatedVisibility(p != null, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
         Column(Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally) {
@@ -684,6 +695,7 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
             // tapped: its detail screen (what's wrong, what to do, OK), growing out of it; pressed, it gives a little
             val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
             Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape).frosted(oval = false)
+                .graphicsLayer { alpha = quiet }
                 .then(if (S.low) Modifier.background(Color(0xFF101018).copy(alpha = .7f)) else Modifier)   // (no frost: it's over the lyrics)
                 .background(Color.White.copy(alpha = .12f)).border(1.dp, Color.White.copy(alpha = .22f), shape)
                 .then(if (!many) Modifier else Modifier.pointerInput(Unit) {
@@ -705,9 +717,10 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
                     else (fadeIn(tween(260)) + slideInVertically(spring(.7f, Spring.StiffnessMediumLow)) { it / 2 } + scaleIn(spring(.6f, Spring.StiffnessMediumLow), initialScale = .92f)) togetherWith (fadeOut(tween(160)) + scaleOut(tween(160), targetScale = .96f))
                 }, label = "notice") { q ->
                     // words alone, in the middle of the glass: OK and what fixes it are on the screen tapping opens
-                    Row(Modifier.padding(start = 12.dp, end = 16.dp, top = if (row) 4.dp else 8.dp, bottom = if (row) 4.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (q != null) NoticeIcon(q.k, if (row) 22.dp else 28.dp)
-                        Column(Modifier.weight(1f, fill = false).padding(start = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, row) }
+                    val one = row || q?.k == "next"
+                    Row(Modifier.padding(start = if (one) 8.dp else 12.dp, end = 16.dp, top = if (one) 4.dp else 8.dp, bottom = if (one) 4.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (q != null) NoticeIcon(q.k, if (one) 22.dp else 28.dp, q.img)
+                        Column(Modifier.weight(1f, fill = false).padding(start = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) { if (q != null) NoticeLines(q, one) }
                     }
                 }
             }
@@ -724,7 +737,8 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false) {
 /** What kind of notice it is at a glance (Material 3 Expressive): broken (red), waiting (yellow) or good news (white), its
  *  icon on a soft round tile of its colour. */
 @Composable
-fun NoticeIcon(k: String, size: Dp = 28.dp) {
+fun NoticeIcon(k: String, size: Dp = 28.dp, img: String? = null) {
+    if (k == "next") { NoticeCover(img, size); return }   // Up next: the song's cover
     val (icon, tint) = when (k) {
         "err" -> Icons.Rounded.ErrorOutline to Color(0xFFFFB4AB)
         "ok" -> Icons.Rounded.CheckCircle to Color.White
@@ -739,8 +753,18 @@ fun NoticeIcon(k: String, size: Dp = 28.dp) {
  *  on its detail screen). On its side, where the room is the left column's: one text of two lines at most. */
 @Composable
 fun NoticeLines(p: E.Prob, row: Boolean = false, live: Boolean = false) {
-    val tint = when (p.k) { "err" -> Color(0xFFFFB4AB); "ok" -> Color.White; else -> Color(0xFFFFD27A) }   // red broken, white good news, yellow waiting
+    val tint = when (p.k) { "err" -> Color(0xFFFFB4AB); "ok", "next" -> Color.White; else -> Color(0xFFFFD27A) }   // red broken, white good news (and Up next), yellow waiting
     val act: @Composable () -> Unit = {}
+    if (p.k == "next") {   // Up next: "UP NEXT  Song · Artist" in one quiet line, beside the song's cover
+        val words = androidx.compose.ui.text.buildAnnotatedString {
+            withStyle(androidx.compose.ui.text.SpanStyle(color = dim, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)) { append("UP NEXT  ") }
+            withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append(p.t) }
+            if (p.s.isNotEmpty()) withStyle(androidx.compose.ui.text.SpanStyle(color = dim, fontSize = 12.sp)) { append("  ·  " + p.s) }
+        }
+        if (S.b("aMarquee") && !S.low && !S.calm) NoticeText(words, 13.sp, live = live)
+        else Text(words, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        return
+    }
     // each line scrolls across the pill when it's too long, instead of wrapping (0.46.1); with Scroll long names off, or in Low
     // performance mode, they wrap as before
     if (S.b("aMarquee") && !S.low && !S.calm) {
@@ -904,43 +928,14 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
     }
 }
 
-/** Up next (Spicy Lyrics 6.5.0's card): in a song's last 30 s, the song that comes after it, under the lyrics, as the
- *  queue's first row reads (its cover, name and artist; nothing to tap). Not on repeat-one, for the DJ, in the small
- *  window or in Ambient mode; Settings → Lyrics → Up next. The queue is read 6 s into the song and again as its last
- *  30 s begin (`Preload`). The lyrics area makes room for it at once (the lines glide up), then it fades in. */
+/** A song's cover as a notice's icon (Up next), rounded; a note while it loads or when the song has none. */
 @Composable
-private fun UpNext(modifier: Modifier, short: Boolean = false) {
-    val next by produceState<io.github.bozkow.vibevisualizer.lyrics.SongMeta?>(null) {
-        while (true) {
-            value = if (!S.b("aUpNext") || E.inPip || E.ambient || E.dj || (E.src == "spotify" && Spotify.repeat == "track")) null
-            else Preload.upNext()?.takeIf { _ -> val d = E.curDur(); val left = d - E.curTime(); d > 0 && left in .5..30.0 }
-            kotlinx.coroutines.delay(500)
-        }
-    }
-    var shown by remember { mutableStateOf<io.github.bozkow.vibevisualizer.lyrics.SongMeta?>(null) }
-    if (next != null) shown = next
-    AnimatedVisibility(next != null, modifier, enter = fadeIn(tween(320, 120)) + androidx.compose.animation.slideInVertically(tween(420, 120)) { it / 3 }, exit = fadeOut(tween(220))) {
-        val m = shown ?: return@AnimatedVisibility
-        Crossfade(m, label = "upnext") { s ->
-            Row(Modifier.fillMaxWidth().padding(vertical = if (short) 4.dp else 6.dp).glass(RoundedCornerShape(16.dp)).padding(8.dp)
-                .semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
-                val size = if (short) 36.dp else 44.dp
-                val bm by produceState(s.cover.takeIf { it.isNotEmpty() }?.let { Images.cached("$it@128") }, s.cover) { value = s.cover.takeIf { it.isNotEmpty() }?.let { Images.load(it, 128) } }
-                Box(Modifier.size(size).clip(RoundedCornerShape(8.dp)).background(GlassFill), contentAlignment = Alignment.Center) {
-                    val b = bm
-                    if (b != null) Image(b.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    else Icon(Icons.Rounded.MusicNote, null, Modifier.size(20.dp), tint = Color.White.copy(alpha = .6f))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("UP NEXT", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = Color.White.copy(alpha = .6f))
-                    androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
-                        Scrolling(s.title, 14.sp, FontWeight.Bold, Color.White)
-                        if (s.artist.isNotEmpty() && !short) Scrolling(s.artist, 12.sp, FontWeight.Medium, dim)
-                    }
-                }
-            }
-        }
+fun NoticeCover(url: String?, size: Dp) {
+    val bm by produceState(url?.let { Images.cached("$it@128") }, url) { value = url?.let { Images.load(it, 128) } }
+    Box(Modifier.size(size).clip(RoundedCornerShape(size * .22f)).background(GlassFill).border(1.dp, GlassEdge, RoundedCornerShape(size * .22f)), contentAlignment = Alignment.Center) {
+        val b = bm
+        if (b != null) Image(b.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        else Icon(Icons.Rounded.MusicNote, null, Modifier.size(size * .6f), tint = Color.White.copy(alpha = .7f))
     }
 }
 
