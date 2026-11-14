@@ -33,6 +33,9 @@ class LocalLyricsFormatTest {
         // a Latin word beside them still gets its space
         val q = parseTTML("""<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.0" end="3.0"><span begin="1.0" end="1.5">Oh</span><span begin="1.5" end="2.0">君</span><span begin="2.0" end="3.0">の</span></p></div></body></tt>""")
         assertEquals("Oh 君の", shown(q.lines[0]))
+        // the long-vowel mark is written without spaces too (Unicode puts it in no script)
+        val r = parseTTML("""<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.0" end="3.0"><span begin="1.0" end="1.5">コー</span><span begin="1.5" end="2.0">ヒー</span><span begin="2.0" end="2.5">せ</span><span begin="2.5" end="3.0">ー</span></p></div></body></tt>""")
+        assertEquals("コーヒーせー", shown(r.lines[0]))
     }
 
     @Test fun joinsNextOnHyphens() {

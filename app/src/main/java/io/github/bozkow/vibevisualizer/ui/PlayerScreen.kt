@@ -534,7 +534,7 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(26.dp).then(if (toSpotify != null) Modifier.clickable { E.haptic(); toSpotify() } else Modifier), contentAlignment = Alignment.Center) {
                 val tm = androidx.compose.ui.text.rememberTextMeasurer()
                 val style = androidx.compose.material3.LocalTextStyle.current.merge(TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp))
-                val room = constraints.maxWidth - with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.roundToPx() }
+                val room = constraints.maxWidth - with(androidx.compose.ui.platform.LocalDensity.current) { 4.dp.roundToPx() }   // (whole, it sits in the middle with no padding)
                 val fits = remember(one, room, style) { tm.measure(one, style, maxLines = 1, softWrap = false).size.width <= room }
                 AnimatedContent(if (fits) one else short, Modifier.fillMaxWidth(), contentAlignment = Alignment.Center, transitionSpec = { (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(160)) }, label = "hdone") { t ->
                     TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)

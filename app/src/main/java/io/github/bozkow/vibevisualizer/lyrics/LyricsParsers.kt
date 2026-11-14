@@ -77,9 +77,12 @@ private fun allByLocal(root: Node, name: String, out: MutableList<Element> = Arr
 }
 
 /** A word part that runs straight on into the next: one ending in a hyphen ("la-"), or before one starting with one. */
-/** Two parts that meet between characters of a script written without spaces (kanji, kana, Thai…). */
-internal fun unspacedSeam(text: String, next: String?): Boolean =
-    next != null && UNSPACED.containsMatchIn(text.trimEnd().takeLast(1)) && UNSPACED.containsMatchIn(next.trimStart().take(1))
+/** Two parts that meet between characters of a script written without spaces (kanji, kana, Thai…). The long-vowel mark
+ *  and the repeat marks count too: Unicode puts ー in no script, and コー|ヒー was spaced (romanized "koo hii"). */
+internal fun unspacedSeam(text: String, next: String?): Boolean {
+    fun cj(c: String) = c.isNotEmpty() && (UNSPACED.containsMatchIn(c) || c[0] in "ーｰ々〆ゝゞヽヾ〜～")
+    return next != null && cj(text.trimEnd().takeLast(1)) && cj(next.trimStart().take(1))
+}
 
 internal fun joinsNext(text: String, next: String?): Boolean {
     val a = text.trimEnd(); val b = next?.trimStart() ?: return false
