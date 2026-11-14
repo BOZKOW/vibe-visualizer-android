@@ -772,7 +772,7 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false, upNext: Boolean = t
                 .shadow(8.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = .4f), spotColor = Color.Black.copy(alpha = .5f))
                 .clip(shape).liquidFrost(radius = if (row) 14.dp else 18.dp)
                 .then(if (S.low) Modifier.background(Color(0xFF101018).copy(alpha = .7f)) else Modifier)   // (no frost: it's over the lyrics)
-                .drawBehind { glassBody(0f); if (liquidOn()) liquidShine(shape) }.border(1.dp, GlassRim, shape)
+                .drawBehind { glassBody(0f) }.border(1.dp, GlassRim, shape)
                 .then(if (!many) Modifier else Modifier.pointerInput(Unit) {
                     // byHand already at the start: a turn by itself under the finger made the swipe land back on the same one
                     detectHorizontalDragGestures(onDragStart = { byHand = true }, onDragEnd = {
@@ -1173,9 +1173,8 @@ private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp
     // on: filled white with a dark icon, as the translate and romanize buttons, so on and off can't be mistaken
     val fg = androidx.compose.ui.graphics.lerp(Color.White, Color(0xFF111116), k)
     // off: the glass (0.55.0: the cover's colour, a sheen and a rim that catches the light, over the frost behind it)
-    // (Liquid glass, the experiment: the frost behind through a lens, and the light on its rim)
-    val liquid = liquidOn()
-    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).liquidFrost().drawBehind { glassBody(0f, 1f - k); if (liquid) liquidShine(CircleShape) }.background(Color.White.copy(alpha = .9f * k))
+    // (Liquid glass, the experiment: what's behind through a lens, clear)
+    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).liquidFrost().drawBehind { glassBody(0f, 1f - k) }.background(Color.White.copy(alpha = .9f * k))
         .border(1.dp, GlassRim, CircleShape)
         .quickClick(src, enabled, androidx.compose.material3.ripple(), onHold = onLongClick?.let { h -> { E.haptic(); h() } }) { E.haptic(); onClick() }
         .semantics { contentDescription = desc; selected = on }, contentAlignment = Alignment.Center) {

@@ -90,16 +90,28 @@ import io.github.bozkow.vibevisualizer.engine.E
 val GlassFill = Color.White.copy(alpha = .12f)
 val GlassEdge = Color.White.copy(alpha = .22f)
 
-/** The rim: bright along the top, fading down the sides, a faint line of light again at the foot. */
-val GlassRim: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha = .5f), .3f to Color.White.copy(alpha = .17f), .7f to Color.White.copy(alpha = .08f), 1f to Color.White.copy(alpha = .2f))
+/** The rim: bright along the top, fading down the sides, a faint line of light again at the foot. With Liquid glass (the
+ *  experiment, the whole design): the light catching it at the top left, brighter, a glint again at the bottom right. */
+private val FrostRim: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha = .5f), .3f to Color.White.copy(alpha = .17f), .7f to Color.White.copy(alpha = .08f), 1f to Color.White.copy(alpha = .2f))
+private val LiquidRim: Brush = Brush.linearGradient(0f to Color.White.copy(alpha = .85f), .3f to Color.White.copy(alpha = .2f), .62f to Color.White.copy(alpha = .06f), 1f to Color.White.copy(alpha = .4f))
+val GlassRim: Brush get() = if (liquidOn()) LiquidRim else FrostRim
 /** The rim of something switched off or quiet. */
 val GlassRimFaint: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha = .2f), .5f to Color.White.copy(alpha = .06f), 1f to Color.White.copy(alpha = .1f))
 
 /** The glass's body: [shade] so white words read, the cover's colour, the sheen; [k] how much of it (an island coming in).
  *  The colour is read as it's drawn, so a new song's tints the glass without anything being laid out again. */
 fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .16f, k: Float = 1f) {
+    // Liquid glass (the experiment, the owner's picks): clear, no shade, no colour, no sheen; only its thickness at the
+    // edges, a little light inside the top and a little shadow inside the foot
+    if (liquidOn()) {
+        val e = minOf(size.height * .22f, 14.dp.toPx())
+        drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = .1f * k), 1f to Color.Transparent, endY = e), size = androidx.compose.ui.geometry.Size(size.width, e))
+        drawRect(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = .1f * k), startY = size.height - e, endY = size.height),
+            topLeft = Offset(0f, size.height - e), size = androidx.compose.ui.geometry.Size(size.width, e))
+        return
+    }
     if (shade > 0f) drawRect(Color(0xFF0E0E14).copy(alpha = shade * k))
-    drawRect(io.github.bozkow.vibevisualizer.engine.Visuals.accent.copy(alpha = .16f * k))
+    drawRect(io.github.bozkow.vibevisualizer.engine.Visuals.glassTint.copy(alpha = .16f * k))   // (the Canvas's colour while one plays, the cover's otherwise)
     drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = .17f * k), .5f to Color.White.copy(alpha = .06f * k), 1f to Color.White.copy(alpha = .035f * k)))
 }
 
@@ -133,7 +145,7 @@ fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean
     val acc = MaterialTheme.colorScheme.primary
     // (the glass more of the cover's colour: still the one to press)
     androidx.compose.material3.Button(onClick, modifier.glassFace(ButtonDefaults.shape, enabled), enabled, border = BorderStroke(1.dp, if (enabled) GlassRim else GlassRimFaint),
-        colors = ButtonDefaults.buttonColors(containerColor = acc.copy(alpha = .3f), contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+        colors = ButtonDefaults.buttonColors(containerColor = if (liquidOn()) Color.Transparent else acc.copy(alpha = .3f), contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
 
 /** A fainter frosted button. */
@@ -211,14 +223,17 @@ fun Modifier.glassIsland(b: Backdrop?, k: Float = 1f, shape: Shape = RoundedCorn
     val blur = androidx.compose.ui.graphics.rememberGraphicsLayer()
     val at = remember { floatArrayOf(0f, 0f) }
     val fx = remember { androidx.compose.ui.graphics.BlurEffect(6f, 6f, androidx.compose.ui.graphics.TileMode.Clamp) }
+    val liquid = liquidOn()
+    val lens = rememberLens()
     if (k <= 0f) return this
     return this.shadow(10.dp * k, shape, clip = false, ambientColor = Color.Black, spotColor = Color.Black)
         .onGloballyPositioned { val p = it.positionInRoot(); at[0] = p.x; at[1] = p.y }
         .clip(shape)
         .drawBehind {
             if (b != null && b.layer.size.width > 0) {
-                val f = 4f; val sw = (size.width / f).toInt() + 2; val sh = (size.height / f).toInt() + 2
-                blur.renderEffect = fx; blur.alpha = k
+                // (Liquid glass: what's under it sharp, at full size, bent at the edges; otherwise a quarter-size blur)
+                val f = if (liquid) 1f else 4f; val sw = (size.width / f).toInt() + 2; val sh = (size.height / f).toInt() + 2
+                blur.renderEffect = if (liquid) lens.effect(size.width, size.height, minOf(size.width, size.height) / 2) else fx; blur.alpha = k
                 blur.record(androidx.compose.ui.unit.IntSize(sw, sh)) {
                     scale(1f / f, 1f / f, pivot = Offset.Zero) { translate(b.at.x - at[0], b.at.y - at[1]) { drawLayer(b.layer) } }
                 }

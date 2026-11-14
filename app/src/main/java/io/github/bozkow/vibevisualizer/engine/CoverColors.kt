@@ -41,6 +41,16 @@ object Visuals {
     var cover: Bitmap? = null; private set              // the cover as loaded (or null: the default colors)
     var coverVer by mutableIntStateOf(0); private set   // bumps on every new cover (the UI redraws it)
     var accent by mutableStateOf(Color(0xFF8B7CFF)); private set
+    /** The glass's colour (0.56.0, the owner: "take colors from the canvas behind it too"): the Canvas's while one plays (or an
+     *  animated cover's), the cover's otherwise, whatever the bars' theme; the average of their colours. Read as the glass is
+     *  drawn, so a change redraws the glass alone (the accent, which redraws everything, follows a video only slowly). */
+    var glassTint by mutableStateOf(Color(0xFF8B7CFF)); private set
+    private fun tintFrom() {
+        val st = canvasBars ?: motionBars ?: barCols
+        if (st.isEmpty()) return
+        val c = Color(st.map { it[0] }.average().toFloat() / 255f, st.map { it[1] }.average().toFloat() / 255f, st.map { it[2] }.average().toFloat() / 255f)
+        if (c != glassTint) glassTint = c
+    }
 
     // the bars' colors, blending over 0.9 s from the old ones
     var pal: IntArray = IntArray(0); private set
@@ -123,6 +133,7 @@ object Visuals {
         if (c == null && canvasBars == null) return
         if (c != null && canvasBars?.let { near(it, c) } == true) return
         canvasBars = c; palDirty = true; palMsNext = 300.0
+        tintFrom()
     }
     private fun near(a: List<IntArray>, b: List<IntArray>): Boolean =
         a.size == b.size && a.indices.all { i -> (0..2).all { x -> abs(a[i][x] - b[i][x]) < 20 } }
@@ -133,6 +144,7 @@ object Visuals {
         if (c == null && motionBars == null) return
         if (c != null && motionBars?.let { near(it, c) } == true) return
         motionBars = c; palDirty = true; palMsNext = 300.0
+        tintFrom()
     }
 
     var quietVer = -1; private set   // a cover that changes without its animation (the same picture, sharper)
@@ -143,6 +155,7 @@ object Visuals {
         if (img != null) runCatching { extract(img) }.onSuccess { (r, b) -> rawCols = r; barCols = b }.onFailure { rawCols = DEF_COLS; barCols = DEF_COLS }
         else { rawCols = DEF_COLS; barCols = DEF_COLS }
         palDirty = true
+        tintFrom()
         coverVer++
         bake(true)
     }
