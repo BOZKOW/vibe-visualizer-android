@@ -360,7 +360,7 @@ object Spotify {
     fun durationMs() = aheadOf?.takeIf { aheadMs() != null }?.third ?: spState?.duration ?: ((meta?.duration ?: 0.0) * 1000)
 
     // the Spotify app on this phone tells the app at once when it plays, pauses, seeks or changes song
-    init { SpotifyApp.onTrack = { onAppTrack() }; SpotifyApp.onState = { onAppState() } }
+    init { SpotifyApp.onTrack = { onAppTrack() }; SpotifyApp.onState = { onAppState() }; SpotifyApp.onMeta = { E.onAppMeta() } }
 
     /** The Spotify app played, paused or seeked. If its song isn't the one the Web API last named (a skip), ask now. */
     fun onAppState() {

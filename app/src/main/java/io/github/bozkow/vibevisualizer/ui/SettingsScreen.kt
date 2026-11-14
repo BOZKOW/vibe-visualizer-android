@@ -204,7 +204,6 @@ private fun pages(): List<Page> = listOf(
         Item.Ch("aBar4", "Fourth button", BAR_CHOICES),
         Item.Ch("aBar5", "Fifth button", BAR_CHOICES),
         Item.Sub("The line at the top"),
-        Item.Sw("aTopLine", "Where it plays from and on", "The line at the top: Spotify (or the music app, or this phone) and the device it plays on. Off, nothing's there; what's wrong still shows."),
         Item.Sub("Song name and seek bar"),
         Item.Ch("aTitle", "Song name size", listOf("s" to "Small", "m" to "Medium", "l" to "Large")),
         Item.Sw("aYear", "Release year", "Beside the artist, when the song’s year is known. From Spicy Lyrics Mobile 0.18."),
@@ -450,7 +449,7 @@ fun SettingsScreen() {
                     Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {
                         val close = @Composable { IconButton(onClick = { E.settingsPage = null }, Modifier.then(if (k > .5f) Modifier.padding(4.dp).glassChip(k) else Modifier)) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
                         val search = @Composable { sm: Modifier, x: Boolean ->
-                            TextField(q, { q = it }, sm.glassIsland(under, k).glass(RoundedCornerShape(28.dp)), singleLine = true,
+                            TextField(q, { q = it }, sm.glassIsland(under, k).glass(RoundedCornerShape(28.dp), lift = false), singleLine = true,
                                 placeholder = { Text("Search settings", color = Color.White.copy(alpha = .55f)) },
                                 // (an island: the close button comes into it, the title it was beside being gone)
                                 leadingIcon = { if (x) close() else Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = .7f)) },
@@ -1094,7 +1093,7 @@ private fun SegGroup(n: Int, row: @Composable (Int) -> Unit) {
     Column(Modifier.fillMaxWidth().widthIn(max = 760.dp).padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         for (i in 0 until n) {
             val sh = segShape(i, n)
-            Box(Modifier.fillMaxWidth().glass(sh)) { row(i) }
+            Box(Modifier.fillMaxWidth().glass(sh, lift = false)) { row(i) }   // (tiles that touch: no shadow between them)
         }
     }
 }

@@ -272,9 +272,22 @@ private fun LyricsWithLyrics() {
     Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
         Column(Modifier.fillMaxSize()) {
             // no top line here (the owner's pick: the song as high as Spicy Lyrics has it); notices still come first
-            TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true, line = false, upNext = false)
-            Box(Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)) {
-                TitleRow(big = false, bleed = true, cover = withCover, header = true, coverSlot = { slot = it })
+            TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true, line = false, upNext = false, report = false)
+            // (the song at the top is where the top's shade and the Canvas's blur reach down to, as the top line was and the
+            // controls are: the owner's ask)
+            Box(Modifier.reportTop().padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
+                TitleRow(big = false, bleed = true, cover = withCover, header = true, coverSlot = { slot = it }, textAway = if (withCover) rk else 0f)
+                // while the cover is out in a long break, the name and artist centred at the top (the owner's pick: beside an
+                // empty spot they looked off), crossfading with the ones beside the cover
+                if (withCover && rk > .01f) Column(Modifier.fillMaxWidth().graphicsLayer { alpha = rk.coerceIn(0f, 1f) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
+                        val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }
+                        Scrolling(E.title, 24f.times(k).sp, FontWeight.Bold, Color.White, (-.3).sp)
+                        val by = E.byLine()
+                        if (by.isNotEmpty()) Scrolling(by, 16f.times(k).sp, FontWeight.SemiBold, dim)
+                    }
+                    if (S.b("aUpNext")) UpNextLine(center = true)
+                }
             }
             var areaH by remember { mutableFloatStateOf(0f) }
             Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }.onGloballyPositioned { area = it.boundsInRoot() }) {   // (under all the rest: the lyrics run behind it)
@@ -551,7 +564,7 @@ private fun EmptyState() {
  *  space for what's wrong. Always there, also with the controls away. */
 @Composable
 private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false, floatNotice: Boolean = false, line: Boolean = true,
-                   upNext: Boolean = true, noticeGap: Boolean = true) {
+                   upNext: Boolean = true, noticeGap: Boolean = true, report: Boolean = true) {
     E.sec.intValue
     // where it plays from and on, short enough to stand either side of the camera whole (with "PLAYING FROM …" and
     // "PLAYING ON …" both only ever showed their first words, crawling); an icon says which is which
@@ -564,9 +577,12 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
     val sd = Spotify.device
     val dev = when (E.src) { "spotify" -> sd?.name ?: if (Spotify.meta == null) "NOTHING PLAYING" else ""; "file" -> Local.position(); else -> "" }.uppercase()
     val devIcon = when (E.src) { "spotify" -> sd?.let { deviceIcon(it.type) }; "file" -> Icons.AutoMirrored.Rounded.QueueMusic; else -> null }
-    Column(modifier.fillMaxWidth().reportTop()) {
+    Column(modifier.fillMaxWidth().then(if (report) Modifier.reportTop() else Modifier)) {
         // the status bar hidden: the line goes up where it was, either side of the camera, and takes no room here
-        if (side && S.b("aTopLine")) {
+        // where it plays from and on: gone since 0.55.0 (the owner: "remove the playing from and on completely"); only the
+        // home screen keeps its line (the app's name). Notices stay
+        val showLine = home && S.b("aTopLine")
+        if (side && showLine) {
             // on its side, one line with room for the words: "PLAYING FROM SPOTIFY ON <DEVICE>"
             val one = when (E.src) {
                 "spotify" -> "PLAYING FROM SPOTIFY" + (if (sd != null) " ON $dev" else if (dev.isNotEmpty()) " · $dev" else "")
@@ -591,7 +607,7 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
                     TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
                 }
             }
-        } else if (S.b("aTopLine") && line) TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"), onTopClick = toSpotify)
+        } else if (showLine && line) TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"), onTopClick = toSpotify)
         // [floatNotice]: the notice floats in a room of a fixed height (NoticeGap): the lyrics and the cover move down by the same
         // amount whatever its size, one line or two (0.46.1; at its own height a taller notice pushed them further, and on the
         // lyrics screen in 0.45.4 it took no room at all while the cover screen made room for it)
@@ -746,10 +762,12 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false, upNext: Boolean = t
             val shape = RoundedCornerShape(if (row) 14.dp else 18.dp)
             // tapped: its detail screen (what's wrong, what to do, OK), growing out of it; pressed, it gives a little
             val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-            Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).pressScale(press, .96f).clip(shape).frosted(oval = false)
+            Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).pressScale(press, .96f)
                 .graphicsLayer { alpha = quiet }
+                .shadow(8.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = .4f), spotColor = Color.Black.copy(alpha = .5f))
+                .clip(shape).frosted(oval = false)
                 .then(if (S.low) Modifier.background(Color(0xFF101018).copy(alpha = .7f)) else Modifier)   // (no frost: it's over the lyrics)
-                .background(Color.White.copy(alpha = .12f)).border(1.dp, Color.White.copy(alpha = .22f), shape)
+                .drawBehind { glassBody(0f) }.border(1.dp, GlassRim, shape)
                 .then(if (!many) Modifier else Modifier.pointerInput(Unit) {
                     // byHand already at the start: a turn by itself under the finger made the swipe land back on the same one
                     detectHorizontalDragGestures(onDragStart = { byHand = true }, onDragEnd = {
@@ -923,7 +941,7 @@ private fun MoreButton() {
 
 @Composable
 private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center, bleed: Boolean = false, cover: Boolean = false,
-                     header: Boolean = false, coverSlot: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null) {
+                     header: Boolean = false, coverSlot: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null, textAway: Float = 0f) {
     val ver = E.trackVer
     // [cover]: the Lyrics screen upright, where the big cover only shows in long breaks: a small one beside the name, so
     // it's always in sight; it steps aside while the big one shows
@@ -944,7 +962,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
         // [header]: the buttons on the name's line and the heart on the artist's (the owner's sketch), so the artist and Up next
         // have the column's whole width; the name and the artist still slide in step
         if (header) {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).graphicsLayer { alpha = (1f - textAway).coerceIn(0f, 1f) }) {
                 androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
                     val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
                     // (they slide out right up to the cover's edge, fading there: from the column's own edge they faded 16 dp short
@@ -1014,11 +1032,11 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
  *  under the artist, the next song's cover and name, in a song's last 30 s. Its room is always kept, empty otherwise, so the
  *  name doesn't shift when it comes. */
 @Composable
-private fun UpNextLine() {
+private fun UpNextLine(center: Boolean = false) {
     val nx = Preload.shown?.takeIf { !E.inPip && !E.ambient }
     var last by remember { mutableStateOf<io.github.bozkow.vibevisualizer.lyrics.SongMeta?>(null) }
     if (nx != null) last = nx
-    Box(Modifier.fillMaxWidth().height(24.dp).padding(top = 4.dp)) {
+    Box(Modifier.fillMaxWidth().height(24.dp).padding(top = 4.dp), contentAlignment = if (center) Alignment.Center else Alignment.CenterStart) {
         androidx.compose.animation.AnimatedVisibility(nx != null, enter = fadeIn(tween(400)), exit = fadeOut(tween(250))) {
             val m = last ?: return@AnimatedVisibility
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1149,9 +1167,9 @@ private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp
     val a by animateFloatAsState(if (enabled) 1f else .4f, tween(220), label = "barok")
     // on: filled white with a dark icon, as the translate and romanize buttons, so on and off can't be mistaken
     val fg = androidx.compose.ui.graphics.lerp(Color.White, Color(0xFF111116), k)
-    // off: frosted glass (GlassFill and GlassEdge, as the seek bar's track)
-    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).frosted().background(Color.White.copy(alpha = .12f + .8f * k))
-        .border(1.dp, Color.White.copy(alpha = .22f + .7f * k), CircleShape)
+    // off: the glass (0.55.0: the cover's colour, a sheen and a rim that catches the light, over the frost behind it)
+    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).frosted().drawBehind { glassBody(0f, 1f - k) }.background(Color.White.copy(alpha = .9f * k))
+        .border(1.dp, GlassRim, CircleShape)
         .quickClick(src, enabled, androidx.compose.material3.ripple(), onHold = onLongClick?.let { h -> { E.haptic(); h() } }) { E.haptic(); onClick() }
         .semantics { contentDescription = desc; selected = on }, contentAlignment = Alignment.Center) {
         if (icon != null) Icon(icon, null, Modifier.size(d * .42f), tint = fg)

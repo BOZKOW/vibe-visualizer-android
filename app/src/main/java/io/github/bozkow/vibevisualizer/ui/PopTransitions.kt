@@ -149,7 +149,7 @@ fun <T : Any> PopSheet(key: T?, onDismiss: () -> Unit, color: Color, glass: Bool
                 .widthIn(max = 640.dp).fillMaxWidth().heightIn(max = maxH).graphicsLayer { translationY = drag.value }
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(color)
                 // frosted glass, as everything in the Glass design: the light edge along its top
-                .then(if (glass) Modifier.background(GlassFill).border(1.dp, GlassEdge, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) else Modifier)
+                .then(if (glass) Modifier.then(androidx.compose.ui.Modifier.drawGlassBody(.3f)).border(1.dp, GlassRim, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) else Modifier)
                 .clickable(remember { MutableInteractionSource() }, null) {}) {   // taps on the sheet stay on it
                 // the handle: pull it down to close
                 Box(Modifier.fillMaxWidth().height(28.dp).draggable(rememberDraggableState { dy -> scope.launch { drag.snapTo((drag.value + dy).coerceAtLeast(0f)) } }, Orientation.Vertical,

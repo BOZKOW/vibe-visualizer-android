@@ -124,7 +124,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         ctrl?.let { runCatching { it.unregisterCallback(cb) } }
         ctrl = c; stoppedAt = 0; main.removeCallbacks(recheck); pkg = c?.packageName ?: ""
         clock.reset(SystemClock.elapsedRealtime()); awaitingReport = false; resyncNext = false; endBuffering = null; backAt = 0
-        if (c == null) { connected.value = false; state = null; title = ""; artist = ""; album = ""; durMs = 0; art = null; onState?.invoke(); return }
+        if (c == null) { connected.value = false; state = null; title = ""; artist = ""; album = ""; durMs = 0; art = null; artUri = ""; onState?.invoke(); return }
         c.registerCallback(cb, main)
         connected.value = true
         state = c.playbackState
@@ -141,6 +141,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         album = m?.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
         durMs = m?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0
         art = m?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: m?.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: m?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+        artUri = m?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI) ?: m?.getString(MediaMetadata.METADATA_KEY_ART_URI) ?: m?.getString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI) ?: ""
         if (notify && changed && t.isNotEmpty()) { report(state, force = true, trackChanged = true); onTrack?.invoke() }
         if (notify) onMeta?.invoke()
     }
@@ -201,6 +202,10 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
     }
 
     /** The app's cover for what it plays now (readable: a hardware bitmap is copied). */
+    /** The picture's address, when the app gives one (a web address, or Spotify's own "spotify:image:…", as Spicy Lyrics reads it). */
+    var artUri = ""; protected set
+    fun artUrl(): String? = artUri.let { u -> when { u.startsWith("https://") -> u; u.startsWith("spotify:image:") -> "https://i.scdn.co/image/" + u.removePrefix("spotify:image:"); else -> null } }
+
     fun cover(): android.graphics.Bitmap? = art?.takeIf { !it.isRecycled }
         ?.let { if (it.config == android.graphics.Bitmap.Config.HARDWARE) it.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else it }
 

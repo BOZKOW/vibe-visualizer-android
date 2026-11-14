@@ -326,7 +326,7 @@ object E {
             if (!dj) onSpDj()
             djApp = true   // (also when the Web API saw the DJ first: the app's next song ends it)
             title = t; artist = a; album = SpotifyApp.album; trackVer++; appShown = t
-            appArt = art != null && setCoverBitmap(art, "From the Spotify app", coverTok)
+            djCover()
             return
         }
         // the DJ handed over to a song: the Web API may have named it already, while the DJ still talked (onSpTrack waited)
@@ -373,6 +373,22 @@ object E {
      *  next song (onSpTrack). The last cover and its colours stay: each time the DJ spoke they went to the default ones and
      *  back. */
     var dj = false; private set
+
+    /** The Spotify app's details changed without a new name (its picture often comes after the name): while the DJ talks,
+     *  the picture is the DJ's own, which the Web API never gives (the owner: "the DJ keeps the last cover"). */
+    fun onAppMeta() { if (dj && src == "spotify") djCover() }
+    private var djArtKey = ""
+    /** The DJ's picture from the Spotify app: its bitmap, or the address it gives (loaded); each picture once. */
+    private fun djCover() {
+        val bm = SpotifyApp.cover()
+        val key = SpotifyApp.title + "|" + (bm?.generationId?.toString() ?: SpotifyApp.artUri)
+        if (key == djArtKey || (bm == null && SpotifyApp.artUrl() == null)) return
+        djArtKey = key
+        if (bm != null) { appArt = setCoverBitmap(bm, "From the Spotify app", coverTok); return }
+        val u = SpotifyApp.artUrl() ?: return
+        val tok = coverTok
+        Vibe.scope.launch { if (tok == coverTok && dj) setCover(u, "From the Spotify app", tok) }
+    }
     private var djApp = false   // the DJ as the Spotify app named it (isDjItem), so the app's next song ends it
     fun onSpDj() {
         if (dj) { updPlay(); return }
@@ -382,8 +398,8 @@ object E {
         title = if (named) SpotifyApp.title else "DJ"; artist = if (named) SpotifyApp.artist else "Spotify"; year = ""; album = ""; status = "Spotify"; trackVer++
         if (named) appShown = title
         // the DJ's own picture, as the Spotify app shows it (the Web API often names the DJ first, and the app's report of the
-        // same name then changed nothing: the last song's cover stayed, the owner's screenshot); none: the last cover stays
-        SpotifyApp.cover()?.let { appArt = setCoverBitmap(it, "From the Spotify app", coverTok) }
+        // same name then changed nothing: the last song's cover stayed, the owner's screenshot); it may come a moment later
+        djArtKey = ""; djCover()
         // its note shows also with No lyrics notice off: it's about the DJ, not a song without lyrics
         Lyr.clear("Lyrics aren’t available with the DJ", "The DJ talks between the songs and mixes them together, so there’s nothing to line lyrics up with. They’re back with the next song.", "none", always = true)
         updPlay()
