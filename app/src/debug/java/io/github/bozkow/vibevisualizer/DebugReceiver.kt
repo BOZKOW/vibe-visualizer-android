@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import kotlinx.coroutines.launch
 import io.github.bozkow.vibevisualizer.core.Defaults
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.engine.E
@@ -15,7 +16,8 @@ import io.github.bozkow.vibevisualizer.lyrics.Person
 /** Debug builds only (app/src/debug): a test on the emulator sets any setting and opens any Settings page or pop-up
  *  directly, as Settings would, without finding them on screen:
  *  adb shell am broadcast -n io.github.bozkow.vibevisualizer/.DebugReceiver --es set lstyle --es to focus
- *  … --es page lyrics (or close) · … --es sheet timing (or close) · … --es year 2024 · … --es dj 1 (Spotify's DJ starts talking) · … --es canvas 1 (look up a Canvas for this song) */
+ *  … --es page lyrics (or close) · … --es sheet timing (or close) · … --es year 2024 · … --es dj 1 (Spotify's DJ starts talking) · … --es canvas 1 (look up a Canvas for this song)
+ *  · … --es files content://media/external/file/1,content://… (play these files one after another: Up next) · … --es seek 150 (s) */
 class DebugReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
         val set = i.getStringExtra("set"); val to = i.getStringExtra("to")
@@ -37,6 +39,15 @@ class DebugReceiver : BroadcastReceiver() {
                 Lyr::class.java.getDeclaredMethod("setCredit", Credit::class.java).apply { isAccessible = true }
                     .invoke(Lyr, Credit("spicy_lyrics", uploader = up, maker = Person("maker", null, null, a)))
             }
+            i.getStringExtra("files")?.let { f ->
+                val us = f.split(',').map { android.net.Uri.parse(it.trim()) }
+                io.github.bozkow.vibevisualizer.core.Vibe.scope.launch {
+                    val r = io.github.bozkow.vibevisualizer.engine.Files.sort(us)
+                    android.util.Log.i("VV-dbg", "files: ${us.size} given, ${r.audio.size} audio, ${r.lyrics.size} lyrics")
+                    E.openFiles(us)
+                }
+            }
+            i.getStringExtra("seek")?.toDoubleOrNull()?.let { io.github.bozkow.vibevisualizer.media.Local.seek((it * 1000).toLong()) }
             if (page != null) { if (page == "close") E.settingsPage = null else E.openSettings(page) }
             if (sheet != null) E.sheet = if (sheet == "close") null else sheet
         }

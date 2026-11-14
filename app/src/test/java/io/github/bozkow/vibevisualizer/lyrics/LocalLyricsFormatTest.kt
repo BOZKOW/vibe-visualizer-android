@@ -26,6 +26,15 @@ class LocalLyricsFormatTest {
         assertEquals("Hello world", shown(p.lines[0]))
     }
 
+    @Test fun japaneseSyllablesWithNoSpacesStayGlued() {
+        // syllables of a script written without spaces get none, so 君の名前 isn't shown (or romanized) as 君 の 名 前
+        val p = parseTTML("""<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.0" end="3.0"><span begin="1.0" end="1.5">君</span><span begin="1.5" end="2.0">の</span><span begin="2.0" end="2.5">名</span><span begin="2.5" end="3.0">前</span></p></div></body></tt>""")
+        assertEquals("君の名前", shown(p.lines[0]))
+        // a Latin word beside them still gets its space
+        val q = parseTTML("""<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.0" end="3.0"><span begin="1.0" end="1.5">Oh</span><span begin="1.5" end="2.0">君</span><span begin="2.0" end="3.0">の</span></p></div></body></tt>""")
+        assertEquals("Oh 君の", shown(q.lines[0]))
+    }
+
     @Test fun joinsNextOnHyphens() {
         assertTrue(joinsNext("la-", "la"))
         assertTrue(joinsNext("la", "-la"))

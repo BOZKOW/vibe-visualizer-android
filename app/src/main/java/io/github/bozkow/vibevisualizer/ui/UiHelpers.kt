@@ -114,8 +114,9 @@ fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean
 
 /** A fainter frosted button. */
 @Composable
-fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-    androidx.compose.material3.OutlinedButton(onClick, modifier, enabled, border = BorderStroke(1.dp, if (enabled) GlassEdge else Color.White.copy(alpha = .08f)),
+fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
+                    contentPadding: androidx.compose.foundation.layout.PaddingValues = ButtonDefaults.ContentPadding, content: @Composable RowScope.() -> Unit) {
+    androidx.compose.material3.OutlinedButton(onClick, modifier, enabled, contentPadding = contentPadding, border = BorderStroke(1.dp, if (enabled) GlassEdge else Color.White.copy(alpha = .08f)),
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White.copy(alpha = .05f), contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
 

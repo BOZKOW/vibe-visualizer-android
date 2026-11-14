@@ -316,12 +316,13 @@ fun TimingParts() {
         val so = Lyr.songOffMs
         Text("This song: " + (if (so > 0) "+" else "") + so + " ms", fontWeight = FontWeight.Bold, color = Color.White)
         Hint("Only for the song that’s playing, on top of the setting above (as Spicy Lyrics Mobile’s song delay).")
-        // steps of 100 and 10 ms (Spicy Lyrics 6.5.0's per-song offset); they wrap onto a second row on a narrow phone
-        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (d in listOf(-100, -10, 10, 100)) VOutlinedButton(onClick = { Lyr.songOffSet(so + d) }) { Text((if (d > 0) "+" else "−") + kotlin.math.abs(d)) }
-            if (so != 0) VTonalButton(onClick = { Lyr.songOffSet(0) }) { Text("Reset") }
+        // steps of 100 and 10 ms (Spicy Lyrics 6.5.0's per-song offset), the four sharing one row
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (d in listOf(-100, -10, 10, 100)) VOutlinedButton(onClick = { Lyr.songOffSet(so + d) }, Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)) {
+                Text((if (d > 0) "+" else "−") + kotlin.math.abs(d), maxLines = 1)
+            }
         }
+        if (so != 0) VTonalButton(onClick = { Lyr.songOffSet(0) }) { Text("Reset") }
         PartDivider()
         Row(verticalAlignment = Alignment.CenterVertically) {
             VTonalButton(onClick = { Lyr.resync() }) { Icon(VIcons.resync, null, Modifier.size(18.dp)); HSpace(6.dp); Text("Resync now") }

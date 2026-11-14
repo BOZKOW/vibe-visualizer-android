@@ -77,6 +77,10 @@ private fun allByLocal(root: Node, name: String, out: MutableList<Element> = Arr
 }
 
 /** A word part that runs straight on into the next: one ending in a hyphen ("la-"), or before one starting with one. */
+/** Two parts that meet between characters of a script written without spaces (kanji, kana, Thai…). */
+internal fun unspacedSeam(text: String, next: String?): Boolean =
+    next != null && UNSPACED.containsMatchIn(text.trimEnd().takeLast(1)) && UNSPACED.containsMatchIn(next.trimStart().take(1))
+
 internal fun joinsNext(text: String, next: String?): Boolean {
     val a = text.trimEnd(); val b = next?.trimStart() ?: return false
     return a.endsWith('-') || a.endsWith('‐') || b.startsWith('-') || b.startsWith('‐')
@@ -109,10 +113,11 @@ fun parseTTML(x0: String): Parsed {
         }
     }
     // a file with no spaces between its words at all: each gets one, but not inside a hyphenated word ("la-" "la-" "la"
-    // is "la-la-la", not "la- la- la") nor before a part that starts with a hyphen
+    // is "la-la-la", not "la- la- la") nor before a part that starts with a hyphen, nor between two characters of a script
+    // written without spaces (Japanese and Chinese syllables are glued: "君" "の" is 君の, not 君 の)
     fun fix(ws: MutableList<Word>): MutableList<Word> {
         if (ws.isNotEmpty() && ws.none { it.sp || it.text.lastOrNull()?.isWhitespace() == true })
-            ws.forEachIndexed { i, w -> w.sp = !joinsNext(w.text, ws.getOrNull(i + 1)?.text) }
+            ws.forEachIndexed { i, w -> val nx = ws.getOrNull(i + 1)?.text; w.sp = !joinsNext(w.text, nx) && !unspacedSeam(w.text, nx) }
         return ws
     }
     // a word-synced file (its timing="Word", or lines with several timed words): a line of one word ("Oh") is
