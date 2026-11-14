@@ -331,6 +331,9 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
             val liquidVideo = liquidOn() && vs != null && vs.size.width > 0 && Frost.videoAlpha > .01f && io.github.bozkow.vibevisualizer.engine.CanvasVideo.cvmode
             // (the blurred Canvas first, as the screen has it under everything; Liquid glass then the sharp one over it)
             if (v != null && v.size.width > 0 && scr.width > 0) scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) }
+            // (and its darkening toward the edges, as CanvasBlur draws it there)
+            if (liquidVideo && scr.width > 0) drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = .15f), Color.Black.copy(alpha = .55f)), Offset(scr.width * .7f, scr.height * .5f), maxOf(scr.width, scr.height) * .8f),
+                size = androidx.compose.ui.geometry.Size(scr.width.toFloat(), scr.height.toFloat()))
             if (liquidVideo && vs != null) {
                 // as the screen has it upright: softening into the blurred Canvas (in the background) at the top and the foot
                 val r = androidx.compose.ui.geometry.Rect(0f, 0f, vs.size.width.toFloat(), vs.size.height.toFloat())
