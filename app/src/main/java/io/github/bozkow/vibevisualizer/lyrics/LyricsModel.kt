@@ -12,7 +12,10 @@ class Word(var t: Double, var end: Double?, val text: String, var sp: Boolean, v
 }
 
 /** Background vocals under a line, with their own timing when the lyrics have it. */
-class Bg(val text: String, var rom: String?, val words: List<Word>?) { var romOwn = false }
+class Bg(val text: String, var rom: String?, val words: List<Word>?) {
+    var romOwn = false
+    var tr: String? = null   // its translation, on screen under it (filled in as the line's is, never saved)
+}
 
 class Line(
     var t: Double?,

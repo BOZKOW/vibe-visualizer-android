@@ -28,6 +28,8 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -247,32 +249,77 @@ private fun LyricsScreen() {
     Crossfade(noLyrics(), label = "nolyrics") { big -> if (big) NowPlaying(noLyricsNote = true) else LyricsWithLyrics() }
 }
 
+/** The Lyrics screen upright (0.53.0, after Spicy Lyrics Mobile, the owner's pick): the song at the top (a big cover, its
+ *  name and artist beside it, translate / romanize and the heart at its end), the lyrics under it, then the bars, the seek
+ *  bar and the credits, and the controls when they're woken. Notices come under the top line, above the song. With the
+ *  Focus style's Cover in long breaks, the cover itself grows from its place into the lyrics' and goes back as the next
+ *  line comes ([MovingCover]); the name stays. Without the cover (Settings → Player screen → Cover at the top): the name
+ *  alone up there, and a break's cover fades in over the lyrics as before. */
 @Composable
 private fun LyricsWithLyrics() {
     val hidden = E.uiHidden
-    Column(Modifier.fillMaxSize()) {
-        TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true)
-        var areaH by remember { mutableFloatStateOf(0f) }
-        // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
-        val rest = restCover()
-        val rk by animateFloatAsState(if (rest) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, if (rest) Spring.StiffnessVeryLow else Spring.StiffnessLow), label = "rest")
-        val over = rk >= .99f
-        androidx.compose.runtime.SideEffect { Lyr.view.covered = over }
-        androidx.compose.runtime.DisposableEffect(Unit) { onDispose { Lyr.view.covered = false } }
-        Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }) {   // (under all the rest: the lyrics run behind it)
-            LyricsPane(Modifier.fillMaxSize().graphicsLayer { alpha = (1f - rk).coerceIn(0f, 1f) }, areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false, behind = true)
-            if (rk > .01f) Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp).ambientOut()
-                .graphicsLayer { alpha = rk.coerceIn(0f, 1f); val s = .9f + .1f * rk; scaleX = s; scaleY = s }, contentAlignment = Alignment.Center) {
-                CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
+    val withCover = S.b("aLyrCover")
+    var slot by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the cover's place in the song at the top (in the root)
+    var area by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the lyrics' area (in the root)
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
+    val rest = restCover()
+    val rk by animateFloatAsState(if (rest) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, if (rest) Spring.StiffnessVeryLow else Spring.StiffnessLow), label = "rest")
+    val over = rk >= .99f
+    androidx.compose.runtime.SideEffect { Lyr.view.covered = over }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { Lyr.view.covered = false } }
+    Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
+        Column(Modifier.fillMaxSize()) {
+            TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true)
+            Box(Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 8.dp)) {
+                TitleRow(big = false, toggles = true, bleed = true, cover = withCover, header = true, coverSlot = { slot = it })
             }
+            var areaH by remember { mutableFloatStateOf(0f) }
+            Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }.onGloballyPositioned { area = it.boundsInRoot() }) {   // (under all the rest: the lyrics run behind it)
+                LyricsPane(Modifier.fillMaxSize().graphicsLayer { alpha = (1f - rk).coerceIn(0f, 1f) }, areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false, behind = true)
+                if (!withCover && rk > .01f) Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp).ambientOut()
+                    .graphicsLayer { alpha = rk.coerceIn(0f, 1f); val s = .9f + .1f * rk; scaleX = s; scaleY = s }, contentAlignment = Alignment.Center) {
+                    CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
+                }
+            }
+            if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
+            Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, lyrics = true, name = false, restCover = rest) }
+            AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
+                Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
+            }
+            if (hidden) Spacer(Modifier.height(16.dp))
         }
-        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
-        Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true, restCover = rest) }
-        AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
-            Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
-        }
-        if (hidden) Spacer(Modifier.height(16.dp))
+        if (withCover && slot.width > 0f) MovingCover(slot, area, rk, origin)
     }
+}
+
+/** The cover of the song at the top, drawn over the screen at its place there ([slot]); in a long break ([k] going to 1) it
+ *  grows into the middle of the lyrics' [area], as big as the break's cover was, and flows back as the next line comes
+ *  (the owner: "make the cover get bigger, the text would stay"). Positions are in the root; [origin] is this layer's. */
+@Composable
+private fun MovingCover(slot: androidx.compose.ui.geometry.Rect, area: androidx.compose.ui.geometry.Rect, k0: Float, origin: Offset) {
+    val dens = androidx.compose.ui.platform.LocalDensity.current
+    val cvk by animateFloatAsState(if (CanvasVideo.cvmode && S.b("cvShrink")) .56f else 1f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, Spring.StiffnessVeryLow), label = "cvcover")
+    val k = k0.coerceIn(0f, 1f)
+    val padH = with(dens) { 24.dp.toPx() }; val padV = with(dens) { 16.dp.toPx() }
+    val bigSide = (minOf(area.width - 2 * padH, area.height - 2 * padV) * cvk).coerceAtLeast(slot.width)
+    fun mix(a: Float, b: Float) = a + (b - a) * k
+    val side = mix(slot.width, bigSide)
+    val x = mix(slot.left, area.center.x - bigSide / 2); val y = mix(slot.top, area.center.y - bigSide / 2)
+    val shape = RoundedCornerShape(mix(10f, 22f).dp)
+    Box(Modifier.offset { androidx.compose.ui.unit.IntOffset((x - origin.x).roundToInt(), (y - origin.y).roundToInt()) }.size(with(dens) { side.toDp() })
+        .then(if (k > .01f) Modifier.ambientOut() else Modifier)) {
+        // small, a soft shadow of its own; big, the big cover's (and its animated cover, if the album has one)
+        CoverArt(Modifier.fillMaxSize().then(if (k < .99f) Modifier.shadow(mix(8f, 24f).dp, shape, ambientColor = Color.Black, spotColor = Color.Black) else Modifier), corner = mix(10f, 22f).dp, small = k < .99f)
+    }
+}
+
+/** The cover's size in the song at the top of the Lyrics screen: about a third of the width, as Spicy Lyrics Mobile has it
+ *  (115 dp on a 360 dp phone), less on a short screen. */
+@Composable
+private fun headerCoverSize(): Dp {
+    val c = androidx.compose.ui.platform.LocalConfiguration.current
+    return minOf(c.screenWidthDp * .32f, c.screenHeightDp * .16f).coerceIn(64f, 128f).dp
 }
 
 /* ================= Visualizer ================= */
@@ -870,7 +917,8 @@ private fun MoreButton() {
 }
 
 @Composable
-private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center, bleed: Boolean = false, cover: Boolean = false) {
+private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center, bleed: Boolean = false, cover: Boolean = false,
+                     header: Boolean = false, coverSlot: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null) {
     val ver = E.trackVer
     // [cover]: the Lyrics screen upright, where the big cover only shows in long breaks: a small one beside the name, so
     // it's always in sight; it steps aside while the big one shows
@@ -883,17 +931,19 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
     LaunchedEffect(ver) { if (!S.low && !E.reduceMotion()) { a.snapTo(0f); a.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
     Row(Modifier.fillMaxWidth().graphicsLayer { alpha = a.value; translationY = (1 - a.value) * 10f * density }, verticalAlignment = Alignment.CenterVertically) {
         if (ck > .01f) {
-            Box(Modifier.size(52.dp * ck).graphicsLayer { alpha = ck.coerceIn(0f, 1f) }) { CoverArt(Modifier.fillMaxSize(), corner = 10.dp, small = true) }
-            Spacer(Modifier.width(12.dp * ck))
+            // [header]: the Lyrics screen's song at the top, its big cover drawn by MovingCover at the place kept here
+            if (header && coverSlot != null) Box(Modifier.size(headerCoverSize() * ck).onGloballyPositioned { coverSlot(it.boundsInRoot()) })
+            else Box(Modifier.size(52.dp * ck).graphicsLayer { alpha = ck.coerceIn(0f, 1f) }) { CoverArt(Modifier.fillMaxSize(), corner = 10.dp, small = true) }
+            Spacer(Modifier.width((if (header) 16.dp else 12.dp) * ck))
         }
         // the name and the artist slide in step (Spicy Lyrics 6.5.0's TextScroller): they leave together, the shorter waits
         // at its end, and they come back together
         Column(Modifier.weight(1f), horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
             androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
                 val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
-                Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)
+                Scrolling(E.title, (if (header) 24f else if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)
                 val by = E.byLine()
-                if (by.isNotEmpty()) Scrolling(by, (if (big) 19f else 15f).times(k).sp, FontWeight.Medium, dim, bleedL = bl, bleedR = br)
+                if (by.isNotEmpty()) Scrolling(by, (if (header) 16f else if (big) 19f else 15f).times(k).sp, if (header) FontWeight.SemiBold else FontWeight.Medium, dim, bleedL = bl, bleedR = br)
             }
         }
         if (toggles) {   // the Lyrics screen: translate and romanize, when the lyrics need them

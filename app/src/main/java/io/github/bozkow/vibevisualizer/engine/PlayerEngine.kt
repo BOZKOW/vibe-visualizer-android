@@ -319,6 +319,22 @@ object E {
     private var appShown = ""; private var appArt = false
     fun onAppSong(t: String, a: String, art: android.graphics.Bitmap?) {
         if (t.isEmpty() || t == title || src != "spotify" || aheadId.isNotEmpty()) return   // (a skip from here: shown already)
+        // the DJ talking, as the Spotify app names it ("Up next" in your language, by "DJ X", a few seconds long): the Web API
+        // didn't always say so (an item of an unknown kind), and its lookups for a song called "Up next" found nothing or
+        // the wrong thing (the owner: the DJ "doesn't work"). Its note shows, with the DJ's own picture
+        if (isDjItem(a, SpotifyApp.durMs)) {
+            if (!dj) onSpDj()
+            djApp = true   // (also when the Web API saw the DJ first: the app's next song ends it)
+            title = t; artist = a; album = SpotifyApp.album; trackVer++; appShown = t
+            appArt = art != null && setCoverBitmap(art, "From the Spotify app", coverTok)
+            return
+        }
+        // the DJ handed over to a song: the Web API may have named it already, while the DJ still talked (onSpTrack waited)
+        if (dj && djApp) {
+            dj = false; djApp = false
+            val m = Spotify.meta
+            if (m != null && SpotifyApp.matches(m.title, m.duration * 1000)) { onSpTrack(m); return }
+        }
         // while the DJ talks: the app's name for it and its picture, if any. The lyrics wait for the Web API to name a song: from
         // here they went on "loading" until it did, as onSpDj has nothing more to do once in the DJ
         if (dj) { title = t; artist = a; album = SpotifyApp.album; trackVer++; appShown = t; appArt = art != null && setCoverBitmap(art, "From the Spotify app", coverTok); return }
@@ -357,6 +373,7 @@ object E {
      *  next song (onSpTrack). The last cover and its colours stay: each time the DJ spoke they went to the default ones and
      *  back. */
     var dj = false; private set
+    private var djApp = false   // the DJ as the Spotify app named it (isDjItem), so the app's next song ends it
     fun onSpDj() {
         if (dj) { updPlay(); return }
         dj = true; newTok(); aheadId = ""; appShown = ""; earlyId = ""
@@ -369,7 +386,10 @@ object E {
     }
 
     fun onSpTrack(m: SongMeta) {
-        dj = false
+        // the Web API names the song the DJ is about to play while the DJ still talks in the Spotify app: it waits for the app
+        // to move on to it (onAppSong), or the song's lyrics showed over the DJ's voice
+        if (dj && djApp && SpotifyApp.connected.value && isDjItem(SpotifyApp.artist, SpotifyApp.durMs)) return
+        dj = false; djApp = false
         curArtistId = m.artistId
         Spotify.likeCheck(m)
         // already showing from the Spotify app: no second drop of the bars, no title animating in again, and the cover
@@ -782,4 +802,13 @@ object E {
     }
 
     fun shareIntent(text: String) = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+}
+
+/** An item the Spotify app plays that is its DJ talking, not a song: by its DJ's name ("DJ X", Spotify's DJ; "DJ Livi", the
+ *  Spanish one) and, when its length is known, a short one (the owner's showed 0:05). A real song by an artist of that name
+ *  runs longer than 90 s. */
+fun isDjItem(artist: String, durMs: Long): Boolean {
+    val a = artist.trim()
+    if (!a.equals("DJ X", ignoreCase = true) && !a.equals("DJ Livi", ignoreCase = true)) return false
+    return durMs <= 0 || durMs < 90_000
 }

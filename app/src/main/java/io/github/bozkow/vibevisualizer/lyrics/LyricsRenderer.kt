@@ -126,6 +126,7 @@ class LyricsRenderer {
     var bleedTop = 0f; var bleedBot = 0f; var bleedLeft = 0f   // how far outside the area they're drawn (LyricsPane's behind)
     private var areaH = 0f
     private var screenH = 0f; private var screenW = 0f
+    private val FLING_FRICTION = 4.2f
     private var dens = 1f
     var F = 0f; private set
     private var padL = 0f; private var padR = 0f
@@ -239,8 +240,11 @@ class LyricsRenderer {
             d.rows.add(main)
             l.bg?.forEach { b ->   // background vocals: their own smaller line, sung word by word on their own timing
                 val bwds = b.words
-                val romW = romMode == "replace" && l.rom != null && bwds?.any { it.rom != null } == true
-                val romB = romMode == "replace" && l.rom != null && b.rom != null && !romW
+                // romanized in place as its line is, or on its own when the line is in Latin letters (it stayed in its script
+                // then: only a romanized line let its background vocals be)
+                val romOn = romMode == "replace" && (l.rom != null || !nonLatin(l.text))
+                val romW = romOn && bwds?.any { it.rom != null } == true
+                val romB = romOn && b.rom != null && !romW
                 val r = Row(1, .75f, 1.18f, .1f, 600)
                 // the brackets go by Background vocals in brackets: on, as the lyrics have them (added where they have
                 // none); off, none, even where the lyrics came with them (a TTML file's "(…)": they showed whatever the setting)
@@ -261,6 +265,31 @@ class LyricsRenderer {
                     r.text = bgBrackets(t, br)
                 }
                 d.rows.add(r)
+                // Romanization below: its own romanization right under it, word by word with it where it has words (kind 4:
+                // small, tucked away and out with it); the line's romanization under the line never had them
+                if (romMode == "below" && nonLatin(b.text) && (b.rom != null || bwds?.any { it.rom != null } == true)) {
+                    val rRow = Row(4, .4f, 1.25f, .05f, 700)
+                    if (sync && bwds != null && bwds.isNotEmpty() && bwds.any { it.rom != null }) {
+                        val bts = bwds.mapIndexed { k, w -> TS(w.t, w.end ?: if (k + 1 < bwds.size) bwds[k + 1].t else w.t + 1) }
+                        rRow.pieces = bwds.mapIndexed { k, w -> val t = w.rom ?: w.text; Pc(t + if ((w.sp || w.romSp) && t.isNotBlank()) " " else "", bts[k]) }
+                    } else {
+                        rRow.text = b.rom
+                        val lt = l.t
+                        if (sync && lt != null) rRow.oneTs = TS(lt, max(lt + .3, lineEnd(l) ?: lt + 2))
+                    }
+                    d.rows.add(rRow)
+                }
+                // its translation right under it, smaller and dimmer, tucked away and out with it (kind 4)
+                b.tr?.takeIf { S.tr }?.let { tr ->
+                    val tRow = Row(4, .36f, 1.18f, .05f, 900)
+                    tRow.text = bgBrackets(tr, br)
+                    if (sync) {
+                        val bts = bwds?.takeIf { it.isNotEmpty() }?.let { ws -> TS(ws.first().t, ws.last().let { it.end ?: it.t + 1 }) }
+                        val lt = l.t
+                        tRow.oneTs = bts ?: lt?.let { TS(it, max(it + .3, lineEnd(l) ?: it + 2)) }
+                    }
+                    d.rows.add(tRow)
+                }
             }
             // romanization and translation under the line fill in time with it: word by word when the romanized words
             // line up with the sung ones, otherwise across the whole line
@@ -385,7 +414,7 @@ class LyricsRenderer {
                     r.h = max(lh, sl2.lineCount * lh)
                 }
                 y = r.y + r.h
-                if (r.kind == 1) bg += F * r.mt + r.h
+                if (r.kind == 1 || r.kind == 4) bg += F * r.mt + r.h   // (a background vocal and its translation)
             }
             d.hText = y + 2 * F * linePad(); d.bgH = bg
         }
@@ -445,6 +474,7 @@ class LyricsRenderer {
         if (wasPlace) place(t, pos)
         else if (lyTall && !lyFree && t - lyTallAt > (if (pipScroll() && !pipGlide()) 250 else 40)) { lyTallAt = t; place(t, pos) }   // (often: a row's move starts on time)
         if (!viewOn) return
+        flingStep(t)
         if (!sync) { rest = false; staticScroll(t, pos); tops(t); bump(); return }
         val r = S.b("aRestCover") && S.xFocus && restAt(pos)   // one of Focus mode's (Settings greys it without)
         if (r != rest) { rest = r; restAt = t }
@@ -762,20 +792,49 @@ class LyricsRenderer {
     }
 
     /* ---- scrolling through the lyrics by hand, as in Spicy Lyrics ---- */
-    fun freeBy(dy: Float) {
-        if (lines.isEmpty() || !sync) { if (isStatic) { stUser = now(); stPos = null; stScroll = (stScroll - dy).coerceIn(0f, max(0f, staticMax())); bump() }; return }
+    fun freeBy(dy: Float) { flingV = 0f; scrollBy(dy) }
+
+    /** Moves the lyrics by [dy] px (a finger's move, or a fling's step); false when they're at an end and didn't move. */
+    private fun scrollBy(dy: Float): Boolean {
+        if (lines.isEmpty() || !sync) {
+            if (!isStatic) return false
+            stUser = now(); stPos = null
+            val to = (stScroll - dy).coerceIn(0f, max(0f, staticMax())); val moved = to != stScroll; stScroll = to; bump(); return moved
+        }
         val t = now()
         if (!lyFree) { lyFree = true; lyFreeY = if (gliding) lyG.value(t) else lyY.value(t); gliding = false; lv.forEach { targets(it, t, S.xFocus) } }
         val hh = H; val maxY = hh * .45f; val minY = min(maxY, hh * .45f - totalH)
-        lyFreeY = (lyFreeY + dy).coerceIn(minY, maxY)
+        val to = (lyFreeY + dy).coerceIn(minY, maxY); val moved = to != lyFreeY
+        lyFreeY = to
         lyY.snap(lyFreeY)
         lyFreeAt = t
         bump()
+        return moved
+    }
+
+    /* the lyrics let go of with some speed carry on and slow down, as any list does (Compose's exponential decay: its
+       friction of 4.2/s); they stopped dead the moment the finger lifted. Worked out from the time on each frame (the frame
+       limit's), not a Compose animation */
+    private var flingV = 0f; private var flingAt = 0.0; private var flingDone = 0f
+    fun freeFling(v: Float) {
+        flingV = if (abs(v) < 80f * dens || S.low) 0f else v
+        flingAt = now(); flingDone = 0f
+        bump()
+    }
+    /** A touch stops a fling under way; true if there was one. */
+    fun stopFling(): Boolean { val was = flingV != 0f; flingV = 0f; return was }
+    private fun flingStep(t: Double) {
+        if (flingV == 0f) return
+        val s = ((t - flingAt) / 1000.0).toFloat()
+        val total = flingV / FLING_FRICTION * (1f - kotlin.math.exp(-FLING_FRICTION * s))
+        val dy = total - flingDone; flingDone = total
+        val v = flingV * kotlin.math.exp(-FLING_FRICTION * s)
+        if (!scrollBy(dy) || abs(v) < 20f * dens) flingV = 0f
     }
 
     fun freeEnd(t: Double = now(), pos: Double? = null) {
         if (!lyFree) return
-        lyFree = false
+        lyFree = false; flingV = 0f
         lv.forEach { targets(it, t, S.xFocus) }
         lyY.snap(lyFreeY)
         if (pos != null) place(t, pos) else lActKey = "x"   // re-placed on the next frame
@@ -1106,12 +1165,13 @@ class LyricsRenderer {
         var yShift = 0f
         for (r in d.rows) {
             val fs = F * r.fs * r.fit; val lh = fs * r.lh
-            if (r.kind == 1 && bgK < 1f) {   // background vocals tucked away until the line is sung
+            val tucks = r.kind == 1 || r.kind == 4   // a background vocal, or its translation
+            if (tucks && bgK < 1f) {   // background vocals tucked away until the line is sung
                 if (bgK <= .01f) { yShift -= F * r.mt + r.h; continue }
             }
             val ry = padT + r.y + yShift
             c.save()
-            if (r.kind == 1 && bgK < 1f) {
+            if (tucks && bgK < 1f) {
                 val k = bgK
                 c.clipRect(-F, ry - F * .1f, W + F, ry + r.h * k + F * .2f)
                 c.translate(0f, -.6f * fs * (1 - k)); c.scale(.8f + .2f * k, .8f + .2f * k, if (d.opp) W - padL - padR else 0f, ry)
@@ -1127,11 +1187,12 @@ class LyricsRenderer {
             if (ps != null) {
                 val p = paint(fs, r.weight)
                 // (a translation: filled .85 to .5 while its line is sung, about half bright otherwise, as Spicy Lyric Translator)
-                val (aFill, aEnd) = when (r.kind) { 0 -> .85f to .5f; 1 -> .6f to .3f; 2 -> 1f to .45f; else -> .85f to .5f }
+                val (aFill, aEnd) = when (r.kind) { 0 -> .85f to .5f; 1, 4 -> .6f to .3f; 2 -> 1f to .45f; else -> .85f to .5f }
                 val restColor = when {
                     st -> 1f
                     r.kind == 2 -> if (active) 1f else .75f
                     r.kind == 3 -> .5f
+                    r.kind == 4 -> .35f
                     d.p -> if (r.kind == 1) .6f else .85f
                     else -> if (r.kind == 1) .3f else .5f
                 }
@@ -1182,7 +1243,7 @@ class LyricsRenderer {
                             val gl = d.lineGlowV; if (gl > .01 && !S.low) tpp.setShadowLayer(((4 + 8 * gl) / 40 * F * .87).toFloat(), 0f, 0f, white(gl * .5))
                         }
                         active && r.oneTs != null -> {   // a whole romanized line, or a translation, filled in time
-                            val g = oneGrad[r] ?: -20.0; val (a1, a2) = when (r.kind) { 0 -> .85f to .5f; 2 -> 1f to .45f; else -> .85f to .5f }
+                            val g = oneGrad[r] ?: -20.0; val (a1, a2) = when (r.kind) { 0 -> .85f to .5f; 2 -> 1f to .45f; 4 -> .6f to .3f; else -> .85f to .5f }
                             val w = sl.width.toFloat()
                             tpp.color = white(1f); tpp.shader = LinearGradient((w * g / 100).toFloat(), 0f, (w * (g + 20) / 100).toFloat(), 0f, white(a1 * subA), white(a2 * subA), Shader.TileMode.CLAMP)
                         }
@@ -1190,6 +1251,7 @@ class LyricsRenderer {
                             0 -> if (active) .6f else if (d.p) .85f else .35f
                             1 -> if (active) .6f else if (d.p) .6f else .3f
                             2 -> if (active) 1f else .75f
+                            4 -> .35f
                             else -> .5f
                         } * subA)
                     }

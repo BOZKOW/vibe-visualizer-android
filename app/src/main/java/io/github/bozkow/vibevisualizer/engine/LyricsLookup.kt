@@ -653,7 +653,7 @@ object Lyr {
         val latin = ls.filter { !nonLatin(it.text) }.map { it.text }
         val song = if (latin.isNotEmpty()) guessLatin(latin) else null
         val skip = skipLangs()
-        needRom = ls.any { nonLatin(it.text) }
+        needRom = ls.any { l -> nonLatin(l.text) || l.bg?.any { nonLatin(it.text) } == true }   // (background vocals in another script too)
         needTr = ls.any { !skip.contains(if (nonLatin(it.text)) lineLang(it.text, null) else song) }
         needSync = lsync && ls.isNotEmpty()
     }
@@ -668,8 +668,10 @@ object Lyr {
         val tok = ++trTok
         Vibe.scope.launch {
             val ls = L.filter { !it.dots && it.text.isNotEmpty() }
-            L.forEach { it.tr = null; it.rom = null }
-            val wantRom = S.romMode != "off" && ls.any { nonLatin(it.text) }; val wantTr = S.tr
+            L.forEach { l -> l.tr = null; l.rom = null; l.bg?.forEach { it.tr = null } }
+            // background vocals are translated too, each under its own line (they ride along in the same request)
+            val bgs = ls.flatMap { l -> l.bg.orEmpty().filter { it.text.isNotBlank() } }
+            val wantRom = S.romMode != "off" && ls.any { l -> nonLatin(l.text) || l.bg?.any { nonLatin(it.text) } == true }; val wantTr = S.tr
             if (ls.isEmpty() || (!wantRom && !wantTr)) { if (L.isNotEmpty() && !fresh) render(null, true); return@launch }
             // romanization/translation that came with the lyrics is used first; Google fills the gaps. Translations that
             // don't say their language (the Spicy Lyrics API's, a doubled LRC's) are told by the phone; when it can't
@@ -693,16 +695,17 @@ object Lyr {
                 if (wantTr && trOk(l) && !skip0.contains(lineLang(l.text, null))) l.tr = l.apiTr
             }
             val needRom = ls.any { wantRom && nonLatin(it.text) && it.rom == null }
-            val needTr = ls.any { wantTr && it.tr == null && !trOk(it) }
+            val needTr = ls.any { wantTr && it.tr == null && !trOk(it) } || (wantTr && bgs.isNotEmpty())
             if (!needRom && !needTr) { render(null, true); return@launch }
+            val texts = ls.map { it.text } + (if (wantTr) bgs.map { it.text } else emptyList())
             // Google gives the translation and the romanization in one; another service translates, and Google only fills
             // romanization the phone couldn't do
             val svc = S.str("aTrSvc").takeIf { needTr } ?: "google"
-            val key = svc + "|" + S.trTo + "|" + ls.joinToString("\n") { it.text }
+            val key = svc + "|" + S.trTo + "|" + texts.joinToString("\n")
             val res = trCache[key] ?: try {
-                (if (svc == "google") Google.all(ls.map { it.text }, S.trTo)
+                (if (svc == "google") Google.all(texts, S.trTo)
                 else {
-                    val o = Translators.translate(svc, ls.map { it.text }, S.trTo)
+                    val o = Translators.translate(svc, texts, S.trTo)
                     val rom = if (needRom) runCatching { Google.all(ls.map { it.text }, S.trTo).rom }.getOrDefault(emptyList()) else emptyList()
                     Google.Res(o.tr, rom, o.lang)
                 }).also { trCache[key] = it }
@@ -714,9 +717,16 @@ object Lyr {
                 if (wantRom && nonLatin(l.text) && l.rom == null && rom != null && rom != l.text) l.rom = rom
                 if (wantTr && l.tr == null && !trOk(l) && tr != null && !skip.contains(lineLang(l.text, res.lang)) && !tr.equals(l.text, ignoreCase = true)) l.tr = tr
             }
+            if (wantTr) bgs.forEachIndexed { k, b ->
+                val tr = res.tr.getOrNull(ls.size + k)
+                if (tr != null && !skip.contains(lineLang(b.text, res.lang)) && !tr.equals(b.text, ignoreCase = true) && !tr.equals(bgBareText(b.text), ignoreCase = true)) b.tr = tr
+            }
             render(null, true)
         }
     }
+
+    /** A background vocal without the brackets around it, to tell an untranslated one ("(ooh)" back as "ooh"). */
+    private fun bgBareText(t: String) = t.trim().removePrefix("(").removeSuffix(")").trim()
 
     /** The language of [text], by the phone's own language identification (nothing is sent anywhere; Spicy Lyrics Mobile
      *  0.18's SystemLanguageDetector); null when it isn't sure. */

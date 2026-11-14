@@ -213,17 +213,23 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                         // sideways, or with another finger or a palm on the screen too
                         var stray = false; var upAt = down.uptimeMillis
                         val idx = view.lineAt(down.position.y); view.pressed = idx; view.dragged = false; view.bump()
+                        if (view.stopFling()) stray = true   // (a touch stops a fling under way, as in any list, without jumping to a line)
+                        val vt = androidx.compose.ui.input.pointer.util.VelocityTracker(); vt.addPosition(down.uptimeMillis, down.position)
+                        var lifted = false
                         while (true) {
                             val ev = awaitPointerEvent(); val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
                             if (ev.changes.count { it.pressed } > 1) stray = true
                             upAt = ch.uptimeMillis
-                            if (!ch.pressed) break
+                            vt.addPosition(ch.uptimeMillis, ch.position)
+                            if (!ch.pressed) { lifted = true; break }
                             val dy = ch.position.y - lastY
                             if (!dragged && abs(ch.position.y - down.position.y) > slop) { dragged = true; view.dragged = true; view.pressed = -1; E.poke() }
                             if (!dragged && abs(ch.position.x - down.position.x) > slop * 2) { stray = true; view.pressed = -1 }
                             if (dragged) { view.freeBy(dy); lastY = ch.position.y; ch.consume() }
                         }
                         view.pressed = -1; view.bump()
+                        // let go while moving: they carry on (they stopped dead the moment the finger lifted)
+                        if (dragged && lifted) view.freeFling(vt.calculateVelocity().y)
                         val quick = upAt - down.uptimeMillis < viewConfiguration.longPressTimeoutMillis
                         if (!dragged && !stray && quick && idx >= 0 && !E.wakeTap) Lyr.tap(idx)
                         view.dragged = false
