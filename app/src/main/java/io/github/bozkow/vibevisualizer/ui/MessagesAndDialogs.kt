@@ -252,7 +252,7 @@ fun NoticeDetail() {
                 val sub = if (q.k == "next") "Up next" + (if (q.s.isNotEmpty()) " · " + q.s else "") else q.s
                 if (sub.isNotEmpty()) Text(sub, Modifier.part(2).padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint, textAlign = TextAlign.Center)
                 if (q.steps.isNotEmpty()) Column(Modifier.part(3).padding(top = if (short) 10.dp else 18.dp).fillMaxWidth().glassCard().padding(16.dp)) {
-                    Text("What to do", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = .6f), letterSpacing = 1.sp)
+                    Text(if (q.k == "next") "Good to know" else "What to do", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = .6f), letterSpacing = 1.sp)
                     q.steps.forEachIndexed { i, st ->
                         // each step after the one before
                         Row(Modifier.part(4 + i).padding(top = 8.dp)) {
