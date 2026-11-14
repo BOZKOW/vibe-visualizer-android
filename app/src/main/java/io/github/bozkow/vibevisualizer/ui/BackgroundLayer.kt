@@ -281,6 +281,8 @@ val LocalFrost = staticCompositionLocalOf { false }
 
 object Frost {
     var video by mutableStateOf<GraphicsLayer?>(null)   // the Canvas, blurred ([CanvasBlur])
+    var videoSharp: GraphicsLayer? = null               // the Canvas as it plays (CanvasBackdrop's), for Liquid glass's clear glass
+    var videoAlpha = 1f                                 // ...and how much of it shows there
     var screen = IntSize.Zero                           // the size that's drawn at
     var cover by mutableStateOf(Rect.Zero)              // where the cover is, in the window
     var upright by mutableStateOf(false)                // the phone's held upright: frost shows what's behind it
@@ -324,7 +326,12 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
                 else -> Frost.bg?.let { drawLayer(it) }
             }
             val v = Frost.video; val scr = Frost.screen
-            if (v != null && v.size.width > 0 && scr.width > 0) scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) }
+            val vs = Frost.videoSharp
+            // Liquid glass: clear, so the Canvas as it plays, sharp (the frosted glass shows its blurred copy)
+            if (liquidOn() && vs != null && vs.size.width > 0 && Frost.videoAlpha > .01f && io.github.bozkow.vibevisualizer.engine.CanvasVideo.cvmode) {
+                drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f, 0f, vs.size.width.toFloat(), vs.size.height.toFloat()), androidx.compose.ui.graphics.Paint().apply { alpha = Frost.videoAlpha })
+                drawLayer(vs); drawContext.canvas.restore()
+            } else if (v != null && v.size.width > 0 && scr.width > 0) scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) }
             if (Frost.gradeW > 0f) screenGrade(Frost.gradeW, Frost.gradeH, Frost.gradeTop, Frost.gradeShade)   // (what's behind it is graded)
             Frost.lyrics?.let { l -> if (l.size.width > 0) translate(0f, Frost.lyricsY) { scale(8f, 8f, pivot = Offset.Zero) { drawLayer(l) } } }
         }

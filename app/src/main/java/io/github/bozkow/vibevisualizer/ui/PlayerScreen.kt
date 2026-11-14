@@ -1439,6 +1439,9 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     // the video, recorded as it's drawn, so the background can draw it again blurred (on the GPU, see CanvasBlur)
     val vid = rememberGraphicsLayer()
     var vidSize by remember { mutableStateOf(IntSize.Zero) }
+    // (the sharp video, and how much of it shows, for Liquid glass's clear glass: it shows what's really behind it)
+    androidx.compose.runtime.DisposableEffect(vid) { Frost.videoSharp = vid; onDispose { if (Frost.videoSharp === vid) Frost.videoSharp = null } }
+    androidx.compose.runtime.SideEffect { Frost.videoAlpha = maxOf(a, .01f) * (if (stage != null && !S.low) .75f else 1f) }
     CanvasBlur(vid, { vidSize }, wide, stage != null)
     // on its side the sharp video first blurs where it is, then fades into the blurred background (straight from sharp to the
     // blurred copy, which sits elsewhere, the two showed as an edge)
