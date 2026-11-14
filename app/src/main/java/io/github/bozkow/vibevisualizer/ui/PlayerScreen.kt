@@ -274,7 +274,7 @@ private fun LyricsWithLyrics() {
             // no top line here (the owner's pick: the song as high as Spicy Lyrics has it); notices still come first
             TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true, line = false, upNext = false)
             Box(Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)) {
-                TitleRow(big = false, toggles = true, bleed = true, cover = withCover, header = true, coverSlot = { slot = it })
+                TitleRow(big = false, bleed = true, cover = withCover, header = true, coverSlot = { slot = it })
             }
             var areaH by remember { mutableFloatStateOf(0f) }
             Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }.onGloballyPositioned { area = it.boundsInRoot() }) {   // (under all the rest: the lyrics run behind it)
@@ -287,7 +287,7 @@ private fun LyricsWithLyrics() {
             if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
             Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, lyrics = true, name = false, restCover = rest) }
             AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
-                Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true) }
+                Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true, lyricsToggles = true) }
             }
             if (hidden) Spacer(Modifier.height(16.dp))
         }
@@ -1077,7 +1077,7 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
 /** The music app's bottom row: five buttons you pick (Settings → Player screen → Buttons under the controls; by
  *  default where it plays · the bars · Lyrics timing · Resync · Look again), then Settings, always last: it's the way into them. */
 @Composable
-private fun BottomBar(big: Boolean = true, mid: Boolean = false) {
+private fun BottomBar(big: Boolean = true, mid: Boolean = false, lyricsToggles: Boolean = false) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
     // six that fit with room between them (a narrow phone, or the largest display size), and round when the row gets less
     // height than they'd like (on its side: the large song name, a notice of two lines and the controls together)
@@ -1085,7 +1085,12 @@ private fun BottomBar(big: Boolean = true, mid: Boolean = false) {
     Row(Modifier.fillMaxWidth().padding(top = if (big) 6.dp else 2.dp, bottom = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         // (Lyrics and Visualizer were screens of their own until 0.38.0: a slot saved with Lyrics turns the bars on and
         // off now, one with the Visualizer opens Lyrics timing, so the old default row has no button twice)
-        for (i in 1..5) BarButton(S.str("aBar$i").let { k -> when (k) { "lyrics" -> "bars"; "viz" -> "timing"; else -> k } }, d)
+        val picks = (1..5).map { i -> S.str("aBar$i").let { k -> when (k) { "lyrics" -> "bars"; "viz" -> "timing"; else -> k } } }
+        // [lyricsToggles]: the upright Lyrics screen, whose song at the top has no room for them (the owner's pick, as Spicy
+        // Lyrics Mobile has them): translate and romanize first when the lyrics need them, the last picked ones giving way,
+        // so the row keeps its six
+        val first = if (!lyricsToggles) emptyList() else listOfNotNull("tr".takeIf { Lyr.needTr && "tr" !in picks }, "rom".takeIf { Lyr.needRom && "rom" !in picks })
+        for (k in (first + picks).take(5)) BarButton(k, d)
         BarIcon(Icons.Rounded.Settings, "Settings", false, d) { E.openSettings() }
     }
     }
