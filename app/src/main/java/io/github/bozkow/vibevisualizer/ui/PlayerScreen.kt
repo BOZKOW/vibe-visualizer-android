@@ -263,6 +263,7 @@ private fun LyricsWithLyrics() {
     var slot by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the cover's place in the song at the top (in the root)
     var area by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the lyrics' area (in the root)
     var origin by remember { mutableStateOf(Offset.Zero) }
+    var nameAt by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the name centred at the top in a break (in the root)
     // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
     val rest = restCover()
     val rk by animateFloatAsState(if (rest) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, if (rest) Spring.StiffnessVeryLow else Spring.StiffnessLow), label = "rest")
@@ -279,7 +280,7 @@ private fun LyricsWithLyrics() {
                 TitleRow(big = false, bleed = true, cover = withCover, header = true, coverSlot = { slot = it }, textAway = if (withCover) rk else 0f)
                 // while the cover is out in a long break, the name and artist centred at the top (the owner's pick: beside an
                 // empty spot they looked off), crossfading with the ones beside the cover
-                if (withCover && rk > .01f) Column(Modifier.fillMaxWidth().graphicsLayer { alpha = rk.coerceIn(0f, 1f) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                if (withCover && rk > .01f) Column(Modifier.fillMaxWidth().onGloballyPositioned { nameAt = it.boundsInRoot() }.graphicsLayer { alpha = rk.coerceIn(0f, 1f) }, horizontalAlignment = Alignment.CenterHorizontally) {
                     androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
                         val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }
                         Scrolling(E.title, 24f.times(k).sp, FontWeight.Bold, Color.White, (-.3).sp)
@@ -305,7 +306,7 @@ private fun LyricsWithLyrics() {
             }
             if (hidden) Spacer(Modifier.height(16.dp))
         }
-        if (withCover && slot.width > 0f) MovingCover(slot, area, rk, origin)
+        if (withCover && slot.width > 0f) MovingCover(slot, area, rk, origin, nameAt.bottom)
     }
 }
 
@@ -313,15 +314,18 @@ private fun LyricsWithLyrics() {
  *  grows into the middle of the lyrics' [area], as big as the break's cover was, and flows back as the next line comes
  *  (the owner: "make the cover get bigger, the text would stay"). Positions are in the root; [origin] is this layer's. */
 @Composable
-private fun MovingCover(slot: androidx.compose.ui.geometry.Rect, area: androidx.compose.ui.geometry.Rect, k0: Float, origin: Offset) {
+private fun MovingCover(slot: androidx.compose.ui.geometry.Rect, area: androidx.compose.ui.geometry.Rect, k0: Float, origin: Offset, nameBottom: Float = 0f) {
     val dens = androidx.compose.ui.platform.LocalDensity.current
     val cvk by animateFloatAsState(if (CanvasVideo.cvmode && S.b("cvShrink")) .56f else 1f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, Spring.StiffnessVeryLow), label = "cvcover")
     val k = k0.coerceIn(0f, 1f)
-    val padH = with(dens) { 24.dp.toPx() }; val padV = with(dens) { 16.dp.toPx() }
-    val bigSide = (minOf(area.width - 2 * padH, area.height - 2 * padV) * cvk).coerceAtLeast(slot.width)
+    // big, from just under the name centred at the top down to the lyrics' foot, as wide as the margins allow (only the
+    // lyrics' area, under the whole song's place, made it look small: the owner)
+    val padH = with(dens) { 24.dp.toPx() }; val padV = with(dens) { 12.dp.toPx() }
+    val top = (if (nameBottom > 0f) nameBottom else area.top) + padV; val bottom = area.bottom - padV
+    val bigSide = (minOf(area.width - 2 * padH, bottom - top) * cvk).coerceAtLeast(slot.width)
     fun mix(a: Float, b: Float) = a + (b - a) * k
     val side = mix(slot.width, bigSide)
-    val x = mix(slot.left, area.center.x - bigSide / 2); val y = mix(slot.top, area.center.y - bigSide / 2)
+    val x = mix(slot.left, area.center.x - bigSide / 2); val y = mix(slot.top, (top + bottom) / 2 - bigSide / 2)
     val shape = RoundedCornerShape(mix(10f, 22f).dp)
     Box(Modifier.offset { androidx.compose.ui.unit.IntOffset((x - origin.x).roundToInt(), (y - origin.y).roundToInt()) }.size(with(dens) { side.toDp() })
         .then(if (k > .01f) Modifier.ambientOut() else Modifier)) {
