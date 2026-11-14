@@ -284,7 +284,8 @@ private fun LyricsWithLyrics() {
                     CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
                 }
             }
-            if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
+            // (lined up with the seek bar and the lyrics, 24 dp in: they reached 12 dp further out on both sides, the owner's pick)
+            if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 24.dp))
             Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, lyrics = true, name = false, restCover = rest) }
             AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
                 Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true, lyricsToggles = true) }

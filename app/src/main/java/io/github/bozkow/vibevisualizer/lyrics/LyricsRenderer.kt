@@ -588,6 +588,9 @@ class LyricsRenderer {
     }
 
     /* ---- where the lyrics sit (place / fitLine) ---- */
+    /** With the line at the top: how far down it sits (of the area's height). */
+    private fun topAt() = if (pipScroll()) .06f else .1f
+
     private fun place(t: Double, pos: Double) {
         if (lv.isEmpty() || isStatic) return
         tops(t)
@@ -597,7 +600,9 @@ class LyricsRenderer {
         val hh = H
         // the small window can keep the line being sung just under its top, the room going to the lines coming next
         // (Spicy Lyrics Mobile 0.17)
-        var y = if (lineAtTop()) hh * .06f - el.top else hh * (if (S.xFocus) .44f else .38f) - (el.top + el.h / 2)   // Focus: in the middle
+        // (upright too since 0.54.0, the owner's pick after Spicy Lyrics Mobile: the line being sung right under the song at the
+        // top, a little room above it for the one before; the small window keeps its own, nearer its top)
+        var y = if (lineAtTop()) hh * topAt() - el.top else hh * (if (S.xFocus) .44f else .38f) - (el.top + el.h / 2)   // Focus: in the middle
         // two lines sung at once (a duet, or lines whose times overlap, as some Spicy Lyrics syncs have): both in view,
         // the pair around the middle, or in the whole height when it's taller; taller than the view, the newer one whole
         // (in the Focus style the line in focus is the older one and the newer waits under it: only when it wouldn't fit there and
@@ -632,7 +637,7 @@ class LyricsRenderer {
             setLyY(y, t)
             return
         }
-        val top = if (lineAtTop()) hh * .06f else hh * .16f; if (el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
+        val top = if (lineAtTop()) hh * topAt() else hh * .16f; if (el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
         setLyY(fitLine(el, y, pos), t)
     }
 
@@ -656,7 +661,7 @@ class LyricsRenderer {
                 if (!small) return false
                 // not even that: the newer line alone (the main voice goes on; the held one shows again when there's room)
                 pins(-1, 0f, t)
-                setLyY(fitLine(lower, if (lineAtTop()) hh * .06f - lower.top else hh * .38f - (lower.top + lower.h / 2), pos), t)
+                setLyY(fitLine(lower, if (lineAtTop()) hh * topAt() - lower.top else hh * .38f - (lower.top + lower.h / 2), pos), t)
                 return true
             }
             rowTop = (sungRow(first, pos) - rowH / 2).coerceIn(0f, max(0f, first.h - rowH))

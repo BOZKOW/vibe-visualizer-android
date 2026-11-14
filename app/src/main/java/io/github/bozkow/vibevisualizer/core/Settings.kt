@@ -43,7 +43,7 @@ object Defaults {
         "lprov" to "spicy:1,spotify:1,lrclib:1,netease:1", "loff" to 0, "lsize" to 100, "lblur" to true,
         "canvasOn" to true, "low" to false, "perfAsk" to true, "anim" to "system", "lDesync" to "ask", "design" to "glass",
         "uiHide" to "idle", "xRefCred" to true, "xScrub" to true, "xSkeleton" to true, "xKeep" to true, "xBgPop" to true,
-        "xRefSimple" to true, "ljoin" to true, "lbgBr" to false,   // (xRefSimple: Bloom is always refreshed since 0.52.0; ljoin: ljoinMode != "off", for backups)
+        "xRefSimple" to true, "ljoin" to false, "lbgBr" to false,   // (xRefSimple: Bloom is always refreshed since 0.52.0; ljoin: ljoinMode != "off", for backups)
         // Android only
         "aCap" to "phone",      // what the bars hear: phone (everything the phone plays), mic, off
         "aKeepOn" to true,      // keep the screen on while music plays
@@ -82,7 +82,7 @@ object Defaults {
         "aMotionFirst" to false, // a song with both: its animated cover instead of its Canvas (Spicy Lyrics Mobile 0.19.0)
         "aBgHex" to "",         // the Color background: #RRGGBB, or empty for the cover's
         "ljoinPace" to false,   // Join split words: each syllable's letters at that syllable's own speed
-        "ljoinMode" to "steady", // Join split words (Spicy Lyrics 6.5.0): off, full (all words), steady (steadily sung), held (held words)
+        "ljoinMode" to "off",   // Join split words (Spicy Lyrics 6.5.0): off, full (all words), steady (steadily sung), held (held words); off by default again as in 6.5.10
         "lspace" to true,       // Increased line spacing with Spring (Spicy Lyrics 6.5.0's springLineSpacing)
         "aUpNext" to true,      // Up next: the next song at the lyrics' foot in a song's last 30 s (Spicy Lyrics 6.5.0)
         "cvLyrA" to 25,         // how much of the Canvas video shows behind the lyrics (%; 0: only its soft glow)
