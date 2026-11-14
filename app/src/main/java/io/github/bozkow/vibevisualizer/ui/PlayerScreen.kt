@@ -172,6 +172,7 @@ import io.github.bozkow.vibevisualizer.engine.E
 import io.github.bozkow.vibevisualizer.engine.FilePicker
 import io.github.bozkow.vibevisualizer.engine.Images
 import io.github.bozkow.vibevisualizer.engine.Lyr
+import io.github.bozkow.vibevisualizer.engine.Preload
 import io.github.bozkow.vibevisualizer.engine.Updates
 import io.github.bozkow.vibevisualizer.engine.Visuals
 import io.github.bozkow.vibevisualizer.media.Local
@@ -265,6 +266,7 @@ private fun LyricsWithLyrics() {
                 CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
         }
+        UpNext(Modifier.padding(horizontal = 24.dp))
         if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 12.dp))
         Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, toggles = true, lyrics = true, restCover = rest) }
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
@@ -430,6 +432,7 @@ private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 4
             // the screen's edge (28 dp in, they sat towards the middle: "move the duet vocals more to the right")
             else LyricsPane(Modifier.fillMaxSize().padding(end = lyricsEnd), areaHeightPx = areaH, padStart = 4f, padEnd = 6f, problems = false, behind = true, startRoom = startRoom)
         }
+        if (!bars) UpNext(Modifier.padding(end = endGap), short = true)
         if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = endGap).height(34.dp))
         Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }
     }
@@ -463,6 +466,7 @@ private fun RightPane(modifier: Modifier) {
             if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 16.dp)); AwayNote(Modifier.align(Alignment.Center)) }
             else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 8f, padEnd = 16f, problems = false)
         }
+        if (!bars) UpNext(Modifier)
         if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(64.dp))
         LyricsCredits()
     }
@@ -858,11 +862,15 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
             Box(Modifier.size(52.dp * ck).graphicsLayer { alpha = ck.coerceIn(0f, 1f) }) { CoverArt(Modifier.fillMaxSize(), corner = 10.dp, small = true) }
             Spacer(Modifier.width(12.dp * ck))
         }
+        // the name and the artist slide in step (Spicy Lyrics 6.5.0's TextScroller): they leave together, the shorter waits
+        // at its end, and they come back together
         Column(Modifier.weight(1f), horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
-            val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
-            Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)
-            val by = E.byLine()
-            if (by.isNotEmpty()) Scrolling(by, (if (big) 19f else 15f).times(k).sp, FontWeight.Medium, dim, bleedL = bl, bleedR = br)
+            androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
+                val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
+                Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)
+                val by = E.byLine()
+                if (by.isNotEmpty()) Scrolling(by, (if (big) 19f else 15f).times(k).sp, FontWeight.Medium, dim, bleedL = bl, bleedR = br)
+            }
         }
         if (toggles) {   // the Lyrics screen: translate and romanize, when the lyrics need them
             if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
@@ -893,6 +901,46 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
     Box(Modifier.onSizeChanged { boxW = it.width }) {
         Text(text, scroll, style = TextStyle(shadow = textShadow),
             fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
+    }
+}
+
+/** Up next (Spicy Lyrics 6.5.0's card): in a song's last 30 s, the song that comes after it, under the lyrics, as the
+ *  queue's first row reads (its cover, name and artist; nothing to tap). Not on repeat-one, for the DJ, in the small
+ *  window or in Ambient mode; Settings → Lyrics → Up next. The queue is read 6 s into the song and again as its last
+ *  30 s begin (`Preload`). The lyrics area makes room for it at once (the lines glide up), then it fades in. */
+@Composable
+private fun UpNext(modifier: Modifier, short: Boolean = false) {
+    val next by produceState<io.github.bozkow.vibevisualizer.lyrics.SongMeta?>(null) {
+        while (true) {
+            value = if (!S.b("aUpNext") || E.inPip || E.ambient || E.dj || (E.src == "spotify" && Spotify.repeat == "track")) null
+            else Preload.upNext()?.takeIf { _ -> val d = E.curDur(); val left = d - E.curTime(); d > 0 && left in .5..30.0 }
+            kotlinx.coroutines.delay(500)
+        }
+    }
+    var shown by remember { mutableStateOf<io.github.bozkow.vibevisualizer.lyrics.SongMeta?>(null) }
+    if (next != null) shown = next
+    AnimatedVisibility(next != null, modifier, enter = fadeIn(tween(320, 120)) + androidx.compose.animation.slideInVertically(tween(420, 120)) { it / 3 }, exit = fadeOut(tween(220))) {
+        val m = shown ?: return@AnimatedVisibility
+        Crossfade(m, label = "upnext") { s ->
+            Row(Modifier.fillMaxWidth().padding(vertical = if (short) 4.dp else 6.dp).glass(RoundedCornerShape(16.dp)).padding(8.dp)
+                .semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
+                val size = if (short) 36.dp else 44.dp
+                val bm by produceState(s.cover.takeIf { it.isNotEmpty() }?.let { Images.cached("$it@128") }, s.cover) { value = s.cover.takeIf { it.isNotEmpty() }?.let { Images.load(it, 128) } }
+                Box(Modifier.size(size).clip(RoundedCornerShape(8.dp)).background(GlassFill), contentAlignment = Alignment.Center) {
+                    val b = bm
+                    if (b != null) Image(b.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    else Icon(Icons.Rounded.MusicNote, null, Modifier.size(20.dp), tint = Color.White.copy(alpha = .6f))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("UP NEXT", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = Color.White.copy(alpha = .6f))
+                    androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
+                        Scrolling(s.title, 14.sp, FontWeight.Bold, Color.White)
+                        if (s.artist.isNotEmpty() && !short) Scrolling(s.artist, 12.sp, FontWeight.Medium, dim)
+                    }
+                }
+            }
+        }
     }
 }
 

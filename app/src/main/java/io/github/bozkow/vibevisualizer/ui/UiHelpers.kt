@@ -254,25 +254,36 @@ fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 250
     val dens = androidx.compose.ui.platform.LocalDensity.current
     val calm = S.low || io.github.bozkow.vibevisualizer.engine.E.reduceMotion()
     val on = travel > 0 && iterations > 0 && !calm
-    // a short way at about 36 dp a second; past 120 dp slower, 20 dp a second (a long name or notice flew by), with a
-    // gentle ease in and out (a sine's: its fastest is only half again its average)
+    // a short way at about 36 dp a second; past 120 dp slower, 20 dp a second (a long name or notice flew by)
     val ms = if (travel <= 0) 0L else with(dens) { val near = 120.dp.toPx(); ((min(travel.toFloat(), near) / 36.dp.toPx() + max(0f, travel - near) / 20.dp.toPx()) * 1000).toLong().coerceIn(700L, 30000L) }
-    val start = remember(travel, iterations, calm) { android.os.SystemClock.uptimeMillis() }   // (starts over for new text or room)
+    val group = LocalSlideGroup.current
+    val me = remember { Any() }
+    val start0 = remember(travel, iterations, calm) { android.os.SystemClock.uptimeMillis() }   // (starts over for new text or room)
+    if (group != null) androidx.compose.runtime.DisposableEffect(group, on, ms) {
+        if (on) group.ms[me] = ms else group.ms.remove(me)
+        group.start = android.os.SystemClock.uptimeMillis()   // one of them changed: they start over together
+        onDispose { group.ms.remove(me) }
+    }
     LaunchedEffect(on, ms) { onRead?.invoke(if (on) delayMillis + ms + 1500L else 0L) }   // ([onRead]: how long until its end has been read)
     // where it is, worked out from the time on the app's own frames (E.drawTick, at the frame limit): an animation of
     // its own ran at the screen's rate (120 Hz) the whole time a long name slid, whatever the limit
     val offset = {
         if (!on) 0f else {
             io.github.bozkow.vibevisualizer.engine.E.drawTick.longValue
-            val cycle = delayMillis + ms + 1800 + ms
+            // in a group the cycle is the longest one's: this one waits at its end until that one is back from it
+            val longest = group?.ms?.values?.maxOrNull()?.coerceAtLeast(ms) ?: ms
+            val start = group?.start ?: start0
+            val cycle = delayMillis + longest + 1800 + longest
             val e = android.os.SystemClock.uptimeMillis() - start
             if (iterations != Int.MAX_VALUE && e / cycle >= iterations) 0f else {
                 val k = e % cycle
+                val back = delayMillis + longest + 1800
                 val f = when {
                     k < delayMillis -> 0f
-                    k < delayMillis + ms -> SLIDE_EASE.transform((k - delayMillis).toFloat() / ms)
-                    k < delayMillis + ms + 1800 -> 1f
-                    else -> 1f - SLIDE_EASE.transform((k - delayMillis - ms - 1800).toFloat() / ms)
+                    k < delayMillis + ms -> slide((k - delayMillis).toFloat() / ms, ms)
+                    k < back -> 1f
+                    k < back + ms -> 1f - slide((k - back).toFloat() / ms, ms)
+                    else -> 0f
                 }
                 -travel * f
             }
@@ -298,7 +309,26 @@ fun Modifier.pingPong(iterations: Int, endGap: Dp = 0.dp, delayMillis: Int = 250
             layout(w, p.height) { p.placeWithLayer(0, 0) { translationX = offset() } }
         }
 }
-private val SLIDE_EASE = androidx.compose.animation.core.CubicBezierEasing(.37f, 0f, .63f, 1f)
+/** Where a slide is ([u] of the way through its [ms]): at one steady pace, easing in and out over 600 ms at its ends (Spicy
+ *  Lyrics 6.5.0's TextScroller), at most a third of it each, so it's never faster than the sine ease it had before. */
+private fun slide(u: Float, ms: Long): Float {
+    val r = min(600f / ms, .35f); val peak = 1f / (1f - r)
+    return when {
+        u <= 0f -> 0f
+        u >= 1f -> 1f
+        u < r -> peak * u * u / (2 * r)
+        u > 1f - r -> 1f - peak * (1f - u) * (1f - u) / (2 * r)
+        else -> peak * (u - r / 2)
+    }
+}
+
+/** Texts that slide together (a song's name and its artist): they leave at once, the one with less to travel waits at
+ *  its end, and they come back together, so they never drift out of step (Spicy Lyrics 6.5.0's TextScroller). */
+class SlideGroup {
+    internal val ms = androidx.compose.runtime.mutableStateMapOf<Any, Long>()
+    internal var start by androidx.compose.runtime.mutableLongStateOf(android.os.SystemClock.uptimeMillis())
+}
+val LocalSlideGroup = androidx.compose.runtime.staticCompositionLocalOf<SlideGroup?> { null }
 
 /** Out past the side margins by [by] on each side (the bars, to the screen's edges: 0.46.1). */
 fun Modifier.bleedX(by: Dp): Modifier = this.layout { m, c ->

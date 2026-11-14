@@ -25,6 +25,11 @@ object Preload {
     /** The next songs as found ahead (the Spotify app's song change starts its lookups at once when it's one of them). */
     private var next: List<SongMeta> = emptyList()
     private var at = 0   // how many of them Next in this app has gone past before Spotify named a song
+    private var readFor = -1   // the song (E.coverTok) the list was read for
+
+    /** Up next (Spicy Lyrics 6.5.0's card): the song that comes after this one, as read from the queue for this song;
+     *  null while it isn't known. */
+    fun upNext(): SongMeta? = if (readFor == E.coverTok) next.getOrNull(at) else null
 
     /** Next pressed in this app: the song found ahead that comes now (pressing again before Spotify answers gives the
      *  one after), or null. */
@@ -40,22 +45,27 @@ object Preload {
     /** The queue changed (shuffle): what was found ahead no longer follows. */
     fun forget() { next = emptyList(); at = 0 }
 
+    private suspend fun read(): List<SongMeta> = when (E.src) {
+        "spotify" -> Spotify.queueAhead(AHEAD)
+        "media" -> listOfNotNull(MediaApps.nextSong())
+        "file" -> listOfNotNull(Local.nextItem()?.let { (u, name) -> E.fileSong(name, Files.tags(u)) })
+        else -> emptyList()
+    }.filter { it.title.isNotEmpty() }
+
     /** A song started: in a few seconds (after its own lookups), find the next ones and get them ready. */
     fun songStarted() {
         job?.cancel()
-        if (!S.b("aPreload")) return
+        val ready = S.b("aPreload"); val upNext = S.b("aUpNext")
+        if (!ready && !upNext) return
         val tok = E.coverTok
         job = Vibe.scope.launch {
             delay(6000)
             if (tok != E.coverTok) return@launch
-            val ms = when (E.src) {
-                "spotify" -> Spotify.queueAhead(AHEAD)
-                "media" -> listOfNotNull(MediaApps.nextSong())
-                "file" -> listOfNotNull(Local.nextItem()?.let { (u, name) -> E.fileSong(name, Files.tags(u)) })
-                else -> emptyList()
-            }.filter { it.title.isNotEmpty() }
-            if (tok != E.coverTok || ms.isEmpty()) return@launch
-            next = ms; at = 0
+            val ms = read()
+            if (tok != E.coverTok) return@launch
+            if (upNext) launch { lastLook(tok) }
+            if (ms.isEmpty() || !ready) { if (ms.isNotEmpty()) { next = ms; at = 0; readFor = tok }; return@launch }
+            next = ms; at = 0; readFor = tok
             // the nearest first, one song at a time (its lyrics, Canvas and cover together), so the sources aren't asked
             // for five songs at once; what's ready already (saved, or got ready from an earlier song) is skipped quickly
             work?.cancel()
@@ -66,6 +76,26 @@ object Preload {
                     if (m.cover.isNotEmpty()) launch { runCatching { Images.load(m.cover) } }
                 }
             }
+        }
+    }
+
+    /** Up next shows in a song's last 30 s: the queue is read once more as they begin (one more request to Spotify),
+     *  so a song you queued meanwhile is the one it names. A seek forwards counts; the wait checks every 2 s. */
+    private suspend fun lastLook(tok: Int) {
+        while (true) {
+            delay(2000)
+            if (tok != E.coverTok) return
+            val d = E.curDur(); val left = d - E.curTime()
+            if (d > 0 && left in 0.0..36.0) break
+        }
+        if (E.dj || (E.src == "spotify" && Spotify.repeat == "track")) return
+        val ms = read()
+        if (tok != E.coverTok || ms.isEmpty()) return
+        val first = next.getOrNull(at)?.let { it.id to it.title }
+        next = ms; at = 0; readFor = tok
+        // a new song next: got ready too, as the ones read 6 s in were
+        if (S.b("aPreload") && (ms[0].id to ms[0].title) != first) ms[0].let { m ->
+            runCatching { Lyr.preload(m) }; runCatching { CanvasVideo.preload(m) }; if (m.cover.isNotEmpty()) runCatching { Images.load(m.cover) }
         }
     }
 
