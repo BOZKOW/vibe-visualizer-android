@@ -321,7 +321,8 @@ private fun MovingCover(slot: androidx.compose.ui.geometry.Rect, area: androidx.
     // big, from just under the name centred at the top down to the lyrics' foot, as wide as the margins allow (only the
     // lyrics' area, under the whole song's place, made it look small: the owner)
     val padH = with(dens) { 24.dp.toPx() }; val padV = with(dens) { 12.dp.toPx() }
-    val top = (if (nameBottom > 0f) nameBottom else area.top) + padV; val bottom = area.bottom - padV
+    // (clear of the bars under it too: their tallest reach above their own room)
+    val top = (if (nameBottom > 0f) nameBottom else area.top) + padV; val bottom = area.bottom - with(dens) { 28.dp.toPx() }
     val bigSide = (minOf(area.width - 2 * padH, bottom - top) * cvk).coerceAtLeast(slot.width)
     fun mix(a: Float, b: Float) = a + (b - a) * k
     val side = mix(slot.width, bigSide)
