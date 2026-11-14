@@ -272,7 +272,7 @@ private fun LyricsWithLyrics() {
     Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
         Column(Modifier.fillMaxSize()) {
             // no top line here (the owner's pick: the song as high as Spicy Lyrics has it); notices still come first
-            TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true, line = false)
+            TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true, line = false, upNext = false)
             Box(Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)) {
                 TitleRow(big = false, toggles = true, bleed = true, cover = withCover, header = true, coverSlot = { slot = it })
             }
@@ -549,7 +549,8 @@ private fun EmptyState() {
 /** The top of every screen: where the music plays from at the left and on what device at the right, and under them the
  *  space for what's wrong. Always there, also with the controls away. */
 @Composable
-private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false, floatNotice: Boolean = false, line: Boolean = true) {
+private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false, floatNotice: Boolean = false, line: Boolean = true,
+                   upNext: Boolean = true) {
     E.sec.intValue
     // where it plays from and on, short enough to stand either side of the camera whole (with "PLAYING FROM …" and
     // "PLAYING ON …" both only ever showed their first words, crawling); an icon says which is which
@@ -594,17 +595,17 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
         // amount whatever its size, one line or two (0.46.1; at its own height a taller notice pushed them further, and on the
         // lyrics screen in 0.45.4 it took no room at all while the cover screen made room for it)
         if (floatNotice) {
-            Box(Modifier.fillMaxWidth().layout { m, c -> val p = m.measure(c.copy(minHeight = 0)); layout(p.width, 0) { p.place(0, 0) } }) { NoticeSpace(home, row = side) }
-            NoticeGap(home)
+            Box(Modifier.fillMaxWidth().layout { m, c -> val p = m.measure(c.copy(minHeight = 0)); layout(p.width, 0) { p.place(0, 0) } }) { NoticeSpace(home, row = side, upNext = upNext) }
+            NoticeGap(home, upNext)
         }
-        else NoticeSpace(home, row = side)
+        else NoticeSpace(home, row = side, upNext = upNext)
     }
 }
 
 /** The room a notice gets on the upright screens while one shows: always the same, so everything under it moves alike. */
 @Composable
-private fun NoticeGap(home: Boolean) {
-    val on = E.notices(home).isNotEmpty()
+private fun NoticeGap(home: Boolean, upNext: Boolean = true) {
+    val on = E.notices(home).any { upNext || it.id != "upnext" }
     val h by androidx.compose.animation.core.animateDpAsState(if (on) 60.dp else 0.dp,
         if (S.low || E.reduceMotion()) tween(0) else spring(.85f, Spring.StiffnessMediumLow), label = "noticegap")
     Spacer(Modifier.height(h))
@@ -705,8 +706,9 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
  *  time: several take turns (4.5 s each), a new one first, with a dot for each, and you can swipe between them, after which it
  *  stays on the one you left it on. Only a hard error has a button. */
 @Composable
-private fun NoticeSpace(home: Boolean, row: Boolean = false) {
-    val all = E.notices(home)
+private fun NoticeSpace(home: Boolean, row: Boolean = false, upNext: Boolean = true) {
+    // ([upNext] false: the upright Lyrics screen, where Up next has its line in the song at the top instead)
+    val all = E.notices(home).let { l -> if (upNext) l else l.filter { it.id != "upnext" } }
     val ids = all.map { it.id }
     var turn by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     // on and on while there's more than one (a change in the list doesn't start them over)…
@@ -946,6 +948,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
                 Scrolling(E.title, (if (header) 24f else if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)
                 val by = E.byLine()
                 if (by.isNotEmpty()) Scrolling(by, (if (header) 16f else if (big) 19f else 15f).times(k).sp, if (header) FontWeight.SemiBold else FontWeight.Medium, dim, bleedL = bl, bleedR = br)
+                if (header && S.b("aUpNext")) UpNextLine()
             }
         }
         if (toggles) {   // the Lyrics screen: translate and romanize, when the lyrics need them
@@ -977,6 +980,28 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
     Box(Modifier.onSizeChanged { boxW = it.width }) {
         Text(text, scroll, style = TextStyle(shadow = textShadow),
             fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
+    }
+}
+
+/** Up next in the song at the top of the upright Lyrics screen (the owner's pick: there nothing moves for it): a small line
+ *  under the artist, the next song's cover and name, in a song's last 30 s. Its room is always kept, empty otherwise, so the
+ *  name doesn't shift when it comes. */
+@Composable
+private fun UpNextLine() {
+    val nx = Preload.shown?.takeIf { !E.inPip && !E.ambient }
+    var last by remember { mutableStateOf<io.github.bozkow.vibevisualizer.lyrics.SongMeta?>(null) }
+    if (nx != null) last = nx
+    Box(Modifier.fillMaxWidth().height(24.dp).padding(top = 4.dp)) {
+        androidx.compose.animation.AnimatedVisibility(nx != null, enter = fadeIn(tween(400)), exit = fadeOut(tween(250))) {
+            val m = last ?: return@AnimatedVisibility
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                NoticeCover(m.cover.ifEmpty { null }, 18.dp)
+                Spacer(Modifier.width(6.dp))
+                androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
+                    Scrolling("Up next: " + m.title, 13.sp, FontWeight.SemiBold, Color.White.copy(alpha = .75f))
+                }
+            }
+        }
     }
 }
 

@@ -280,7 +280,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sub("Looking for lyrics"),
         Item.Sw("lnotice", "No lyrics notice", "Say so when a song has no lyrics."),
         Item.Sw("aPreload", "Get the next songs ready", "A few seconds into a song, the next ones in the queue (the next five in Spotify’s, the next one in the music app’s or your files’) have their lyrics, Canvas and cover looked up, so they show the moment one starts, also when you skip a few. One more request to Spotify a song."),
-        Item.Sw("aUpNext", "Up next", "In a song’s last 30 seconds, the song that comes after it shows quietly at the top, where notices go: its cover beside its name and artist. Not on repeat-one. The queue is read once more as those 30 seconds begin (one more request to Spotify a song). From Spicy Lyrics 6.5.0."),
+        Item.Sw("aUpNext", "Up next", "In a song’s last 30 seconds, the song that comes after it shows: on the Lyrics screen upright, a small line under the artist; elsewhere quietly at the top, where notices go, its cover beside its name and artist. Not on repeat-one. The queue is read once more as those 30 seconds begin (one more request to Spotify a song). From Spicy Lyrics 6.5.0."),
         Item.Sub("Text"),
         Item.Sl("lsize", "Text size", 60, 200),
         Item.Ch("lfont", "Lyrics font", listOf("vv" to "Vibe Visualizer", "spicy" to "Spicy Lyrics", "system" to "System font"), "Spicy Lyrics: the display cut Spicy Lyrics shows lyrics in."),
