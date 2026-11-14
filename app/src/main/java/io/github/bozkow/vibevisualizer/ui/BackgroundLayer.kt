@@ -328,11 +328,18 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
             val v = Frost.video; val scr = Frost.screen
             val vs = Frost.videoSharp
             // Liquid glass: clear, so the Canvas as it plays, sharp (the frosted glass shows its blurred copy)
-            if (liquidOn() && vs != null && vs.size.width > 0 && Frost.videoAlpha > .01f && io.github.bozkow.vibevisualizer.engine.CanvasVideo.cvmode) {
-                drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f, 0f, vs.size.width.toFloat(), vs.size.height.toFloat()), androidx.compose.ui.graphics.Paint().apply { alpha = Frost.videoAlpha })
-                drawLayer(vs); drawContext.canvas.restore()
+            val liquidVideo = liquidOn() && vs != null && vs.size.width > 0 && Frost.videoAlpha > .01f && io.github.bozkow.vibevisualizer.engine.CanvasVideo.cvmode
+            if (liquidVideo && vs != null) {
+                // as the screen has it upright: softening into the blurred Canvas (in the background) at the top and the foot
+                val r = androidx.compose.ui.geometry.Rect(0f, 0f, vs.size.width.toFloat(), vs.size.height.toFloat())
+                drawContext.canvas.saveLayer(r, androidx.compose.ui.graphics.Paint().apply { alpha = Frost.videoAlpha })
+                drawLayer(vs)
+                drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .35f), .08f to Color.Black.copy(alpha = .7f), .2f to Color.Black, .45f to Color.Black, .58f to Color.Black.copy(alpha = .85f),
+                    .74f to Color.Black.copy(alpha = .5f), .88f to Color.Black.copy(alpha = .18f), 1f to Color.Transparent, endY = r.height), size = r.size, blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+                drawContext.canvas.restore()
             } else if (v != null && v.size.width > 0 && scr.width > 0) scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) }
-            if (Frost.gradeW > 0f) screenGrade(Frost.gradeW, Frost.gradeH, Frost.gradeTop, Frost.gradeShade)   // (what's behind it is graded)
+            // (what's behind it is graded; with a Canvas showing the screen has no grade: Liquid glass's clear glass none either)
+            if (Frost.gradeW > 0f && !(liquidOn() && io.github.bozkow.vibevisualizer.engine.CanvasVideo.cvlive)) screenGrade(Frost.gradeW, Frost.gradeH, Frost.gradeTop, Frost.gradeShade)
             Frost.lyrics?.let { l -> if (l.size.width > 0) translate(0f, Frost.lyricsY) { scale(8f, 8f, pivot = Offset.Zero) { drawLayer(l) } } }
         }
         return
