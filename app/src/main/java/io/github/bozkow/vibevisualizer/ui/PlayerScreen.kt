@@ -249,9 +249,10 @@ private fun LyricsScreen() {
     Crossfade(noLyrics(), label = "nolyrics") { big -> if (big) NowPlaying(noLyricsNote = true) else LyricsWithLyrics() }
 }
 
-/** The Lyrics screen upright (0.53.0, after Spicy Lyrics Mobile, the owner's pick): the song at the top (a big cover, its
- *  name and artist beside it, translate / romanize and the heart at its end), the lyrics under it, then the bars, the seek
- *  bar and the credits, and the controls when they're woken. Notices come under the top line, above the song. With the
+/** The Lyrics screen upright (0.53.0, after Spicy Lyrics Mobile, the owner's pick): the song at the top, right under the
+ *  status bar, no top line (a big cover, its name and artist beside it, translate / romanize and the heart at its end), the
+ *  lyrics under it, then the bars, the seek bar and the credits, and the controls when they're woken. Notices come first,
+ *  above the song, pushing it down while they show. With the
  *  Focus style's Cover in long breaks, the cover itself grows from its place into the lyrics' and goes back as the next
  *  line comes ([MovingCover]); the name stays. Without the cover (Settings → Player screen → Cover at the top): the name
  *  alone up there, and a break's cover fades in over the lyrics as before. */
@@ -270,8 +271,9 @@ private fun LyricsWithLyrics() {
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { Lyr.view.covered = false } }
     Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
         Column(Modifier.fillMaxSize()) {
-            TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true)
-            Box(Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 8.dp)) {
+            // no top line here (the owner's pick: the song as high as Spicy Lyrics has it); notices still come first
+            TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true, line = false)
+            Box(Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp)) {
                 TitleRow(big = false, toggles = true, bleed = true, cover = withCover, header = true, coverSlot = { slot = it })
             }
             var areaH by remember { mutableFloatStateOf(0f) }
@@ -547,7 +549,7 @@ private fun EmptyState() {
 /** The top of every screen: where the music plays from at the left and on what device at the right, and under them the
  *  space for what's wrong. Always there, also with the controls away. */
 @Composable
-private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false, floatNotice: Boolean = false) {
+private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false, floatNotice: Boolean = false, line: Boolean = true) {
     E.sec.intValue
     // where it plays from and on, short enough to stand either side of the camera whole (with "PLAYING FROM …" and
     // "PLAYING ON …" both only ever showed their first words, crawling); an icon says which is which
@@ -587,7 +589,7 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
                     TopText(t, 11.sp, FontWeight.Bold, dim, 1.sp)
                 }
             }
-        } else if (S.b("aTopLine")) TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"), onTopClick = toSpotify)
+        } else if (S.b("aTopLine") && line) TopLine(top, topIcon, dev, devIcon, Modifier, beside = S.b("aHideStatus"), onTopClick = toSpotify)
         // [floatNotice]: the notice floats in a room of a fixed height (NoticeGap): the lyrics and the cover move down by the same
         // amount whatever its size, one line or two (0.46.1; at its own height a taller notice pushed them further, and on the
         // lyrics screen in 0.45.4 it took no room at all while the cover screen made room for it)

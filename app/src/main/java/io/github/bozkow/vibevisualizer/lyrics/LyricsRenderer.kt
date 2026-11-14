@@ -281,7 +281,7 @@ class LyricsRenderer {
                 }
                 // its translation right under it, smaller and dimmer, tucked away and out with it (kind 4)
                 b.tr?.takeIf { S.tr }?.let { tr ->
-                    val tRow = Row(4, .36f, 1.18f, .05f, 900)
+                    val tRow = Row(4, .4f, 1.18f, .05f, 900)
                     tRow.text = bgBrackets(tr, br)
                     if (sync) {
                         val bts = bwds?.takeIf { it.isNotEmpty() }?.let { ws -> TS(ws.first().t, ws.last().let { it.end ?: it.t + 1 }) }
