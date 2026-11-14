@@ -738,15 +738,15 @@ object E {
             "bridge", "aCap" -> Audio.applyCapture()
             "aSession" -> SpotifyApp.refresh(Vibe.app)
             "volume" -> Local.applyVolume()
-            "ljoin", "ljoinPace", "lbgBr", "lsimple", "xRefSimple", "romMode", "lfont" -> Lyr.restyle()
+            "ljoinMode", "ljoinPace", "lbgBr", "lsimple", "romMode", "lfont" -> Lyr.restyle()
             "aCalm" -> { Lyr.restyle(); Lyr.relayout(); Background.resume() }   // (Motion sickness: the words' springs at rest, the lines placed anew)
             "lprov", "lbetter" -> Lyr.cacheClear()
             "tr", "trTo", "trSkip", "aTrSvc" -> Lyr.decorate()
             "lnotice" -> Lyr.noticeChanged()
-            "lsize", "xFocus", "xBgPop", "lduet", "view", "credPos", "xRefCred", "lcredLast", "lminimal", "xKeep" -> Lyr.relayout()
+            "lsize", "xFocus", "xBgPop", "lduet", "view", "credPos", "xRefCred", "lcredLast", "lminimal", "xKeep", "lspace" -> Lyr.relayout()
         }
         if (k == "romMode") Lyr.decorate()
-        if (k == "lsimple" || k == "xRefSimple") Lyr.relayout()   // Background Vocal Pop-Out depends on them: the rows change height
+        if (k == "lsimple") Lyr.relayout()   // Background Vocal Pop-Out and the line spacing depend on it: the rows change height
         barsTick.longValue++
     }
 

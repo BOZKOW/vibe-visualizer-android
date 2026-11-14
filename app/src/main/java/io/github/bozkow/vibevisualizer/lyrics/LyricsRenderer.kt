@@ -215,7 +215,7 @@ class LyricsRenderer {
     var releaser: ((GraphicsLayer) -> Unit)? = null
 
     private fun build() {
-        val romMode = S.romMode; val join = S.b("ljoin"); val br = S.b("lbgBr")
+        val romMode = S.romMode; val jm = S.joinMode; val join = jm != "off"; val br = S.b("lbgBr")
         for (d in lv) {
             d.rows.clear(); d.mainTs = null; d.sweep = null
             val l = d.l
@@ -229,8 +229,8 @@ class LyricsRenderer {
                 val ts = ws.mapIndexed { k, w -> TS(w.t, w.end ?: if (k + 1 < ws.size) ws[k + 1].t else min(w.t + 1.5, nt)) }
                 val rw = if (romOnly) l.rom!!.split(SPACES) else null
                 when {
-                    !romOnly -> { val (jw, jt) = if (join) joinWords(ws, ts) else ws to ts; main.pieces = jw.mapIndexed { k, w -> Pc(w.text + if (w.sp) " " else "", jt[k]) }; d.mainTs = jt }
-                    l.romSyl && ws.any { it.rom != null } -> { val (jw, jt) = if (join) joinWords(ws, ts) else ws to ts; main.pieces = jw.mapIndexed { k, w -> Pc((w.rom ?: w.text) + if (w.sp || w.romSp) " " else "", jt[k]) }; d.mainTs = jt }   // per-syllable romanization
+                    !romOnly -> { val (jw, jt) = if (join) joinWords(ws, ts, jm) else ws to ts; main.pieces = jw.mapIndexed { k, w -> Pc(w.text + if (w.sp) " " else "", jt[k]) }; d.mainTs = jt }
+                    l.romSyl && ws.any { it.rom != null } -> { val (jw, jt) = if (join) joinWords(ws, ts, jm) else ws to ts; main.pieces = jw.mapIndexed { k, w -> Pc((w.rom ?: w.text) + if (w.sp || w.romSp) " " else "", jt[k]) }; d.mainTs = jt }   // per-syllable romanization
                     rw != null && rw.size == ws.size -> { main.pieces = rw.mapIndexed { k, x -> Pc(x + if (k < rw.size - 1) " " else "", ts[k]) }; d.mainTs = ts }   // romanized words line up 1:1
                     else -> { main.text = l.rom; main.oneTs = TS(ws[0].t, min(ws.last().t + .8, nt)); d.mainTs = listOf(main.oneTs!!) }   // fill the whole romanized line
                 }
@@ -322,7 +322,8 @@ class LyricsRenderer {
         bump()
     }
 
-    private fun linePad() = if (S.lsimple && S.xRefSimple && !S.low) .32f else .2f
+    // Bloom's lines are spaced by the text size; Spring's too with Increased line spacing, a little tighter (Spicy Lyrics 6.5.0)
+    private fun linePad() = if (S.low || S.xFocus) .2f else if (S.lsimple) .32f else if (S.b("lspace")) .27f else .2f
 
     private fun layoutAll() {
         if (W <= 0 || F <= 0) return

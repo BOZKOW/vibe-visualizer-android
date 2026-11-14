@@ -42,28 +42,39 @@ private fun mayBreak(a: String, b: String): Boolean {
     return UNSPACED.containsMatchIn(a.substring(a.offsetByCodePoints(a.length, -1))) || UNSPACED.containsMatchIn(b.substring(0, b.offsetByCodePoints(0, 1)))
 }
 
-/** Join Split Words, ported from Spicy Lyrics (src/utils/Lyrics/Applyer/Utils/JoinSplitWords.ts, AGPL-3.0): the
- *  parts of a word sung in syllables become one word, unless they don't line up cleanly (a gap over 100 ms, an uneven
- *  pace, a space inside, a trailing dash, a script written without spaces). */
-fun joinWords(ws: List<Word>, ts: List<TS>): Pair<List<Word>, List<TS>> {
+/** Join Split Words, ported from Spicy Lyrics 6.5.0 (src/utils/Lyrics/Applyer/Utils/JoinSplitWords.ts, AGPL-3.0): the
+ *  parts of a word sung in syllables become one word. A word ends at a dash or a slash between parts ("tea|ry-|eyed" is
+ *  "teary-" then "eyed", "Ah-|ah-|ah" stays three); one with a space inside or in a script written without spaces stays
+ *  split in every [mode]. "full" joins every other word; "steady" only one sung without a gap over 100 ms and at an even
+ *  pace; "held" only one held long enough to be drawn letter by letter. The joined word's [TS.syl] keeps its parts. */
+fun joinWords(ws: List<Word>, ts: List<TS>, mode: String = "steady"): Pair<List<Word>, List<TS>> {
+    if (mode == "off") return ws to ts
     val out = ArrayList<Word>(); val tout = ArrayList<TS>()
     var i = 0
     fun ends(w: Word) = w.sp || w.text.lastOrNull()?.isWhitespace() == true
+    fun newWord(a: Word, b: Word) = JOIN_STOP_END.containsMatchIn(a.text) || JOIN_STOP_START.containsMatchIn(b.text)
+    fun spaced(t: String?) = t != null && t.trim().any { it.isWhitespace() }
     while (i < ws.size) {
         var e = i
-        while (!ends(ws[e]) && e + 1 < ws.size) e++
+        while (!ends(ws[e]) && e + 1 < ws.size && !newWord(ws[e], ws[e + 1])) e++
         val grp = ws.subList(i, e + 1); val rt = ts.subList(i, e + 1)
-        val ok = grp.size > 1 && grp.all { it.text.trim().isNotEmpty() && it.text.trim().none { c -> c.isWhitespace() } } &&
-            grp.dropLast(1).none { DASH_END.containsMatchIn(it.text) } && grp.none { UNSPACED.containsMatchIn(it.text) } &&
-            rt.withIndex().all { (k, x) -> k == 0 || x.t - rt[k - 1].end <= .1 } && evenPace(grp, rt)
+        val oneWord = grp.size > 1 && grp.all { it.text.isNotBlank() && !spaced(it.text) && !spaced(it.rom) } && grp.none { UNSPACED.containsMatchIn(it.text) }
+        val joinedTs = if (oneWord) TS(rt[0].t, rt.maxOf { it.end }) else null
+        val ok = joinedTs != null && when (mode) {
+            "steady" -> rt.withIndex().all { (k, x) -> k == 0 || x.t - rt[k - 1].end <= .1 } && evenPace(grp, rt)
+            "held" -> joinedTs.end - joinedTs.t >= SL.MinLetterCapableDuration && grp.none { RTL.containsMatchIn(it.text) }
+            else -> true
+        }
         if (ok) {
             out.add(Word(rt[0].t, null, grp.joinToString("") { it.text }, grp.last().sp, if (grp.any { it.rom != null }) grp.joinToString("") { it.rom ?: it.text } else null).also { it.romSp = grp.last().romSp })
-            tout.add(TS(rt[0].t, rt.maxOf { it.end }).also { x -> x.syl = grp.mapIndexed { k, w -> w.text to rt[k].t } })
+            tout.add(joinedTs!!.also { x -> x.syl = grp.mapIndexed { k, w -> w.text to rt[k].t } })
         } else grp.forEachIndexed { k, w -> out.add(w); tout.add(rt[k]) }
         i = e + 1
     }
     return out to tout
 }
+private val JOIN_STOP_END = Regex("[-\\u2010-\\u2015/]$")
+private val JOIN_STOP_START = Regex("^[-\\u2010-\\u2015/]")
 
 private fun evenPace(grp: List<Word>, rt: List<TS>): Boolean {
     val du = rt.last().end - rt[0].t; val ch = grp.sumOf { it.text.length }

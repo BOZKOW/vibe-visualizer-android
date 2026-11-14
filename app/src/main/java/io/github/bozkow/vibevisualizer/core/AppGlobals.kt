@@ -42,11 +42,12 @@ object S {
     val view get() = s.s("view")
     val xFocus get() = s.b("xFocus")
     val lsimple get() = s.b("lsimple")
-    val xRefSimple get() = s.b("xRefSimple")
+    val xRefSimple get() = true   // Bloom (the Simple style) is always the refreshed one since 0.52.0 (Spicy Lyrics 6.5.0)
+    val joinMode get() = s.s("ljoinMode")
     val lminimal get() = s.b("lminimal")
     val xKeep get() = s.b("xKeep")
-    // Background Vocal Pop-Out belongs to Refreshed Simple Lyrics (Spicy Lyrics 6.4.70): anywhere else every background line stays open
-    val xBgPop get() = s.b("xBgPop") && s.b("lsimple") && s.b("xRefSimple")
+    // Background Vocal Pop-Out belongs to Bloom (Spicy Lyrics 6.5.0): anywhere else every background line stays open
+    val xBgPop get() = s.b("xBgPop") && s.b("lsimple")
     val lduet get() = s.b("lduet")
     val lblur get() = s.b("lblur")
     val lsmooth get() = s.b("lsmooth")

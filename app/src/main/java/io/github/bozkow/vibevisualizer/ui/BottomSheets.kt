@@ -316,9 +316,10 @@ fun TimingParts() {
         val so = Lyr.songOffMs
         Text("This song: " + (if (so > 0) "+" else "") + so + " ms", fontWeight = FontWeight.Bold, color = Color.White)
         Hint("Only for the song that’s playing, on top of the setting above (as Spicy Lyrics Mobile’s song delay).")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            VOutlinedButton(onClick = { Lyr.songOffSet(so - 100) }) { Text("−100 ms") }
-            VOutlinedButton(onClick = { Lyr.songOffSet(so + 100) }) { Text("+100 ms") }
+        // steps of 100 and 10 ms (Spicy Lyrics 6.5.0's per-song offset); they wrap onto a second row on a narrow phone
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (d in listOf(-100, -10, 10, 100)) VOutlinedButton(onClick = { Lyr.songOffSet(so + d) }) { Text((if (d > 0) "+" else "−") + kotlin.math.abs(d)) }
             if (so != 0) VTonalButton(onClick = { Lyr.songOffSet(0) }) { Text("Reset") }
         }
         PartDivider()

@@ -281,17 +281,18 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("lnotice", "No lyrics notice", "Say so when a song has no lyrics."),
         Item.Sw("aPreload", "Get the next songs ready", "A few seconds into a song, the next ones in the queue (the next five in Spotify’s, the next one in the music app’s or your files’) have their lyrics, Canvas and cover looked up, so they show the moment one starts, also when you skip a few. One more request to Spotify a song."),
         Item.Sub("Text"),
-        Item.Sl("lsize", "Text size", 70, 150),
+        Item.Sl("lsize", "Text size", 60, 200),
         Item.Ch("lfont", "Lyrics font", listOf("vv" to "Vibe Visualizer", "spicy" to "Spicy Lyrics", "system" to "System font"), "Spicy Lyrics: the display cut Spicy Lyrics shows lyrics in."),
         Item.Sub("Style"),
-        Item.Ch("lstyle", "Lyrics style", listOf("spicy" to "Spicy Lyrics", "simple" to "Spicy Lyrics Simple", "focus" to "Focus"),
-            "Spicy Lyrics: every word fills, grows, lifts and glows as it's sung. Spicy Lyrics Simple: the words only fill. Focus: the line being sung sharp in the middle until it's sung to the end; the next one flies in from the bottom 200 ms before it's sung, finished ones fly up and away."),
-        Item.Sw("xRefSimple", "Refreshed simple lyrics mode", "In Simple lyrics mode, the sung part fades in behind one soft edge, words float up as they’re sung, and the letters of a short held word swell, spread, lift and glow. From Spicy Lyrics 6.4.50."),
-        Item.Sw("xBgPop", "Background vocal pop-out", "Background vocals stay tucked under their line until it’s sung, then slide out while the lines below make room. Only with Simple lyrics and Refreshed simple lyrics on. From Spicy Lyrics 6.4.70."),
-        Item.Sw("ljoin", "Join split words", "Show a word sung in syllables as one word, when its parts line up evenly. From Spicy Lyrics 6.4.50."),
+        Item.Ch("lstyle", "Lyrics style", listOf("spicy" to "Spring", "simple" to "Bloom", "focus" to "Focus"),
+            "Spring: every word fills, grows, lifts and glows as it's sung (Spicy Lyrics' own). Bloom: the sung part fades in behind one soft edge, words float up as they're sung, and the letters of a short held word swell, spread, lift and glow (Spicy Lyrics' Simple, refreshed). Focus: the line being sung sharp in the middle until it's sung to the end; the next one flies in from the bottom 200 ms before it's sung, finished ones fly up and away. Spring and Bloom as Spicy Lyrics 6.5.0 names them."),
+        Item.Sw("lspace", "Increased line spacing", "With Spring, the lines are spaced by the text size, as Bloom spaces them (a little tighter). From Spicy Lyrics 6.5.0."),
+        Item.Sw("xBgPop", "Background vocal pop-out", "Background vocals stay tucked under their line until it’s sung, then slide out while the lines below make room. With Bloom. From Spicy Lyrics 6.4.70."),
+        Item.Ch("ljoinMode", "Join split words", listOf("off" to "Off", "full" to "All words", "steady" to "Steadily sung", "held" to "Held words"),
+            "A word sung in syllables shown as one word. All words: every one that's a word (no space inside, not in a script written without spaces). Steadily sung: only those sung without a gap and at an even pace. Held words: only those held long enough to be drawn letter by letter. A dash or a slash between parts ends a word there (“tea|ry-|eyed” is “teary-” then “eyed”). From Spicy Lyrics 6.5.0."),
         Item.Sw("ljoinPace", "Keep syllable pace", "A joined held word still reads as one word, but each syllable’s letters fill at that syllable’s own speed, so a long “per” and a quick “fect” keep their timing. From Spicy Lyrics Mobile 0.18."),
-        Item.Sw("lminimal", "Minimal lyrics mode", "Hide lines that have already been sung."),
-        Item.Sw("xKeep", "Keep overlapping lines", "In Minimal lyrics mode, a line that ends while one above it is still being sung stays on screen, dimmed. From Spicy Lyrics 6.4.50."),
+        Item.Sw("lminimal", "Fade away previous lines", "Hide lines that have already been sung (Minimal lyrics mode before)."),
+        Item.Sw("xKeep", "Keep overlapping lines", "With Fade away previous lines, a line that ends while one above it is still being sung stays on screen, dimmed. From Spicy Lyrics 6.4.50."),
         Item.Sw("lblur", "Blur inactive lines"),
         Item.Sw("lhover", "Highlight on press", "Show a soft box behind a line while your finger is on it."),
         Item.Sw("lduet", "Duet line padding", "Indent each singer’s lines toward their side, so duets read as two columns."),
@@ -372,7 +373,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("fps", "Show FPS"),
     ), sub = "Low performance mode, Power saving, the heat warning, frame rate, animations", group = 3),
     Page("exp", "Experiments", Icons.Rounded.Science, listOf(
-        Item.Txt("Ideas being tried out. They may change, or go away, in a later version. The lyrics ones (the Focus style, Refined credits, Refreshed simple lyrics mode, Background vocal pop-out, Keep overlapping lines) are in Lyrics, beside what they go with."),
+        Item.Txt("Ideas being tried out. They may change, or go away, in a later version. The lyrics ones (the Focus style, Refined credits, Background vocal pop-out, Keep overlapping lines) are in Lyrics, beside what they go with."),
         Item.Sw("xScrub", "Scrub preview", "While you drag the seek bar, a bubble above your finger shows the time it would jump to (and the volume slider, the level). Off, the times show where the song is until you let go. From Spicy Lyrics 6.4.50."),
         Item.Sw("xSkeleton", "Lyrics loading skeleton", "While lyrics load, faint placeholder lines and a small “Loading lyrics” label instead of the big message. From Spicy Lyrics 6.4.0."),
     ), sub = "Ideas being tried out", group = 3),
@@ -589,14 +590,14 @@ private fun needs(k: String): String? = when (k) {
     "lminimal" -> if (S.xFocus) "The Focus style already hides the sung lines" else null
     "learly" -> if (S.xFocus) "The Focus style brings each line in its own way" else null
     "learlyMs" -> if (S.xFocus) "The Focus style brings each line in its own way" else if (!S.learly) "Turn on Early scroll first" else null
-    "xKeep" -> if (S.xFocus) "Not with the Focus style" else if (!S.lminimal) "Turn on Minimal lyrics mode first" else null
-    "xBgPop" -> if (!S.lsimple || !S.b("xRefSimple")) "Needs the Spicy Lyrics Simple style and Refreshed simple lyrics mode" else null
+    "xKeep" -> if (S.xFocus) "Not with the Focus style" else if (!S.lminimal) "Turn on Fade away previous lines first" else null
+    "xBgPop" -> if (!S.lsimple) "Pick the Bloom style first" else null
+    "lspace" -> if (S.lsimple || S.xFocus) "Only with the Spring style" else if (S.low) "Low performance mode keeps the lines close" else null
     "credPos" -> if (!S.b("xRefCred")) "Turn on Refined credits first (above)" else null
     "lcredLast" -> if (!S.b("xRefCred") || S.credPos != "lyrics") "Needs Refined credits under the lyrics" else null
-    "xRefSimple" -> if (!S.lsimple) "Pick the Spicy Lyrics Simple style first" else null
     "aMotionCover" -> if (S.low) "Off in Low performance mode" else null
     "aMotionFirst" -> if (S.low) "Off in Low performance mode" else if (!S.b("aMotionCover")) "Turn on Animated covers first (above)" else if (!S.canvasOn) "Turn on Canvas first" else null
-    "ljoinPace" -> if (!S.b("ljoin")) "Turn on Join split words first" else null
+    "ljoinPace" -> if (S.joinMode == "off") "Turn on Join split words first" else null
     "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
     "cvLyrA" -> if (!S.canvasOn) "Turn on Canvas first" else null
     "aLike" -> if (!Spotify.connected) "Needs Spotify connected" else null
