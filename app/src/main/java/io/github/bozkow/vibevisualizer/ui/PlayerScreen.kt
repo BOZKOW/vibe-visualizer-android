@@ -389,21 +389,12 @@ private fun LandscapeCanvas() {
         // (the song in its big size, but the seek bar and the buttons at the stage's width: wider, as on 0.45.1, looked worse to the owner)
         val dockW = maxOf(st.solid.dp - start, 220.dp)
         Row(Modifier.fillMaxSize().padding(start = start, top = 8.dp, bottom = 8.dp)) {
-            // (0.53.0, the owner's picks after Spicy Lyrics: the same left side as without a Canvas, the video taking the cover's
-            // place: the controls come in where the cover's foot would be, over the video, then the seek bar with the times
-            // beside it, and the name and artist centred under it)
-            Column(Modifier.width(dockW).fillMaxHeight().ambientOut().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.navigationBarsIgnoringVisibility).only(WindowInsetsSides.Vertical)),
-                horizontalAlignment = Alignment.CenterHorizontally) {
-                TopBar(side = true, floatNotice = true, noticeGap = false)
+            Column(Modifier.width(dockW).fillMaxHeight().ambientOut().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.navigationBarsIgnoringVisibility).only(WindowInsetsSides.Vertical))) {
+                TopBar(side = true)
                 Spacer(Modifier.weight(1f))
-                // as without a Canvas, the video in the cover's place: the seek bar, the controls under it while they show,
-                // then the name and the artist centred
+                TitleRow(big = true, toggles = !barsInstead())
                 SeekRow()
-                AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
-                    Column(Modifier.fillMaxWidth()) { Transport(big = false); BottomBar(big = false, lyricsToggles = true) }
-                }
-                Spacer(Modifier.height(6.dp))
-                TitleRow(big = true, center = true, like = true)
+                SideControls()
             }
             val gap = maxOf(st.lyricsStart.dp - start - dockW, 8.dp)
             Spacer(Modifier.width(gap))
@@ -412,42 +403,45 @@ private fun LandscapeCanvas() {
     }
 }
 
-/** Without a Canvas (0.54.0, after Spicy Lyrics Mobile, the owner's picks): where it plays at the top, the cover in the middle of
- *  the left side, notices floating over its top edge; at its foot on a shade, as on the cover card before, the seek bar and,
- *  while they show, the controls under it (scaled to the cover's width, the round buttons smaller); the name and the artist
- *  centred under the cover. The lyrics on the right. */
+/** Without a Canvas: the cover as tall as the screen on the left, and over it where it plays (and what's wrong) at its
+ *  head, the song in its big size, the seek bar and the controls at its foot, each on a soft shade so they read on any
+ *  cover. When the controls hide, the cover has its middle back. */
 @Composable
 private fun LandscapeCover() {
   BoxWithConstraints(Modifier.fillMaxSize()) {
-    val start = if (cameraOnLeft()) 48.dp else 20.dp   // further in on the camera's side (the owner's phone had the cover in the hole)
-    val leftW = (maxWidth * .44f - start).coerceAtLeast(240.dp)
-    Row(Modifier.fillMaxSize().padding(start = start)) {
-        Column(Modifier.width(leftW).fillMaxHeight().ambientOut().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)).padding(bottom = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-            TopBar(Modifier.zIndex(1f), side = true, floatNotice = true, noticeGap = false)   // (drawn over the cover: its notices float there)
-            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                // the cover as big as the height leaves under it for the name and the artist, never wider than the side
-                val song = 74.dp * when (S.str("aTitle")) { "s" -> .9f; "l" -> 1.12f; else -> 1f }
-                val side = minOf(maxHeight - song, maxWidth - 16.dp).coerceAtLeast(140.dp)
-                val corner = 18.dp * (S.i("aCoverR").coerceIn(0, 40) / 22f)
-                val colW = maxWidth
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(side).onGloballyPositioned { Frost.cover = it.boundsInWindow() }) {
-                        CoverArt(Modifier.fillMaxSize(), corner = 18.dp)
-                        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(RoundedCornerShape(bottomStart = corner, bottomEnd = corner))
-                            .background(Brush.verticalGradient(0f to Color.Transparent, .3f to Color.Black.copy(alpha = .3f), 1f to Color.Black.copy(alpha = .7f)))
-                            .padding(start = 12.dp, end = 12.dp, top = 28.dp, bottom = 6.dp)) {
-                            SeekRow()
-                            AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
-                                Column(Modifier.fillMaxWidth()) {
-                                    Box(Modifier.fillMaxWidth().shrinkToFit(262.dp)) { Transport(big = false) }
-                                    BottomBar(big = false, lyricsToggles = true, tight = true)
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Box(Modifier.width(colW)) { TitleRow(big = true, center = true, like = true) }
+    // the cover's size goes by the screen: the height there is (8 dp clear above and below), but no more than 40% of the
+    // width, so the lyrics, the bars and the credits keep most of it (as tall as the screen, it took nearly half a wide
+    // phone: "too large"); never so small its buttons get cramped. Centred in the height
+    val dn = androidx.compose.ui.platform.LocalDensity.current
+    val side = minOf(maxHeight - 16.dp, maxOf(maxWidth * .4f, 280.dp)).coerceAtLeast(160.dp)
+    val gapY = (maxHeight - side) / 2
+    // only what of the status and navigation bars lies over the cover keeps its words clear of them
+    val headIn = (with(dn) { WindowInsets.statusBarsIgnoringVisibility.getTop(dn).toDp() } - gapY).coerceAtLeast(0.dp)
+    val footIn = (with(dn) { WindowInsets.navigationBarsIgnoringVisibility.getBottom(dn).toDp() } - gapY).coerceAtLeast(0.dp)
+    // further in on the camera's side: the owner's phone still had the cover in the hole with the room it reports
+    Row(Modifier.fillMaxSize().padding(start = if (cameraOnLeft()) 48.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(side).ambientOut().onGloballyPositioned { Frost.cover = it.boundsInWindow() }) {
+            CoverArt(Modifier.fillMaxSize(), corner = 18.dp)
+            var headH by remember { mutableFloatStateOf(0f) }
+            var footH by remember { mutableFloatStateOf(0f) }
+            // drawn behind both, reaching past them and fading out over the cover (nothing at the head: no shade there);
+            // the same corners as the cover's (Settings → Player screen → Cover corners)
+            Column(Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp * (S.i("aCoverR").coerceIn(0, 40) / 22f))).drawBehind {
+                // (eased at their ends: from clear straight to dark, the edge showed as a line across a bright cover)
+                val down = 36.dp.toPx(); val up = 72.dp.toPx()
+                val h0 = headH / (headH + down); val f = up / (footH + up)
+                if (headH > 0f) drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .6f), h0 to Color.Black.copy(alpha = .35f), h0 + (1 - h0) * .5f to Color.Black.copy(alpha = .1f), 1f to Color.Transparent, endY = headH + down),
+                    size = androidx.compose.ui.geometry.Size(size.width, headH + down))
+                val y = size.height - footH - up
+                drawRect(Brush.verticalGradient(0f to Color.Transparent, f * .35f to Color.Black.copy(alpha = .06f), f * .7f to Color.Black.copy(alpha = .22f), f to Color.Black.copy(alpha = .38f), 1f to Color.Black.copy(alpha = .72f), startY = y, endY = size.height),
+                    topLeft = Offset(0f, y), size = androidx.compose.ui.geometry.Size(size.width, footH + up))
+            }) {
+                TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.padding(top = headIn).padding(horizontal = 10.dp), side = true)
+                Spacer(Modifier.weight(1f))
+                Column(Modifier.fillMaxWidth().onSizeChanged { footH = it.height.toFloat() }.padding(bottom = footIn).padding(start = 18.dp, end = 18.dp, bottom = 6.dp)) {
+                    TitleRow(big = true, toggles = !barsInstead())
+                    SeekRow()
+                    SideControls()
                 }
             }
         }
@@ -460,6 +454,14 @@ private fun LandscapeCover() {
 /** On its side, the bars take the lyrics' place: the Visualizer, or a song without lyrics. */
 private fun barsInstead() = E.screen == "viz" || noLyrics()
 
+/** The controls on its side, in two rows, each its full size (side by side in one row they were too small to hit);
+ *  they hide after a few seconds. */
+@Composable
+private fun SideControls() {
+    AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
+        Column(Modifier.fillMaxWidth()) { Transport(big = false); BottomBar(big = false) }
+    }
+}
 
 /** The right side on its side: the lyrics with the whole height (duets and background vocals have room), or the bars,
  *  then the small bars and the credits under them. All the rest is on the left. */
@@ -1079,12 +1081,11 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
 /** The music app's bottom row: five buttons you pick (Settings → Player screen → Buttons under the controls; by
  *  default where it plays · the bars · Lyrics timing · Resync · Look again), then Settings, always last: it's the way into them. */
 @Composable
-private fun BottomBar(big: Boolean = true, mid: Boolean = false, lyricsToggles: Boolean = false, tight: Boolean = false) {
+private fun BottomBar(big: Boolean = true, mid: Boolean = false, lyricsToggles: Boolean = false) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
     // six that fit with room between them (a narrow phone, or the largest display size), and round when the row gets less
-    // height than they'd like (on its side: the large song name, a notice of two lines and the controls together);
-    // [tight]: inside the cover on its side, the owner's pick: smaller (about 34 dp), with only a little room between
-    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, if (tight) maxWidth / 6 - 2.dp else (maxWidth - 40.dp) / 6, (maxHeight - (if (big) 10.dp else 6.dp)).coerceAtLeast(0.dp))
+    // height than they'd like (on its side: the large song name, a notice of two lines and the controls together)
+    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 40.dp) / 6, (maxHeight - (if (big) 10.dp else 6.dp)).coerceAtLeast(0.dp))
     Row(Modifier.fillMaxWidth().padding(top = if (big) 6.dp else 2.dp, bottom = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         // (Lyrics and Visualizer were screens of their own until 0.38.0: a slot saved with Lyrics turns the bars on and
         // off now, one with the Visualizer opens Lyrics timing, so the old default row has no button twice)

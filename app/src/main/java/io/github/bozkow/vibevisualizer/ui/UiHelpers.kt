@@ -331,18 +331,6 @@ class SlideGroup {
 }
 val LocalSlideGroup = androidx.compose.runtime.staticCompositionLocalOf<SlideGroup?> { null }
 
-/** Lays its content out [w] wide and scales it down to fit when there's less room (the controls over a small cover on its
- *  side, the owner's pick: smaller rather than cut off); with room, as it is. Touches scale with it. */
-fun Modifier.shrinkToFit(w: Dp): Modifier = this.layout { m, c ->
-    val want = w.roundToPx()
-    if (!c.hasBoundedWidth || c.maxWidth >= want) { val p = m.measure(c); return@layout layout(p.width, p.height) { p.place(0, 0) } }
-    val k = c.maxWidth.toFloat() / want
-    val p = m.measure(c.copy(minWidth = want, maxWidth = want, minHeight = 0, maxHeight = if (c.hasBoundedHeight) (c.maxHeight / k).toInt() else c.maxHeight))
-    layout(c.maxWidth, kotlin.math.round(p.height * k).toInt()) {
-        p.placeWithLayer(0, 0) { scaleX = k; scaleY = k; transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f) }
-    }
-}
-
 /** Out past the side margins by [by] on each side (the bars, to the screen's edges: 0.46.1). */
 fun Modifier.bleedX(by: Dp): Modifier = this.layout { m, c ->
     val px = by.roundToPx()
