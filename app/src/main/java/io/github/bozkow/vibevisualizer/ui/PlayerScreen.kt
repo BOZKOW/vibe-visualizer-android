@@ -1333,7 +1333,8 @@ private fun SeekRow(inline: Boolean = false) {
     // where the song is, worked out as the bar draws, on the app's own frames (E.drawTick): smooth, and never a frame of its
     // own (its 260 ms glide towards a target that moved every 240 ms never ended, and kept the app drawing at 120 Hz)   // under Settings' blur it steps (a glide re-blurs the screen every frame)
     // read by the bar as it draws: the glide repaints the bar alone instead of rebuilding this whole row every frame
-    val frac = { drag ?: if (E.seeking) E.seekFrac else { E.drawTick.longValue; val d = E.curDur(); if (d > 0) (E.curTime() / d).toFloat().coerceIn(0f, 1f) else 0f } }
+    // (it follows the frames only while the music plays: paused it isn't drawn again, 0.58.1)
+    val frac = { drag ?: if (E.seeking) E.seekFrac else { if (E.playingState) E.drawTick.longValue else E.timeText; val d = E.curDur(); if (d > 0) (E.curTime() / d).toFloat().coerceIn(0f, 1f) else 0f } }
     val d0 = drag   // while dragging, the times and the bubble follow the finger
     E.timeText   // the row itself is rebuilt with the time ticker (once a second or so): the times and a new song's length
     val dur = E.curDur()

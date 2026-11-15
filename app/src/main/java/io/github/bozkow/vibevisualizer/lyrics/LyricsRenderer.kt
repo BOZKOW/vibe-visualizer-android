@@ -475,7 +475,7 @@ class LyricsRenderer {
         else if (lyTall && !lyFree && t - lyTallAt > (if (pipScroll() && !pipGlide()) 250 else 40)) { lyTallAt = t; place(t, pos) }   // (often: a row's move starts on time)
         if (!viewOn) return
         flingStep(t)
-        if (!sync) { rest = false; staticScroll(t, pos); tops(t); bump(); return }
+        if (!sync) { rest = false; val was = stScroll; staticScroll(t, pos); tops(t); if (stScroll != was) bump() else frameBump(t, pos); return }
         val r = S.b("aRestCover") && S.xFocus && restAt(pos)   // one of Focus mode's (Settings greys it without)
         if (r != rest) { rest = r; restAt = t }
         if (rest && covered && !lyFree) return   // the cover's over them (upright): they rest until it goes
@@ -525,7 +525,7 @@ class LyricsRenderer {
         } else if (si != lsi) { lsi = si; place(t, pos) }
         wordsTick(t, pos)
         tops(t)
-        bump()
+        frameBump(t, pos)
     }
 
     private fun setActive(i: Int, t: Double, pos: Double) {
@@ -1316,6 +1316,15 @@ class LyricsRenderer {
         c.restore()
     }
 
-    fun bump() { tick.longValue++ }
+    /** Something changed: the lyrics are drawn again, and on every frame for 3 s after, while what it set off settles. */
+    fun bump() { busyUntil = now() + 3000; tick.longValue++ }
+    private var busyUntil = 0.0
+    private var drawnPos = Double.NaN
+    /** The frame's redraw: only while the song moves on or something settles (0.58.1, the owner: "stop rendering what isn't
+     *  moving"). Paused and settled, the lyrics aren't drawn again at all. */
+    private fun frameBump(t: Double, pos: Double) {
+        if (pos != drawnPos) { drawnPos = pos; busyUntil = t + 3000 }
+        if (t < busyUntil) tick.longValue++
+    }
     fun lineCount() = lines.size
 }
