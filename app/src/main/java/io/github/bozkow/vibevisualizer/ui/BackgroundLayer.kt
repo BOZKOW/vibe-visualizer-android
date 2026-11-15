@@ -365,7 +365,7 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
         val sx = ((at.x - c.left) * k).roundToInt().coerceIn(0, iw - sw); val sy = ((at.y - c.top) * k).roundToInt().coerceIn(0, ih - sh)
         drawImage(img, IntOffset(sx, sy), IntSize(sw, sh), IntOffset.Zero, IntSize(size.width.roundToInt() + 1, size.height.roundToInt() + 1), filterQuality = FilterQuality.Low)
     }
-    if (!liquidOn()) drawRect(Color.Black.copy(alpha = .35f))   // the white on it keeps reading on a bright cover (liquid glass: none, clear)
+    if (!liquidOn()) drawRect(Color.Black.copy(alpha = .15f))   // the white on it keeps reading on a bright cover (with the glass's own 10%; liquid glass: none, clear)
 }
 
 /* ---- Liquid glass (0.56.0, an experiment the owner asked for: "iOS-like"; Settings → Experiments → Liquid glass) ----

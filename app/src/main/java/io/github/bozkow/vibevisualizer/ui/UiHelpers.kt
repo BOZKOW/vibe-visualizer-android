@@ -92,7 +92,9 @@ val GlassEdge = Color.White.copy(alpha = .22f)
 
 /** The rim: bright along the top, fading down the sides, a faint line of light again at the foot. With Liquid glass (the
  *  experiment, the whole design): the light catching it at the top left, brighter, a glint again at the bottom right. */
-private val FrostRim: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha = .5f), .3f to Color.White.copy(alpha = .17f), .7f to Color.White.copy(alpha = .08f), 1f to Color.White.copy(alpha = .2f))
+// (0.56.1, the owner: "too bright… get the glass from Spicy Lyrics Mobile", its 0.19's: SpicyGlass in SpicyTokens.kt: a 1 px ring
+// at .16 white, a bright line along the top at .36 and a fainter one at the foot at .18)
+private val FrostRim: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha = .36f), .14f to Color.White.copy(alpha = .16f), .86f to Color.White.copy(alpha = .16f), 1f to Color.White.copy(alpha = .18f))
 private val LiquidRim: Brush = Brush.linearGradient(0f to Color.White.copy(alpha = .85f), .3f to Color.White.copy(alpha = .2f), .62f to Color.White.copy(alpha = .06f), 1f to Color.White.copy(alpha = .4f))
 val GlassRim: Brush get() = if (liquidOn()) LiquidRim else FrostRim
 /** The rim of something switched off or quiet. */
@@ -110,9 +112,11 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .1
             topLeft = Offset(0f, size.height - e), size = androidx.compose.ui.geometry.Size(size.width, e))
         return
     }
-    if (shade > 0f) drawRect(Color(0xFF0E0E14).copy(alpha = shade * k))
-    drawRect(io.github.bozkow.vibevisualizer.engine.Visuals.glassTint.copy(alpha = .16f * k))   // (the Canvas's colour while one plays, the cover's otherwise)
-    drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = .17f * k), .5f to Color.White.copy(alpha = .06f * k), 1f to Color.White.copy(alpha = .035f * k)))
+    // Spicy Lyrics Mobile 0.19's glass: over what's blurred behind it, a 10% black fill and nothing else (no colour wash, no
+    // sheen: its colour is what shows through, the Canvas's or the cover's); a card or plate ([shade] > 0, not over a blur of
+    // its own) is its near-black plate at that strength with its cards' 6% white
+    if (shade > 0f) { drawRect(Color(0xFF161616).copy(alpha = shade * k)); drawRect(Color.White.copy(alpha = .06f * k)) }
+    else drawRect(Color.Black.copy(alpha = .1f * k))
 }
 
 /** The glass's body drawn behind something ([shade] as in [glassBody]). */
@@ -121,9 +125,9 @@ fun Modifier.drawGlassBody(shade: Float = .16f): Modifier = this.drawBehind { gl
 /** Glass on a card or panel ([strong]: more shade, for panels over busy content); [lift]: a soft shadow under it (not for
  *  tiles that touch each other). */
 fun Modifier.glass(shape: Shape, strong: Boolean = false, lift: Boolean = true): Modifier = this
-    .then(if (lift) Modifier.shadow(10.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = .4f), spotColor = Color.Black.copy(alpha = .5f)) else Modifier)
+    .then(if (lift) Modifier.shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF080A12).copy(alpha = .42f), spotColor = Color(0xFF080A12).copy(alpha = .42f)) else Modifier)
     .clip(shape)
-    .drawBehind { glassBody(if (strong) .42f else .16f) }
+    .drawBehind { glassBody(if (strong) .55f else .16f) }
     .border(1.dp, GlassRim, shape)
 
 /** The glass's body and rim on something already shaped and clipped (a button): drawn behind its content. */
@@ -145,7 +149,7 @@ fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean
     val acc = MaterialTheme.colorScheme.primary
     // (the glass more of the cover's colour: still the one to press)
     androidx.compose.material3.Button(onClick, modifier.glassFace(ButtonDefaults.shape, enabled), enabled, border = BorderStroke(1.dp, if (enabled) GlassRim else GlassRimFaint),
-        colors = ButtonDefaults.buttonColors(containerColor = if (liquidOn()) Color.Transparent else acc.copy(alpha = .3f), contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+        colors = ButtonDefaults.buttonColors(containerColor = if (liquidOn()) Color.Transparent else acc.copy(alpha = .22f), contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
 
 /** A fainter frosted button. */
