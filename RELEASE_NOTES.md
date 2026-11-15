@@ -1,3 +1,3 @@
-Vibe Visualizer for Android 0.58.3 (beta). Android 12 or newer; it installs over 0.58.2 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.58.4 (beta). Android 12 or newer; it installs over 0.58.3 (Settings → Help & about → Update now).
 
-- **Help with the DJ:** "Copy debug info" (Settings → Help & about) now includes what the music app told Vibe Visualizer in the last moments, so the DJ's glitch can be found.
+- **A steady DJ:** the cover and colours no longer flicker as if the song changed every second while the DJ talks or a song starts. Spotify sends the same picture many times, and now only a different one changes the cover.
