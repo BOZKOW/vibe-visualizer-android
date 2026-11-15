@@ -315,15 +315,23 @@ object E {
         Lyr.load(meta, tok)
         if (sid.isNotEmpty()) CanvasVideo.lookup(meta, tok)
         Preload.songStarted()
-        mediaArt = setCoverBitmap(MediaApps.cover(), "From " + MediaApps.appName(), tok)
+        // the player's picture, unless it's a placeholder (the Spotify app's grey disc comes before the real cover: it stayed,
+        // the owner's screenshot); a real one may come later (onMediaMeta)
+        val bm0 = MediaApps.cover()
+        mediaArtGen = bm0?.generationId ?: 0
+        mediaArt = bm0 != null && !placeholder(bm0) && setCoverBitmap(bm0, "From " + MediaApps.appName(), tok)
         // (what's on screen stays until there's something else: only with no cover in the end the default colours)
         if (!mediaArt) Vibe.scope.launch {
+            delay(700)   // (the real picture often follows the name within a moment)
+            if (tok != coverTok || mediaArt) return@launch
             // no picture with it, but its address (the Spotify app's spotify:image:…, read as Spicy Lyrics reads it): covers
             // went missing in 0.57.0, the owner's report
             MediaApps.artUrl()?.let { u -> if (setCover(u, "From " + MediaApps.appName(), tok)) { mediaArt = true; return@launch } }
             if (tok != coverTok || mediaArt) return@launch
-            if (S.b("online")) { status = "Searching for cover…"; if (!findCover(meta, tok) && tok == coverTok) { status = "No cover found · using default"; if (!mediaArt) resetCover() } }
-            else { delay(1500); if (tok == coverTok && !mediaArt) resetCover() }
+            // nothing found: the player's own picture after all (a black and white cover looks like a placeholder), else the defaults
+            val last = { if (!mediaArt) { val b = MediaApps.cover(); if (b != null) setCoverBitmap(b, "From " + MediaApps.appName(), tok) else resetCover() } }
+            if (S.b("online")) { status = "Searching for cover…"; if (!findCover(meta, tok) && tok == coverTok) { status = "No cover found · using default"; last() } }
+            else { delay(1500); if (tok == coverTok) last() }
         }
         updPlay()
     }
@@ -336,9 +344,14 @@ object E {
         // the Spotify song ID can come after the name: the Canvas is looked up then
         val sid = MediaApps.spotifyId
         if (!dj && sid.isNotEmpty() && sid != mediaId) { mediaId = sid; mediaMeta?.let { m -> CanvasVideo.lookup(m.copy(id = sid, uri = "spotify:track:$sid"), coverTok) } }
-        if (mediaArt && !dj) return
         val bm = MediaApps.cover()
-        if (bm != null) { mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false); return }
+        // a new picture for the same song (the real cover after the placeholder) replaces it
+        if (bm != null && bm.generationId != mediaArtGen && !placeholder(bm)) {
+            mediaArtGen = bm.generationId
+            mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false) || mediaArt; return
+        }
+        if (mediaArt && !dj) return
+        if (bm != null && !placeholder(bm)) { mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false); return }
         val u = MediaApps.artUrl() ?: return
         if (u == mediaArtUrl) return
         mediaArtUrl = u; val tok = coverTok
@@ -347,6 +360,16 @@ object E {
     private var djSettle: kotlinx.coroutines.Job? = null
     private var mediaId = ""
     private var mediaArtUrl = ""
+    private var mediaArtGen = 0
+
+    /** A player's stand-in picture rather than a cover: nearly no colour at all (the Spotify app's grey disc). A black and
+     *  white cover is taken for one too, and then looked up online, which finds the same cover. */
+    private fun placeholder(bm: android.graphics.Bitmap): Boolean = runCatching {
+        val s = android.graphics.Bitmap.createScaledBitmap(bm, 16, 16, true)
+        var sat = 0f; val hsv = FloatArray(3)
+        for (y in 0 until 16) for (x in 0 until 16) { android.graphics.Color.colorToHSV(s.getPixel(x, y), hsv); sat += hsv[1] }
+        sat / 256 < .05f
+    }.getOrDefault(false)
     private var mediaMeta: SongMeta? = null
 
     fun netKick() = Ping.kick()

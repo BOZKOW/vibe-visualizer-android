@@ -553,7 +553,7 @@ private fun EmptyState() {
         AppLogo(96.dp)
         Spacer(Modifier.height(20.dp))
         Text("Nothing playing", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-        Text("Play a song from your phone, connect Spotify, or play something in YouTube Music, SoundCloud or another music app: the app follows it, with its cover and lyrics.",
+        Text("Play something in Spotify, YouTube Music, SoundCloud or another music app, or a song from your phone: the app follows it, with its cover and lyrics.",
             Modifier.padding(top = 8.dp).widthIn(max = 420.dp), fontSize = 15.sp, color = dim, textAlign = TextAlign.Center)
         Spacer(Modifier.height(22.dp))
         VButton(onClick = { E.haptic(); FilePicker.pickAudio() }, Modifier.fillMaxWidth().widthIn(max = 360.dp).height(52.dp)) { Text("Play songs from your phone", fontSize = 15.sp) }

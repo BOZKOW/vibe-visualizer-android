@@ -68,7 +68,11 @@ fun VibeRoot() {
             val sK by animateFloatAsState(if (live && E.settingsPage != null) 1f else 0f, tween(if (E.settingsPage != null) 320 else 240), label = "sblur")
             androidx.compose.runtime.SideEffect { E.quiet = live && sK >= .99f && E.settingsPage != null && !E.inPip }
             // Glass: the player blurs behind the sheets (and behind the heat warning)
-            val qK by animateFloatAsState(if ((E.sheet != null || io.github.bozkow.vibevisualizer.engine.Perf.warn > 0 || E.noticeOpen != null) && !S.low) 1f else 0f, tween(260), label = "qblur")
+            // (every window since 0.58.0: questions and the App updated card too, the owner: "blur behind every window")
+            val win = E.sheet != null || io.github.bozkow.vibevisualizer.engine.Perf.warn > 0 || E.noticeOpen != null || E.ask != null || io.github.bozkow.vibevisualizer.engine.Updates.updated != null
+            val qK by animateFloatAsState(if (win && !S.low) 1f else 0f, tween(260), label = "qblur")
+            // Settings blur too while a window is open over them (it blurred only the player, under Settings' own blur)
+            val wK by animateFloatAsState(if (win && !S.low && E.settingsPage != null) 1f else 0f, tween(260), label = "wblur")
             if (E.inPip) { BackgroundLayer(); PipCanvas(); PipScreen(); PipHeat() }
             else {
                 if (!covered) Box(Modifier.fillMaxSize().cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) { BackgroundLayer(); PlayerScreen() }
@@ -79,7 +83,7 @@ fun VibeRoot() {
                 })
                 // Settings and the setup guide grow out of the button that opened them, and shrink back into it
                 val setFrom = rememberPopOrigin(setT.targetState)
-                AnimatedVisibility(setT, enter = popIn(setFrom), exit = popOut(setFrom)) { Box(popClip()) { SettingsScreen() } }
+                AnimatedVisibility(setT, enter = popIn(setFrom), exit = popOut(setFrom)) { Box(popClip().cheapBlur(wK, 22.dp, .25f * wK)) { SettingsScreen() } }
                 val wizFrom = rememberPopOrigin(wizT.targetState)
                 AnimatedVisibility(wizT, enter = popIn(wizFrom), exit = popOut(wizFrom)) { Box(popClip()) { SetupWizard() } }
                 Sheets()

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.DeviceThermostat
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.style.TextAlign
 import io.github.bozkow.vibevisualizer.core.S
 import androidx.compose.foundation.layout.padding
@@ -306,6 +307,7 @@ fun UpdatedCard() {
         androidx.activity.compose.BackHandler { close() }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .55f)).clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) { close() },
             contentAlignment = Alignment.Center) {
+            // (glass over the screen, which blurs behind it: the real thing behind, blurred, as every window since 0.58.0)
             Column(Modifier.statusBarsSpace().navBarsSpace().padding(24.dp).widthIn(max = 460.dp).fillMaxWidth().glass(RoundedCornerShape(28.dp), strong = true)
                 .clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {}.padding(24.dp)) {
                 Text("App updated", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = .6f), letterSpacing = 1.sp)
