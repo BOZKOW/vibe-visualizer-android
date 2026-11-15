@@ -273,7 +273,8 @@ private fun LyricsWithLyrics() {
     Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot() }) {
         Column(Modifier.fillMaxSize()) {
             // no top line here (the owner's pick: the song as high as Spicy Lyrics has it); notices still come first
-            TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true, line = false, upNext = false, report = false)
+            // (notices float over the song at the top, drawn last below: the owner's ask; they pushed it down)
+            TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true, line = false, upNext = false, report = false, notices = false)
             // (the song at the top is where the top's shade and the Canvas's blur reach down to, as the top line was and the
             // controls are: the owner's ask)
             Box(Modifier.reportTop().padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
@@ -307,6 +308,8 @@ private fun LyricsWithLyrics() {
             if (hidden) Spacer(Modifier.height(16.dp))
         }
         if (withCover && slot.width > 0f) MovingCover(slot, area, rk, origin, nameAt.bottom)
+        // notices over the cover and the name, taking no room
+        Box(Modifier.fillMaxWidth().padding(horizontal = 24.dp).align(Alignment.TopCenter)) { NoticeSpace(false, upNext = false) }
     }
 }
 
@@ -569,7 +572,7 @@ private fun EmptyState() {
  *  space for what's wrong. Always there, also with the controls away. */
 @Composable
 private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: Boolean = false, floatNotice: Boolean = false, line: Boolean = true,
-                   upNext: Boolean = true, noticeGap: Boolean = true, report: Boolean = true) {
+                   upNext: Boolean = true, noticeGap: Boolean = true, report: Boolean = true, notices: Boolean = true) {
     E.sec.intValue
     // where it plays from and on, short enough to stand either side of the camera whole (with "PLAYING FROM …" and
     // "PLAYING ON …" both only ever showed their first words, crawling); an icon says which is which
@@ -616,7 +619,8 @@ private fun TopBar(modifier: Modifier = Modifier, home: Boolean = false, side: B
         // [floatNotice]: the notice floats in a room of a fixed height (NoticeGap): the lyrics and the cover move down by the same
         // amount whatever its size, one line or two (0.46.1; at its own height a taller notice pushed them further, and on the
         // lyrics screen in 0.45.4 it took no room at all while the cover screen made room for it)
-        if (floatNotice) {
+        if (!notices) Unit
+        else if (floatNotice) {
             Box(Modifier.fillMaxWidth().zIndex(1f).layout { m, c -> val p = m.measure(c.copy(minHeight = 0)); layout(p.width, 0) { p.place(0, 0) } }) { NoticeSpace(home, row = side, upNext = upNext) }
             if (noticeGap) NoticeGap(home, upNext)   // ([noticeGap] false: on its side they float over the cover's top edge, the owner's pick)
         }
