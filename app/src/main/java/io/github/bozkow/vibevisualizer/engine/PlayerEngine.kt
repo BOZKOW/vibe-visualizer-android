@@ -297,9 +297,18 @@ object E {
         curArtistId = ""
         // Spotify's DJ talking (the Spotify app names it "Up next" by "DJ X", a few seconds long): its note and its own picture
         if (MediaApps.pkg == SpotifyApp.PKG && isDjItem(MediaApps.artist, MediaApps.durMs)) {
+            // already in the DJ: only its name and a new picture (each update of the DJ's item cleared everything and set it
+            // all up again: the owner's "the DJ is still tweaking")
+            if (dj) {
+                if (title != t0 || artist != MediaApps.artist) { title = t0; artist = MediaApps.artist }
+                val b = MediaApps.cover()
+                if (b != null && b.generationId != mediaArtGen) { mediaArtGen = b.generationId; mediaArt = setCoverBitmap(b, "From " + MediaApps.appName(), coverTok) }
+                updPlay(); return
+            }
             newTok(); dj = true; CanvasVideo.clear(false); Audio.dropBars()
             title = t0; artist = MediaApps.artist; year = ""; album = ""; status = ""; trackVer++
-            mediaArt = setCoverBitmap(MediaApps.cover(), "From " + MediaApps.appName(), coverTok)
+            val djArt = MediaApps.cover(); mediaArtGen = djArt?.generationId ?: 0
+            mediaArt = setCoverBitmap(djArt, "From " + MediaApps.appName(), coverTok)
             Lyr.clear("Lyrics aren’t available with the DJ", "The DJ talks between the songs and mixes them together, so there’s nothing to line lyrics up with. They’re back with the next song.", "none", always = true)
             updPlay(); return
         }
@@ -350,7 +359,7 @@ object E {
             mediaArtGen = bm.generationId
             mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false) || mediaArt; return
         }
-        if (mediaArt && !dj) return
+        if (mediaArt) return   // (the DJ too: its picture changes only with a new one, above)
         if (bm != null && !placeholder(bm)) { mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false); return }
         val u = MediaApps.artUrl() ?: return
         if (u == mediaArtUrl) return

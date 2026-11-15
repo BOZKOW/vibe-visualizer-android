@@ -122,9 +122,12 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
             }
         }) {
         val h = thick.toPx(); val y = (size.height - h) / 2; val r = CornerRadius(h / 2); val w = size.width
-        if (under != null) { clip.reset(); clip.addRoundRect(RoundRect(0f, y, w, y + h, r)); clipPath(clip) { under() } }
-        drawRoundRect(Color.White.copy(alpha = if (enabled) .14f else .07f), Offset(0f, y), Size(w, h), r)
-        drawRoundRect(Color.White.copy(alpha = .22f), Offset(.5f, y + .5f), Size(w - 1f, h - 1f), r, style = Stroke(1.dp.toPx()))
+        clip.reset(); clip.addRoundRect(RoundRect(0f, y, w, y + h, r))
+        if (under != null) clipPath(clip) { under() }
+        // your bar, in the glass the rest of the app has (0.58.2, the owner: "keep my design but the glass from the rest"):
+        // its body (the dark base, the song's colour) and its rim catching the light at the top
+        clipPath(clip) { glassBody(0f, if (enabled) 1f else .5f) }
+        drawRoundRect(GlassRim, Offset(.5f, y + .5f), Size(w - 1f, h - 1f), r, style = Stroke(1.dp.toPx()))
         val x = frac().coerceIn(0f, 1f) * w
         if (x > 0f) drawRoundRect(Color.White, Offset(0f, y), Size(maxOf(x, h), h), r)
     }
