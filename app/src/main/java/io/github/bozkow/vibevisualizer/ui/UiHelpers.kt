@@ -235,6 +235,10 @@ fun Modifier.glassIsland(b: Backdrop?, k: Float = 1f, shape: Shape = RoundedCorn
         .clip(shape)
         .drawBehind {
             if (b != null && b.layer.size.width > 0) {
+                // a solid base first (0.58.0): the list recorded behind it has see-through tiles, so the real, sharp list showed
+                // through its blurred copy (the owner: "no fake blur"); the base takes a little of the song's colour, as the
+                // blurred player behind Settings has it
+                drawRect(androidx.compose.ui.graphics.lerp(Color(0xFF14141B), io.github.bozkow.vibevisualizer.engine.Visuals.glassTint, .22f).copy(alpha = k))
                 // (Liquid glass: what's under it sharp, at full size, bent at the edges; otherwise a quarter-size blur)
                 val f = if (liquid) 1f else 4f; val sw = (size.width / f).toInt() + 2; val sh = (size.height / f).toInt() + 2
                 blur.renderEffect = if (liquid) lens.effect(size.width, size.height, minOf(size.width, size.height) / 2) else fx; blur.alpha = k
