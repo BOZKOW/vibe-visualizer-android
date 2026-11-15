@@ -117,6 +117,9 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .1
     // its own) is its near-black plate at that strength with its cards' 6% white
     if (shade > 0f) { drawRect(Color(0xFF161616).copy(alpha = shade * k)); drawRect(Color.White.copy(alpha = .06f * k)) }
     else drawRect(Color.Black.copy(alpha = .1f * k))
+    // your own touch over it (0.58.1, the owner: "not 1:1 like Spicy Lyrics Mobile"): a light wash of the song's colour
+    // (the Canvas's while one plays)
+    drawRect(io.github.bozkow.vibevisualizer.engine.Visuals.glassTint.copy(alpha = .08f * k))
 }
 
 /** The glass's body drawn behind something ([shade] as in [glassBody]). */

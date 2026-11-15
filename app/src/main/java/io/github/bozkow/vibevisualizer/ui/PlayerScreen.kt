@@ -1288,12 +1288,16 @@ private fun SpicyPlay(width: Dp) {
     Box(Modifier.size(width = maxOf(56.dp, width + 16.dp), height = maxOf(56.dp, h + 16.dp)).pressScale(src, .9f)
         .quickClick(src, true, null) { E.haptic(); E.toggle() }
         .semantics { contentDescription = if (playing) "Pause" else "Play" }, contentAlignment = Alignment.Center) {
+        // (the swap your round button had: a quarter turn, a springy scale and a fade; the owner: "not 1:1 like Mobile")
         AnimatedContent(playing, transitionSpec = {
             if (Pop.calm) fadeIn(tween(120)) togetherWith fadeOut(tween(100))
-            else (fadeIn(tween(160)) + scaleIn(spring(.6f, 500f), initialScale = .6f)) togetherWith (fadeOut(tween(120)) + scaleOut(tween(140), targetScale = .6f))
+            else (fadeIn(tween(140)) + scaleIn(spring(.55f, 500f), initialScale = .45f)) togetherWith (fadeOut(tween(110)) + scaleOut(tween(150), targetScale = .45f))
         }, label = "spicyplay") { p ->
+            val turn by transition.animateFloat(transitionSpec = { spring(.6f, 420f) }, label = "playturn") { st ->
+                if (Pop.calm) 0f else when (st) { androidx.compose.animation.EnterExitState.PreEnter -> -90f; androidx.compose.animation.EnterExitState.PostExit -> 90f; else -> 0f }
+            }
             val v = if (p) SpicyGlyphs.pause else SpicyGlyphs.play
-            Icon(v, null, Modifier.size(width * (v.viewportWidth / 15f), h), tint = Color.White)
+            Icon(v, null, Modifier.size(width * (v.viewportWidth / 15f), h).graphicsLayer { rotationZ = turn }, tint = Color.White)
         }
     }
 }
@@ -1333,7 +1337,7 @@ private fun SeekRow(inline: Boolean = false) {
     val d0 = drag   // while dragging, the times and the bubble follow the finger
     E.timeText   // the row itself is rebuilt with the time ticker (once a second or so): the times and a new song's length
     val dur = E.curDur()
-    val thick = when (S.str("aSeek")) { "thin" -> 6.dp; "thick" -> 18.dp; else -> 10.dp }   // Settings → Player screen → Seek bar (normal: Spicy Lyrics Mobile's 10 dp)
+    val thick = when (S.str("aSeek")) { "thin" -> 6.dp; "thick" -> 18.dp; else -> 12.dp }   // Settings → Player screen → Seek bar (your own again since 0.58.1)
     // Scrub preview (Experiments): while you drag, a bubble above your finger with the time you'd jump to, and the
     // times say the same; off, they show where the song really is until you let go
     val scrub = S.b("xScrub")
@@ -1348,10 +1352,8 @@ private fun SeekRow(inline: Boolean = false) {
         }
     }
     // the time moves on with the app's time ticker (a few times a second), not every frame
-    // (Spicy Lyrics Mobile's times: 13 sp, medium, 60% white, figures of one width)
-    val tStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFeatureSettings = "tnum")
-    val now = @Composable { Text(fmtTime(if (d0 != null && scrub) d0 * dur else E.curTime()), style = tStyle, color = if (d0 != null && scrub) Color.White else Color.White.copy(alpha = .6f)) }
-    val end = @Composable { Text(if (d0 != null && scrub) "-" + fmtTime(dur - d0 * dur) else fmtTime(dur), style = tStyle, color = Color.White.copy(alpha = .6f)) }
+    val now = @Composable { Text(fmtTime(if (d0 != null && scrub) d0 * dur else E.curTime()), fontSize = 14.sp, color = if (d0 != null && scrub) Color.White else dim, fontWeight = FontWeight.Medium) }
+    val end = @Composable { Text(if (d0 != null && scrub) "-" + fmtTime(dur - d0 * dur) else fmtTime(dur), fontSize = 14.sp, color = dim, fontWeight = FontWeight.Medium) }
     // inline: the times on either side of the bar (under a cover in landscape)
     if (inline) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { now(); Spacer(Modifier.width(12.dp)); bar(Modifier.weight(1f)); Spacer(Modifier.width(12.dp)); end() }
     else Column(Modifier.fillMaxWidth()) {
