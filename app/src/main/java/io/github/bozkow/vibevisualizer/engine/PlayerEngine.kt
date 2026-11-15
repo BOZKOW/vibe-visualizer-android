@@ -303,12 +303,12 @@ object E {
             if (dj) {
                 if (title != t0 || artist != MediaApps.artist) { title = t0; artist = MediaApps.artist }
                 val b = MediaApps.cover()
-                if (b != null && b.generationId != mediaArtGen) { mediaArtGen = b.generationId; mediaArt = setCoverBitmap(b, "From " + MediaApps.appName(), coverTok) }
+                if (b != null) { val n = picNews(b); if (n > 0) { keepPic(b); mediaArt = setCoverBitmap(b, "From " + MediaApps.appName(), coverTok, quiet = n == 1) } }
                 updPlay(); return
             }
             newTok(); dj = true; CanvasVideo.clear(false); Audio.dropBars()
             title = t0; artist = MediaApps.artist; year = ""; album = ""; status = ""; trackVer++
-            val djArt = MediaApps.cover(); mediaArtGen = djArt?.generationId ?: 0
+            val djArt = MediaApps.cover(); keepPic(djArt)
             mediaArt = setCoverBitmap(djArt, "From " + MediaApps.appName(), coverTok)
             Lyr.clear("Lyrics aren’t available with the DJ", "The DJ talks between the songs and mixes them together, so there’s nothing to line lyrics up with. They’re back with the next song.", "none", always = true)
             updPlay(); return
@@ -328,7 +328,7 @@ object E {
         // the player's picture, unless it's a placeholder (the Spotify app's grey disc comes before the real cover: it stayed,
         // the owner's screenshot); a real one may come later (onMediaMeta)
         val bm0 = MediaApps.cover()
-        mediaArtGen = bm0?.generationId ?: 0
+        keepPic(bm0)
         mediaArt = bm0 != null && !placeholder(bm0) && setCoverBitmap(bm0, "From " + MediaApps.appName(), tok)
         // (what's on screen stays until there's something else: only with no cover in the end the default colours)
         if (!mediaArt) Vibe.scope.launch {
@@ -355,10 +355,11 @@ object E {
         val sid = MediaApps.spotifyId
         if (!dj && sid.isNotEmpty() && sid != mediaId) { mediaId = sid; mediaMeta?.let { m -> CanvasVideo.lookup(m.copy(id = sid, uri = "spotify:track:$sid"), coverTok) } }
         val bm = MediaApps.cover()
-        // a new picture for the same song (the real cover after the placeholder) replaces it
-        if (bm != null && bm.generationId != mediaArtGen && !placeholder(bm)) {
-            mediaArtGen = bm.generationId
-            mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false) || mediaArt; return
+        // a new picture for the same song (the real cover after the placeholder) replaces it; the same one again doesn't
+        val news = if (bm != null) picNews(bm) else 0
+        if (bm != null && news > 0 && !placeholder(bm)) {
+            keepPic(bm)
+            mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = news == 1) || mediaArt; return
         }
         if (mediaArt) return   // (the DJ too: its picture changes only with a new one, above)
         if (bm != null && !placeholder(bm)) { mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false); return }
@@ -371,6 +372,39 @@ object E {
     private var mediaId = ""
     private var mediaArtUrl = ""
     private var mediaArtGen = 0
+    private var mediaArtSig: IntArray? = null
+    private var mediaArtW = 0
+
+    /** Is [bm] another picture than the one shown? 0 the same, 1 the same one sharper, 2 a different one. The Spotify app
+     *  sends its picture again with every update as a new image (20 in a third of a second as a song starts and all through
+     *  the DJ, at 300 and 540 px: the owner's debug info, 0.58.3), and each one played the cover's change and faded the
+     *  colours anew: the DJ "switching songs every second". So what it shows is compared, not which image it is. */
+    private fun picNews(bm: android.graphics.Bitmap): Int {
+        if (bm.generationId == mediaArtGen) return 0
+        val s = picSig(bm) ?: return 2
+        if (!samePic(s, mediaArtSig)) return 2
+        mediaArtGen = bm.generationId
+        return if (bm.width > mediaArtW * 1.2f) 1 else 0
+    }
+    private fun keepPic(bm: android.graphics.Bitmap?) { mediaArtGen = bm?.generationId ?: 0; mediaArtSig = bm?.let { picSig(it) }; mediaArtW = bm?.width ?: 0 }
+
+    /** A picture's 8×8 average colours (from a 128 px copy, so the 300 and 540 px versions of a cover come out the same). */
+    private fun picSig(bm: android.graphics.Bitmap): IntArray? = runCatching {
+        val s = android.graphics.Bitmap.createScaledBitmap(bm, 128, 128, true)
+        val px = IntArray(128 * 128); s.getPixels(px, 0, 128, 0, 0, 128, 128)
+        IntArray(64 * 3).also { o ->
+            for (y in 0 until 128) for (x in 0 until 128) {
+                val c = px[y * 128 + x]; val i = ((y / 16) * 8 + x / 16) * 3
+                o[i] += (c shr 16) and 255; o[i + 1] += (c shr 8) and 255; o[i + 2] += c and 255
+            }
+            for (i in o.indices) o[i] /= 256
+        }
+    }.getOrNull()
+    private fun samePic(a: IntArray?, b: IntArray?): Boolean {
+        if (a == null || b == null || a.size != b.size) return false
+        var d = 0L; for (i in a.indices) d += kotlin.math.abs(a[i] - b[i])
+        return d / a.size < 10   // (on average less than 10 of 255 apart)
+    }
 
     /** A player's stand-in picture rather than a cover: nearly no colour at all (the Spotify app's grey disc). A black and
      *  white cover is taken for one too, and then looked up online, which finds the same cover. */
