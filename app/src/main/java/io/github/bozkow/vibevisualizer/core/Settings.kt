@@ -35,7 +35,7 @@ object Defaults {
         "lstyle" to "spicy",    // the lyrics' style: spicy, simple (lsimple) or focus (xFocus), one of them (kept in step)
         "bridge" to true, "xFocus" to false, "bgStyle" to "dynamic", "lfont" to "vv", "lsimple" to false, "lminimal" to false,
         "lhover" to true, "lduet" to true, "lcredLast" to false, "lsmooth" to true, "learly" to false, "learlyMs" to 250,
-        "lseekFade" to true, "lnotice" to true, "aRestCover" to true, "aPreload" to true, "aCoverLine" to true, "volshow" to true, "fpscap" to "60", "credPos" to "corner", "cvNoArt" to false, "cvBlur" to false, "cvBlurAmt" to 50, "cvShrink" to true, "cvSpicy" to true, "cvBehind" to "dark",
+        "lseekFade" to true, "lnotice" to true, "aRestCover" to true, "aPreload" to true, "aCoverLine" to true, "volshow" to true, "fpscap" to "60", "credPos" to "corner", "cvNoArt" to false, "cvBlur" to false, "cvBlurAmt" to 50, "cvShrink" to true, "cvSpicy" to true, "cvBehind" to "both",
         "capDev" to "", "romMode" to "below", "tr" to false, "trTo" to navLang(), "trSkip" to "", "theme" to "cover",
         "c1" to "#ff5a5f", "c2" to "#4f8cff", "auto" to true, "boost" to 100, "resp" to 25, "blur" to 0, "bars" to 72,
         "gap" to 28, "glow" to false, "barGlass" to false, "round" to true, "scale" to "1", "fps" to false, "bgblur" to 60, "bri" to 70,
@@ -133,6 +133,12 @@ class Settings(ctx: Context) {
         if (sp.getInt("mig", 0) < 3) {
             v.getValue("xBgPop").value = true
             sp.edit().putString("S", toJson().toString()).putInt("mig", 3).apply()
+        }
+        // once (0.58.0): behind the song at the top and the controls the Canvas is blurred, and shaded, as in Spicy Lyrics Mobile
+        // (the owner: "make the blur behind the controls and cover stronger"); the old default was the shade alone
+        if (sp.getInt("mig", 0) < 4) {
+            if (s("cvBehind") == "dark") v.getValue("cvBehind").value = "both"
+            sp.edit().putString("S", toJson().toString()).putInt("mig", 4).apply()
         }
         if (s("aDesign") != "glass") v.getValue("aDesign").value = "glass"   // Glass only since 0.50.0 (saved settings or a backup may say "android")
         v.getValue("lstyle").value = style()   // from Simple lyrics mode and Focus mode as they are (older settings, a backup)

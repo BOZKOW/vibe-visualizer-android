@@ -1527,7 +1527,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     val from = when { wide -> .52f; behindLyrics -> .6f; else -> .5f } + .12f * sink
     val d = androidx.compose.ui.platform.LocalDensity.current
     val topPx = TopArea.bottom; val rampPx = with(d) { 28.dp.toPx() }; val softPx = with(d) { 96.dp.toPx() }
-    val r = with(d) { (S.i("cvBlurAmt").coerceIn(5, 100) / 100f * 48f).dp.toPx() }
+    val r = with(d) { (S.i("cvBlurAmt").coerceIn(5, 100) / 100f * 72f).dp.toPx() }   // (stronger since 0.58.0, as Spicy Lyrics Mobile's)
     // the top's blur, shade and softening behind the top line (always there, on its side over the Canvas side). Two
     // sizes: just behind the line, or down past what's wrong under it (it follows the error space as it opens and closes)
     val topK = 1f

@@ -278,9 +278,19 @@ object E {
 
     /** A new song in the app followed: its name (cleaned of "(Official Video)" and the like), its cover (or one
      *  found online), and its lyrics found by name and length. No Canvas: that needs a Spotify song. */
-    fun onMediaTrack(force: Boolean = false) {
+    fun onMediaTrack(force: Boolean = false, settled: Boolean = false) {
         if (src != "media") return
         val t0 = MediaApps.title; if (t0.isEmpty()) return
+        // into or out of Spotify's DJ only once it holds for 1.5 s: while the DJ talks over a song's start, the Spotify app
+        // swaps its item between the DJ and the song again and again, and everything switched with it every second (the owner)
+        val djNow = MediaApps.pkg == SpotifyApp.PKG && isDjItem(MediaApps.artist, MediaApps.durMs)
+        if (!settled && !force && djNow != dj && title.isNotEmpty()) {
+            djSettle?.cancel()
+            val key = t0 + "|" + MediaApps.artist
+            djSettle = Vibe.scope.launch { delay(1500); if (MediaApps.title + "|" + MediaApps.artist == key) onMediaTrack(settled = true) }
+            return
+        }
+        djSettle?.cancel()
         val tn = TrackNameCleaner.clean(t0, MediaApps.artist)
         val nt = tn.title.ifEmpty { t0 }; val na = tn.artist.ifEmpty { MediaApps.artist }
         if (!force && nt == title && na == artist) return
@@ -334,6 +344,7 @@ object E {
         mediaArtUrl = u; val tok = coverTok
         Vibe.scope.launch { if (tok == coverTok && setCover(u, "From " + MediaApps.appName(), tok)) mediaArt = true }
     }
+    private var djSettle: kotlinx.coroutines.Job? = null
     private var mediaId = ""
     private var mediaArtUrl = ""
     private var mediaMeta: SongMeta? = null
