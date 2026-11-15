@@ -847,5 +847,7 @@ object Lyr {
         "last lookup: " + (lookupLog.joinToString("; ") { it.p + " " + it.st + (it.ms?.let { m -> " ${m}ms" } ?: "") }.ifEmpty { "—" }),
         "sources: " + S.str("lprov"),
         "problems: " + E.problems(false).joinToString("; ") { it.t },
+        "music app events (seconds since the app started; the last 60):",
+        io.github.bozkow.vibevisualizer.media.MediaApps.traceText().ifEmpty { "—" },
     ).joinToString("\n")
 }

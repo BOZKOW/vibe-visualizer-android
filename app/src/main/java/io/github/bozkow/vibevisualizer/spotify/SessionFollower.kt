@@ -62,6 +62,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
     private val cb = object : MediaController.Callback() {
         override fun onMetadataChanged(m: MediaMetadata?) { readMeta(m, true) }
         override fun onPlaybackStateChanged(s: PlaybackState?) {
+            note("state " + (s?.state ?: -1) + " pos " + (s?.position ?: -1) + " speed " + (s?.playbackSpeed ?: 0f))
             state = s; report(s); onState?.invoke()
             if (!active(s)) { main.removeCallbacks(recheck); main.postDelayed(recheck, STICK_MS + 50) }   // another session may play on
         }
@@ -133,6 +134,16 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         onState?.invoke()
     }
 
+    /* ---- what the player told us, for "Copy debug info" (0.58.3: the DJ still glitched on the owner's phone and couldn't
+       be seen here; the last 60 events, the app's own decisions among them) ---- */
+    private val trace = ArrayDeque<String>()
+    private val t0 = SystemClock.elapsedRealtime()
+    fun note(what: String) {
+        val ms = SystemClock.elapsedRealtime() - t0
+        synchronized(trace) { trace.addLast("%.1f %s".format(ms / 1000.0, what)); while (trace.size > 60) trace.removeFirst() }
+    }
+    fun traceText(): String = synchronized(trace) { trace.joinToString("\n") }
+
     private fun readMeta(m: MediaMetadata?, notify: Boolean) {
         val t = m?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
         val changed = t != title
@@ -146,6 +157,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         // Spicy Lyrics and Spotify's own lyrics are found by it, without asking Spotify's Web API
         spotifyId = sequenceOf(m?.description?.mediaId, m?.getString(MediaMetadata.METADATA_KEY_MEDIA_ID), m?.description?.mediaUri?.toString())
             .mapNotNull { spotifyTrackId(it) }.firstOrNull() ?: ""
+        if (notify) note("meta '" + t + "' by '" + artist + "' " + durMs + "ms art=" + (art?.let { it.width.toString() + "px#" + it.generationId } ?: "none") + (if (artUri.isNotEmpty()) " uri" else "") + (if (spotifyId.isNotEmpty()) " id" else "") + (if (changed) " NEW" else ""))
         if (notify && changed && t.isNotEmpty()) { report(state, force = true, trackChanged = true); onTrack?.invoke() }
         if (notify) onMeta?.invoke()
     }

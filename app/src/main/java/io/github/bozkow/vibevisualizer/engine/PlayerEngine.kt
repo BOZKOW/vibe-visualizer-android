@@ -284,6 +284,7 @@ object E {
         // into or out of Spotify's DJ only once it holds for 1.5 s: while the DJ talks over a song's start, the Spotify app
         // swaps its item between the DJ and the song again and again, and everything switched with it every second (the owner)
         val djNow = MediaApps.pkg == SpotifyApp.PKG && isDjItem(MediaApps.artist, MediaApps.durMs)
+        MediaApps.note("app: track '" + t0 + "' dj=" + dj + " djNow=" + djNow + (if (settled) " settled" else "") + (if (force) " force" else ""))
         if (!settled && !force && djNow != dj && title.isNotEmpty()) {
             djSettle?.cancel()
             val key = t0 + "|" + MediaApps.artist
