@@ -1,7 +1,4 @@
-Vibe Visualizer for Android 0.55.0 (beta). Android 12 or newer; it installs over 0.54.1 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.56.0 (beta). Android 12 or newer; it installs over 0.55.0 (Settings → Help & about → Update now).
 
-- **New glass, everywhere.** Buttons, the round buttons, notices, Settings, sheets and dialogs are now frosted glass with a touch of the song's colour, a sheen from the top, a rim that catches the light and a soft shadow, instead of a flat white film.
-- **No more "Playing from" and "Playing on".** The line at the top saying where the music plays is gone from every screen.
-- **Blurred behind the song at the top.** Upright, the background is shaded (or the Canvas blurred) down past the cover and the name, as behind the controls.
-- **Long breaks:** while the cover is out in the middle, it's bigger now, and the name and artist sit centred above it.
-- **The DJ shows its own cover.** Its picture from the Spotify app is used also when it comes a moment after its name, or when the app only gives its address.
+- **Liquid glass, an experiment.** Settings → Experiments → Liquid glass (off by default; Android 13 or newer) turns the whole app's glass clear, as on iOS 26: no frost, no tint, only a rim that catches the light. The round buttons and notices show what's behind them sharp, the Canvas too, bent at their edges like a lens; Settings' floating header shows the list through it, with a faint rainbow at its edges. Words on it have nothing behind them, so they can be hard to read over busy things. It's off in Low performance mode and with Motion sickness.
+- **The frosted glass takes the Canvas's colour.** While a Canvas or an animated cover plays, the glass is tinted with its colours, and with the cover's otherwise.
