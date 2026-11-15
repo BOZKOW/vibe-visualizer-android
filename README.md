@@ -6,8 +6,8 @@ The native Android app of [Vibe Visualizer](https://github.com/BOZKOW/vibe-visua
 word-by-word synced lyrics, animated the way [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics) animates them,
 with romanization and translation, the cover, a live background made from it, Spotify Canvas and audio-reactive bars.
 
-It follows what you play: your own audio files, Spotify (the Web API, and the Spotify app on the phone for exact
-timing), and other music apps such as YouTube Music, SoundCloud, Apple Music or Deezer.
+It follows whatever plays on the phone, straight from Android: the Spotify app, other music apps such as YouTube
+Music, SoundCloud, Apple Music or Deezer, and your own audio files. No Spotify account or login is needed.
 
 > **Unofficial.** Vibe Visualizer is not made by, endorsed by or affiliated with Spicy Lyrics. Its lyrics animation is
 > ported from the Spicy Lyrics source code, and it uses the [Spicy Lyrics API](https://developers.spicylyrics.org)
@@ -23,55 +23,50 @@ Android 12 or newer. The app is a beta.
 1. Download `vibe-visualizer-android.apk` from the newest release on the [Releases page](../../releases) on the phone
    and open it (allow installing from your browser when Android asks). Google Play Protect may offer to check the app
    first, as it does with any app from outside the Play Store: that's fine to allow.
-2. The setup guide asks whether to use a server:
+2. Give Vibe Visualizer **notification access** when it asks. That's how it sees what the Spotify app and other music
+   apps are playing and controls them; it never reads your notifications.
+3. The setup guide asks whether to use a server:
    - **With your Vibe Visualizer server** (set up as in the [main repository](https://github.com/BOZKOW/vibe-visualizer#setup)):
      enter its address (`NAME.your-tailnet.ts.net`) and keep Tailscale connected on the phone; if the server can't be
-     found, turn off Android's Private DNS (it hides Tailscale names). The server adds Spicy Lyrics, Spotify's own
-     lyrics and Canvas, Vibe Bridge, and keeps your settings and error log.
-   - **Without a server**: everything else runs on the phone (your files, Spotify, other music apps, lyrics from LRCLIB,
-     NetEase, AMLL, Unison, LRCMux, lrc.red and the Chinese catalogues, Canvas from Spicy Lyrics' Canvas service, the
-     bars, the widget…). Spicy Lyrics, Spotify's own lyrics and Vibe Bridge need a server and are left out.
+     found, turn off Android's Private DNS (it hides Tailscale names). The server is only asked for what needs it:
+     Spicy Lyrics, Spotify's own lyrics, your Canvas source and Vibe Bridge.
+   - **Without a server**: everything else runs on the phone (lyrics from LRCLIB, NetEase, AMLL, Unison, LRCMux,
+     lrc.red and the Chinese catalogues, Canvas from Spicy Lyrics' Canvas service, the bars, the widget…).
 
    You can switch later in *Settings → Server & connection*.
-3. Spotify (optional): create an app on the [Spotify developer dashboard](https://developer.spotify.com/dashboard)
-   and put its Client ID in *Settings → Music apps & Spotify*. With a server, Spotify comes back to your server's page
-   (the web app's Redirect URI), which hands the login to the app; without one, add `vibevisualizer://callback` to the
-   app's Redirect URIs. For exact timing with the Spotify app on the phone, give Vibe Visualizer notification access
-   when it asks (it reads the player, never your notifications).
 
-Updates install from inside the app: *Settings → Help & about → Update now*.
+Updates install from inside the app: *Settings → Help & about → Update now*. After an update, a card shows what's new.
 
 ## What it does
 
 - **Lyrics**: Spicy Lyrics (through your server), Spotify's own, LRCLIB, AMLL, Unison, LRCMux, lrc.red, NetEase and,
-  if you turn them on, KuGou, QQ Music and Kuwo, plus your own `.lrc` and `.ttml` files. The first source asks alone,
-  then the rest at once; better timing wins. Duets and background vocals get their own place, and a line too tall for
-  the screen scrolls with the singing.
-- **Romanization and translation**: romanization for Japanese, Chinese, Korean, Cyrillic and more; translation with
-  Google, DeepL, LibreTranslate, any OpenAI-compatible AI or Gemini.
-- **Three lyrics styles** (*Settings → Lyrics*): Spicy Lyrics, Spicy Lyrics Simple and Focus. In Focus, a line flies up
-  and away as soon as it's sung and the next one comes in from below; in breaks of 5 seconds or more, the cover can
-  take the lyrics' place.
-- **Following the music**: your files (with background playback and media controls), Spotify, the Spotify app on
-  the phone and other music apps through their media sessions (with notification access; no notification is read).
-  The lyrics stay in step through Spotify's crossfade, gapless playback, Automix and the DJ.
-- **The player**: the lyrics, the bars and the cover on one screen; held sideways, the lyrics get the right side and
-  everything else the left. Picture-in-picture, a home screen widget, Ambient mode (an always-on display while music
-  plays), Spotify Canvas, Apple Music's animated covers (free, no account or key) and two designs (Android and Glass).
+  if you turn them on, KuGou, QQ Music and Kuwo, plus your own `.lrc` and `.ttml` files. Your order decides which
+  source wins. Duets and background vocals get their own place, and a line too tall for the screen scrolls with the
+  singing. Lyrics without timing scroll with the song and hold still through quiet parts.
+- **Romanization and translation**: Japanese read a whole line at a time, Korean by sound, Chinese by word, Russian
+  and Ukrainian, Greek; under the line or in its place. Background vocals get their own. Translation with Google,
+  DeepL, LibreTranslate, any OpenAI-compatible AI or Gemini.
+- **Three lyrics styles** (*Settings → Lyrics*): Spring, Bloom and Focus. In Focus, a line flies up and away as soon
+  as it's sung and the next one comes in from below; in long breaks the cover grows into the lyrics' place.
+- **Following the music**: the Spotify app and other music apps through Android (the song, where it is, its cover and
+  its own controls, shuffle, repeat and the heart included), and your own files with background playback. The lyrics
+  stay in step through Spotify's crossfade, gapless playback, Automix and the DJ.
+- **The player**: the song at the top, the lyrics, the bars and the controls on one screen; held sideways, the lyrics
+  get the right side. Picture-in-picture, a home screen widget, Ambient mode (an always-on display while music plays),
+  Spotify Canvas, Apple Music's animated covers (free, no account or key), Up next in a song's last 30 seconds, and
+  frosted glass throughout (Liquid glass as an experiment).
 - **Buttons you pick**: choose what goes under the controls, including one tap to add a lyrics file or play songs from
   your phone.
 - **The bars** hear everything the phone plays (Android's Visualizer; it needs the microphone permission, and nothing
   is recorded or sent), the microphone, or [Vibe Bridge](https://github.com/BOZKOW/vibe-visualizer#vibe-bridge-bars-from-the-spotify-app)
   through your server.
-- **Ready before they play**: the next five songs in your Spotify queue (the next one in another music app's or your
-  files') get their lyrics, Canvas and cover while the song before plays, so skipping shows them at once; Canvas
-  videos are kept on the phone.
-- **Says what's wrong**: problems and notices show at the top of the player; tap one to see what it means and what to
-  do. That includes Spicy Lyrics' service status and a heat warning (from a 40 °C battery, or when Android reports the
-  phone is hot).
-- **And also**: lyrics timing per audio output, a desync check that listens to the music, Low performance mode with
-  Power saving, keyboard shortcuts, and settings that can be copied to the web app and back (*Settings → Help & about →
-  Back up settings*).
+- **Ready before they play**: the next songs in the music app's queue (or your files') get their lyrics, Canvas and
+  cover while the song before plays.
+- **Only errors interrupt**: something that's broken shows at the top of the player; tap it to see what it means and
+  what to do.
+- **And also**: lyrics timing per audio output, a desync check that listens to the music, Low performance mode, Motion
+  sickness mode, and settings that can be copied to the web app and back (*Settings → Help & about → Back up
+  settings*).
 
 ## Building
 
@@ -82,7 +77,7 @@ Kotlin, Jetpack Compose (Material 3 Expressive), Media3, OkHttp and kuromoji; AG
 ```
 
 `.github/workflows/android.yml` builds every push. A tag like `android-v0.24.0` publishes a release with
-`RELEASE_NOTES.md` as its notes (also shown in the app's *What's new*), signed with the release key in the repository
+`RELEASE_NOTES.md` as its notes (it also comes with the app, for the card shown after an update), signed with the release key in the repository
 secrets `ANDROID_KEYSTORE_B64` and `ANDROID_KEYSTORE_PASS`; without them the build is signed with a debug key. The
 build number comes from the version (0.24.0 is 124000), so every release counts up.
 
@@ -104,10 +99,16 @@ file names, word timing in LRC lyrics and the translations under their lines, th
 behind the lyrics, the small window's line at the top, the One UI widget size fix, Apple Music's animated covers, your
 own background color, Keep syllable pace, the language of the lyrics' own translations, the Unison, LRCMux, lrc.red,
 KuGou, QQ Music and Kuwo sources, the translation services, session stickiness, Spicy Lyrics' Canvas service, Ambient
-mode, the widget and the Now Playing layout. Its LRCMux source is itself adapted from Lyrica's lrcmux adapter (MIT).
+mode, the widget, the Now Playing layout, its glass (0.19), its transport and timeline, reading the Spotify song ID and
+the player's own buttons from Android, Chinese read by word, and keeping lyrics longer. Its LRCMux source is itself
+adapted from Lyrica's lrcmux adapter (MIT).
+
+Japanese, Korean and Chinese romanization by line, Join split words, Up next and the name scrolling follow Spicy Lyrics
+6.5 (romanization by TheX24 for Spikerko/spicy-lyrics).
 
 The lyrics font option "Spicy Lyrics" uses [Inter](https://rsms.me/inter/) by Rasmus Andersson (SIL Open Font
-License 1.1). Japanese romanization uses [kuromoji](https://github.com/atilika/kuromoji) (Apache 2.0).
+License 1.1). Japanese romanization uses [kuromoji](https://github.com/atilika/kuromoji) (Apache 2.0); Chinese uses
+the dictionaries of [pinyin](https://github.com/hotoo/pinyin) 4.0.0 by 闲耘 (MIT).
 
 ## License
 
