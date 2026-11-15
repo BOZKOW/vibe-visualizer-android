@@ -51,7 +51,8 @@ fun nameKeys(name: String): List<String> {
 /** Lyrics saved on this device, so a song's lyrics aren't fetched again every time: found lyrics for 7 days,
  *  "no lyrics" for 1 day. Spicy Lyrics allows keeping its responses for up to 30 days; expired ones are deleted. */
 object LyricsCache {
-    private const val HIT = 7 * 86_400_000L
+    // 7 days, or 30 with Keep lyrics longer (Spicy Lyrics Mobile 0.20; Spicy Lyrics' terms allow 30 at most)
+    private val HIT get() = (if (io.github.bozkow.vibevisualizer.core.S.b("lkeep30")) 30 else 7) * 86_400_000L
     private const val MISS = 86_400_000L
     private val dir by lazy { File(Vibe.app.filesDir, "lyrics").apply { mkdirs() } }
 

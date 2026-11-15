@@ -175,6 +175,9 @@ import io.github.bozkow.vibevisualizer.engine.FilePicker
 import io.github.bozkow.vibevisualizer.engine.Images
 import io.github.bozkow.vibevisualizer.engine.Lyr
 import io.github.bozkow.vibevisualizer.engine.Preload
+import io.github.bozkow.vibevisualizer.spotify.SpotifyApp
+import io.github.bozkow.vibevisualizer.media.MediaApps
+import io.github.bozkow.vibevisualizer.core.Vibe
 import io.github.bozkow.vibevisualizer.engine.Updates
 import io.github.bozkow.vibevisualizer.engine.Visuals
 import io.github.bozkow.vibevisualizer.media.Local
@@ -303,7 +306,8 @@ private fun LyricsWithLyrics() {
             if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 24.dp))
             Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, lyrics = true, name = false, restCover = rest) }
             AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
-                Column(Modifier.padding(horizontal = 24.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true, lyricsToggles = true) }
+                // (higher above the gesture bar: the owner found them too low)
+                Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 18.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true, lyricsToggles = true) }
             }
             if (hidden) Spacer(Modifier.height(16.dp))
         }
@@ -554,8 +558,9 @@ private fun EmptyState() {
         Spacer(Modifier.height(22.dp))
         VButton(onClick = { E.haptic(); FilePicker.pickAudio() }, Modifier.fillMaxWidth().widthIn(max = 360.dp).height(52.dp)) { Text("Play songs from your phone", fontSize = 15.sp) }
         Spacer(Modifier.height(10.dp))
-        VTonalButton(onClick = { E.haptic(); if (Spotify.connected) E.setSource("spotify") else E.spLogin() }, Modifier.fillMaxWidth().widthIn(max = 360.dp).height(52.dp)) {
-            Icon(VIcons.spotify, null, Modifier.size(20.dp)); HSpace(8.dp); Text(if (Spotify.connected) "Use Spotify" else "Connect Spotify", fontSize = 15.sp)
+        // (0.57.0: no Spotify account; the Spotify app is followed as it plays, through Android)
+        VTonalButton(onClick = { E.haptic(); SpotifyApp.open(Vibe.app) }, Modifier.fillMaxWidth().widthIn(max = 360.dp).height(52.dp)) {
+            Icon(VIcons.spotify, null, Modifier.size(20.dp)); HSpace(8.dp); Text("Open Spotify", fontSize = 15.sp)
         }
         Spacer(Modifier.weight(1f))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -985,10 +990,10 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
                         }
                     }
                     val by = E.byLine()
-                    val heart = E.src == "spotify" && like && S.b("aLike")
+                    val heart = (E.src == "spotify" || E.src == "media") && like && S.b("aLike")
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { if (by.isNotEmpty()) Scrolling(by, 16f.times(k).sp, FontWeight.SemiBold, dim, bleedL = hl, bleedR = if (heart) 0.dp else br) }
-                        if (heart) LikeButton()
+                        if (heart) { if (E.src == "media") MediaLikeButton() else LikeButton() }
                     }
                 }
                 if (S.b("aUpNext")) UpNextLine()
@@ -1010,6 +1015,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
             if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
         }
         if (E.src == "spotify" && like && S.b("aLike")) LikeButton()
+        else if (E.src == "media" && like && S.b("aLike")) MediaLikeButton()
     }
 }
 
@@ -1091,8 +1097,13 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
     Spotify.version
     val sp = E.src == "spotify"
     val main = if (big) 56.dp else if (mid) 50.dp else 42.dp
+    // a music app's own shuffle and repeat (the Spotify app's too, since 0.57.0: all local), as it publishes them, its icons
+    // showing whether they're on
+    val customs = if (E.src == "media") remember(E.mediaVer.intValue, MediaApps.title) { MediaApps.customs() } else emptyList()
+    val shuf = customs.firstOrNull { it.kind == "shuffle" }; val rep = customs.firstOrNull { it.kind == "repeat" }
     Row(Modifier.fillMaxWidth().padding(vertical = if (big) 6.dp else 0.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         if (sp) CtlIcon(Icons.Rounded.Shuffle, "Shuffle", size = 24.dp, enabled = Spotify.spState != null && "toggling_shuffle" !in Spotify.disallows, on = Spotify.shuffle, dot = true) { Spotify.toggleShuffle() }
+        else if (shuf != null) CustomIcon(shuf)
         else CtlIcon(if (Local.muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, if (Local.muted) "Unmute" else "Mute", enabled = E.src == "file") { Local.muted = !Local.muted }
         CtlIcon(Icons.Rounded.FastRewind, "Previous", size = main, enabled = E.src != "none", nudge = -1) { E.prev() }
         PlayButton(if (big) 76.dp else if (mid) 68.dp else 58.dp)
@@ -1101,8 +1112,33 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
             val r = Spotify.repeat
             CtlIcon(if (r == "track") Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat: " + when (r) { "context" -> "all"; "track" -> "this song"; else -> "off" },
                 size = 24.dp, enabled = Spotify.spState != null, on = r != "off", dot = true) { Spotify.cycleRepeat() }
-        } else Box(Modifier.size(48.dp))
+        } else if (rep != null) CustomIcon(rep) else Box(Modifier.size(48.dp))
     }
+}
+
+/** One of a music app's own buttons, with its own icon (white), pressed through its player. */
+@Composable
+private fun CustomIcon(c: io.github.bozkow.vibevisualizer.spotify.SessionFollower.Custom, size: Dp = 24.dp) {
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Box(Modifier.size(maxOf(48.dp, size + 12.dp)).pressScale(src, .86f).clip(CircleShape)
+        .quickClick(src, true, androidx.compose.material3.ripple()) { E.haptic(); MediaApps.custom(c.action); E.poke() }
+        .semantics { contentDescription = c.name.ifEmpty { c.kind } }, contentAlignment = Alignment.Center) {
+        val d = c.icon
+        if (d != null) {
+            val bm = remember(d) { runCatching {
+                val b = android.graphics.Bitmap.createBitmap(72, 72, android.graphics.Bitmap.Config.ARGB_8888)
+                val c0 = android.graphics.Canvas(b); val old = d.bounds; d.setBounds(0, 0, 72, 72); d.draw(c0); d.bounds = old
+                b.asImageBitmap() }.getOrNull() }
+            if (bm != null) Image(bm, null, Modifier.size(size), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White))
+        } else Text(c.name.take(2), fontSize = 12.sp, color = Color.White)
+    }
+}
+
+/** The heart, as the music app gives it (the Spotify app's "add to Liked Songs"): its own icon says whether the song is in. */
+@Composable
+private fun MediaLikeButton() {
+    val c = remember(E.mediaVer.intValue, MediaApps.title) { MediaApps.customs() }.firstOrNull { it.kind == "like" } ?: return
+    CustomIcon(c, 22.dp)
 }
 
 /** The music app's bottom row: five buttons you pick (Settings → Player screen → Buttons under the controls; by
@@ -1140,7 +1176,11 @@ private fun BarButton(k: String, d: Dp) {
         "tr" -> BarIcon(VIcons.translate, "Translate lyrics", S.tr, d) { toggleTr() }
         "rom" -> BarIcon(null, "Romanize lyrics", S.romMode != "off", d, text = "あa") { toggleRom() }
         "canvas" -> BarIcon(Icons.Rounded.Movie, "Canvas", S.canvasOn, d) { S.set("canvasOn", !S.canvasOn) }
-        "like" -> {
+        "like" -> if (E.src == "media") {
+            // the music app's own heart (the Spotify app's, all local since 0.57.0)
+            val c = remember(E.mediaVer.intValue, MediaApps.title) { MediaApps.customs() }.firstOrNull { it.kind == "like" }
+            BarIcon(if (c?.name?.contains("remove", true) == true) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, c?.name?.ifEmpty { null } ?: "Like", false, d, enabled = c != null) { c?.let { MediaApps.custom(it.action); E.poke() } }
+        } else {
             Spotify.version
             val liked = sp && Spotify.liked == true
             BarIcon(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Remove from Liked Songs" else "Save to Liked Songs", liked, d,

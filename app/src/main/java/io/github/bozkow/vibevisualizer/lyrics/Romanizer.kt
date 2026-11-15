@@ -60,7 +60,13 @@ object Romanizer {
             }
         } else if (texts.any { ITEM_HAN.containsMatchIn(it) }) {
             val orig = texts.toList()
-            for (i in 0 until n) if (ITEM_HAN.containsMatchIn(texts[i])) texts[i] = chinese(texts[i], pinyin)
+            if (ChineseLine.available()) {
+                // read by word across the whole unit (Spicy Lyrics Mobile 0.20), each syllable taking its characters' readings
+                val line = StringBuilder(); val starts = IntArray(n)
+                for (i in 0 until n) { if (i > 0 && !partOfWord[i - 1]) line.append(' '); starts[i] = line.length; line.append(texts[i]) }
+                val r = ChineseLine.charReadings(line.toString())
+                for (i in 0 until n) if (ITEM_HAN.containsMatchIn(texts[i])) { val own = r.subList(starts[i], starts[i] + texts[i].length); texts[i] = chineseAt(texts[i]) { k -> own[k] } }
+            } else for (i in 0 until n) if (ITEM_HAN.containsMatchIn(texts[i])) texts[i] = chinese(texts[i], pinyin)
             // pinyin reads by character, so a Han syllable is a word of its own
             for (i in 0 until n) {
                 val next = orig.getOrNull(i + 1) ?: continue
@@ -92,12 +98,15 @@ object Romanizer {
     private fun isHan(c: Char) = ITEM_HAN.matches(c.toString())
 
     /** Pinyin, one reading per Han character, spaced from each other and from the words beside them. */
-    fun chinese(t: String, pinyin: (String) -> String): String {
+    fun chinese(t: String, pinyin: (String) -> String): String = chineseAt(t) { i -> pinyin(t[i].toString()) }
+
+    /** The same with the reading of each character by its place in [t] ([readAt]). */
+    fun chineseAt(t: String, readAt: (Int) -> String): String {
         val out = StringBuilder()
         for ((i, c) in t.withIndex()) {
             val prev = t.getOrNull(i - 1)
             if (prev != null && (isHan(c) || isHan(prev)) && LETTER_OR_DIGIT.matches(prev.toString()) && LETTER_OR_DIGIT.matches(c.toString())) out.append(' ')
-            out.append(if (isHan(c)) pinyin(c.toString()).trim().ifEmpty { c.toString() } else c.toString())
+            out.append(if (isHan(c)) readAt(i).trim().ifEmpty { c.toString() } else c.toString())
         }
         return out.toString()
     }

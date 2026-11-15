@@ -83,7 +83,8 @@ import org.json.JSONObject
 fun SetupWizard() {
     var useFile by remember { mutableStateOf(true) }
     var useSp by remember { mutableStateOf(Vibe.cfg.spotId.isNotEmpty() || true) }
-    val steps = listOf("welcome", "server") + (if (useSp) listOf("spotify") else emptyList()) + listOf("lyrics", "sound", "finish")
+    // (no Spotify login step since 0.57.0: the Spotify app is followed through Android, with notification access in "sound")
+    val steps = listOf("welcome", "server") + listOf("lyrics", "sound", "finish")
     var i by remember { mutableIntStateOf(0) }
     val cur = steps[i.coerceIn(0, steps.size - 1)]
     val done = { Vibe.cfg.saveSetup(true); E.wizard = false }
@@ -113,7 +114,7 @@ fun SetupWizard() {
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
                 if (cur == "finish" && (useFile || (useSp && !Spotify.connected))) Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (useFile) VTonalButton(onClick = { done(); FilePicker.pickAudio() }, Modifier.weight(1f)) { Text("Play songs", maxLines = 1) }
-                    if (useSp && !Spotify.connected) VTonalButton(onClick = { done(); E.spLogin() }, Modifier.weight(1f)) { Text("Connect Spotify", maxLines = 1) }
+                    if (useSp && !Spotify.connected) VTonalButton(onClick = { done(); SpotifyApp.open(Vibe.app) }, Modifier.weight(1f)) { Text("Open Spotify", maxLines = 1) }
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     if (i > 0) TextButton(onClick = { i-- }) { Text("Back") }

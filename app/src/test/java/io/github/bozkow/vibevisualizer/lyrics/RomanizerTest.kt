@@ -69,6 +69,22 @@ class RomanizerTest {
         assertTrue(u.gaps[0])
     }
 
+    @Test fun chineseReadByWord() {
+        // 行 alone is háng (its most common reading); in 行走 it's xíng, read by the word (Spicy Lyrics Mobile 0.20's dictionary)
+        val song = Romanizer.Song(japanese = false, ukrainian = false)
+        val u = Romanizer.romanizeUnit(listOf("行", "走", "长大"), listOf(true, false, false), song, null) { it }
+        assertEquals(listOf("Xíng", "zǒu", "zhǎng dà"), u.texts)
+        assertEquals(listOf("cháng"), Romanizer.romanizeUnit(listOf("长"), listOf(false), song, null) { it }.texts.map { it.lowercase() })
+    }
+
+    @Test fun spotifyIdsFromWhatAPlayerGives() {
+        val id = "4uLU6hMCjMI75M1A2tKUQC"
+        assertEquals(id, io.github.bozkow.vibevisualizer.spotify.spotifyTrackId("spotify:track:$id"))
+        assertEquals(id, io.github.bozkow.vibevisualizer.spotify.spotifyTrackId("https://open.spotify.com/track/$id?si=x"))
+        assertEquals(null, io.github.bozkow.vibevisualizer.spotify.spotifyTrackId("spotify:album:$id"))
+        assertEquals(null, io.github.bozkow.vibevisualizer.spotify.spotifyTrackId("not-an-id"))
+    }
+
     @Test fun aLineStartsWithACapitalButLatinWordsStayAsWritten() {
         val song = Romanizer.Song(japanese = false, ukrainian = false)
         assertEquals(listOf("Sarang", "hae"), Romanizer.romanizeUnit(listOf("사랑", "해"), listOf(true, false), song, null) { it }.texts)

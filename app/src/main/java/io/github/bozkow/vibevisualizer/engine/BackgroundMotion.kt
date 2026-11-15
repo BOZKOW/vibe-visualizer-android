@@ -28,12 +28,12 @@ object Background {
 
     fun tick(t: Double, dt: Double) {
         if (!live()) return
-        val tempo = if (Audio.bgTempo > 0f) Audio.bgTempo.toDouble() else 1.0
-        bgT += dt / 1000 * (S.bgspeed / 100.0) * (.3 + Audio.bgEnergy * .9 + Audio.bgKick * .6) * tempo
+        // its motion follows the song's energy, not its tempo and beats (Spicy Lyrics Mobile 0.20's music-reactive background)
+        bgT += dt / 1000 * (S.bgspeed / 100.0) * (.3 + Audio.bgEnergy * 1.2)
         pulse += (Audio.bass - pulse) * (1 - exp(-dt / 120)).toFloat()
         // calmer than Spicy Lyrics' speed (which follows every beat): the tempo and the loudness set it, a beat adds a
         // little, and it eases over about a second, so it only gets livelier when the music does; 0.1 paused
-        val target = if (E.playing()) (tempo * (.35 + min(1.0, Audio.bgEnergy * 2.2) * .4) + .35 * Audio.bgKick).coerceIn(.1, 1.4) else .1
+        val target = if (E.playing()) (.4 + min(1.0, Audio.bgEnergy * 2.2) * .7).coerceIn(.1, 1.4) else .1
         kwSpeed += (target - kwSpeed) * (1 - exp(-dt / 900))
         kwTime += dt / 1000 * kwSpeed * S.bgspeed / 100
         // redrawn 30 times a second at most while it moves, 20 once it has slowed down for a pause: it drifts far too slowly for more

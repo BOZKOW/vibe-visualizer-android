@@ -36,7 +36,7 @@ object Defaults {
         "bridge" to true, "xFocus" to false, "bgStyle" to "dynamic", "lfont" to "vv", "lsimple" to false, "lminimal" to false,
         "lhover" to true, "lduet" to true, "lcredLast" to false, "lsmooth" to true, "learly" to false, "learlyMs" to 250,
         "lseekFade" to true, "lnotice" to true, "aRestCover" to true, "aPreload" to true, "aCoverLine" to true, "volshow" to true, "fpscap" to "60", "credPos" to "corner", "cvNoArt" to false, "cvBlur" to false, "cvBlurAmt" to 50, "cvShrink" to true, "cvSpicy" to true, "cvBehind" to "dark",
-        "capDev" to "", "romMode" to "replace", "tr" to false, "trTo" to navLang(), "trSkip" to "", "theme" to "cover",
+        "capDev" to "", "romMode" to "below", "tr" to false, "trTo" to navLang(), "trSkip" to "", "theme" to "cover",
         "c1" to "#ff5a5f", "c2" to "#4f8cff", "auto" to true, "boost" to 100, "resp" to 25, "blur" to 0, "bars" to 72,
         "gap" to 28, "glow" to false, "barGlass" to false, "round" to true, "scale" to "1", "fps" to false, "bgblur" to 60, "bri" to 70,
         "sat" to 170, "bgspeed" to 100, "online" to true, "volume" to 100, "view" to "both",
@@ -85,6 +85,8 @@ object Defaults {
         "ljoinMode" to "off",   // Join split words (Spicy Lyrics 6.5.0): off, full (all words), steady (steadily sung), held (held words); off by default again as in 6.5.10
         "lspace" to true,       // Increased line spacing with Spring (Spicy Lyrics 6.5.0's springLineSpacing)
         "aUpNext" to true,      // Up next: the next song at the lyrics' foot in a song's last 30 s (Spicy Lyrics 6.5.0)
+        "lkeep30" to false,     // Keep lyrics longer: found lyrics kept 30 days instead of 7 (Spicy Lyrics Mobile 0.20)
+        "lstatic" to "basic",   // Auto-scroll for lyrics without timing: off, basic (holds still through quiet parts; Spicy Lyrics Mobile 0.20)
         "xLiquid" to false,     // Liquid glass (Experiments): the round buttons and notices bend what's behind them at their edges
         "cvLyrA" to 25,         // how much of the Canvas video shows behind the lyrics (%; 0: only its soft glow)
         "aPipTop" to false,     // the small window: the line being sung at the top

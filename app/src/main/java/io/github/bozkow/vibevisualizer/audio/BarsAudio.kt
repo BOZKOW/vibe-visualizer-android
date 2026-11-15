@@ -42,6 +42,8 @@ object Audio {
     private val autoGain = AutoGain()
     var idleK = 0f; private set
     private var silentFor = 0.0
+    /** How long (ms) the sound being heard has been silent (0 while nothing's heard: then nothing's known). */
+    fun silentMs() = silentFor
     var realAudio = false; private set
 
     // the background follows the music: loudness, bass hits, tempo

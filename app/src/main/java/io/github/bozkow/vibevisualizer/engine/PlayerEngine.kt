@@ -264,7 +264,10 @@ object E {
     /* ---- another music app (YouTube Music, SoundCloud…) ---- */
 
     /** Another music app started playing: followed, unless something here already plays (your files, or Spotify). */
+    /** Bumps when a music app's player changes (its own buttons' icons with it). */
+    val mediaVer = androidx.compose.runtime.mutableIntStateOf(0)
     fun onMediaState() {
+        mediaVer.intValue++
         if (src == "media") { updPlay(); poke(); if (MediaApps.connected.value.not()) { title = "Nothing playing"; artist = "Play something in a music app"; resetCover(); Lyr.clear("") }; return }
         if (!S.b("aOtherApps") || !MediaApps.playing || MediaApps.title.isEmpty()) return
         val busy = (src == "file" && Local.playing()) || (src == "spotify" && Spotify.spPlaying())
@@ -280,11 +283,25 @@ object E {
         val nt = tn.title.ifEmpty { t0 }; val na = tn.artist.ifEmpty { MediaApps.artist }
         if (!force && nt == title && na == artist) return
         curArtistId = ""
+        // Spotify's DJ talking (the Spotify app names it "Up next" by "DJ X", a few seconds long): its note and its own picture
+        if (MediaApps.pkg == SpotifyApp.PKG && isDjItem(MediaApps.artist, MediaApps.durMs)) {
+            newTok(); dj = true; CanvasVideo.clear(false); Audio.dropBars()
+            title = t0; artist = MediaApps.artist; year = ""; album = ""; status = ""; trackVer++
+            mediaArt = setCoverBitmap(MediaApps.cover(), "From " + MediaApps.appName(), coverTok)
+            Lyr.clear("Lyrics aren’t available with the DJ", "The DJ talks between the songs and mixes them together, so there’s nothing to line lyrics up with. They’re back with the next song.", "none", always = true)
+            updPlay(); return
+        }
+        dj = false
         val tok = newTok()
         CanvasVideo.clear(false); Audio.dropBars()
         title = nt; artist = na; year = ""; album = MediaApps.album; status = ""; trackVer++
-        val meta = SongMeta(title = nt, artist = na, album = MediaApps.album, duration = MediaApps.durMs / 1000.0)
+        // the player's Spotify song ID, when it gives one: the Canvas and the lyrics sources that need it (0.57.0, all local)
+        val sid = MediaApps.spotifyId
+        mediaId = sid
+        val meta = SongMeta(id = sid, uri = if (sid.isNotEmpty()) "spotify:track:$sid" else "", title = nt, artist = na, album = MediaApps.album, duration = MediaApps.durMs / 1000.0)
+        mediaMeta = meta
         Lyr.load(meta, tok)
+        if (sid.isNotEmpty()) CanvasVideo.lookup(meta, tok)
         Preload.songStarted()
         mediaArt = setCoverBitmap(MediaApps.cover(), "From " + MediaApps.appName(), tok)
         // (what's on screen stays until there's something else: only with no cover in the end the default colours)
@@ -298,9 +315,16 @@ object E {
 
     /** The app's details changed without a new song: its cover often comes a moment after the name. */
     fun onMediaMeta() {
-        if (src != "media" || mediaArt) return
+        mediaVer.intValue++
+        if (src != "media") return
+        // the Spotify song ID can come after the name: the Canvas is looked up then
+        val sid = MediaApps.spotifyId
+        if (!dj && sid.isNotEmpty() && sid != mediaId) { mediaId = sid; mediaMeta?.let { m -> CanvasVideo.lookup(m.copy(id = sid, uri = "spotify:track:$sid"), coverTok) } }
+        if (mediaArt && !dj) return
         MediaApps.cover()?.let { mediaArt = setCoverBitmap(it, "From " + MediaApps.appName(), coverTok, quiet = false) }
     }
+    private var mediaId = ""
+    private var mediaMeta: SongMeta? = null
 
     fun netKick() = Ping.kick()
 

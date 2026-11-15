@@ -863,6 +863,10 @@ class LyricsRenderer {
     private fun staticScroll(t: Double, pos: Double) {
         val dt = min(.1, (t - (if (stLast == 0.0) t else stLast)) / 1000); stLast = t
         if (t - stUser < 4000) return
+        // Auto-scroll (Spicy Lyrics Mobile 0.20): Off leaves them where they are; Basic moves with the song but holds still
+        // through quiet parts (3 s or more of silence heard: an intro, a break, the end)
+        if (S.str("lstatic") == "off") return
+        if ((silentFn?.invoke() ?: 0.0) > 3000) { stVel = 0f; return }
         val d = durFn?.invoke() ?: 0.0; val mx = staticMax(); if (d <= 0 || mx <= 0) return
         val target = (pos / d).coerceIn(0.0, 1.0).toFloat() * mx
         var p = stPos ?: stScroll.also { stVel = 0f }
@@ -872,6 +876,7 @@ class LyricsRenderer {
         stPos = p; stScroll = p
     }
     var durFn: (() -> Double)? = null
+    var silentFn: (() -> Double)? = null
 
     /* ---- the words (wordsTick) ---- */
     private fun wordsTick(t: Double, pos: Double) {

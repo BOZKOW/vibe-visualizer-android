@@ -277,6 +277,8 @@ private fun pages(): List<Page> = listOf(
         Item.Sub("Your lyrics files"),
         Item.Custom("Add lyrics files use a file for this song remove all import lrc ttml") { MyFiles() },
         Item.Sub("Looking for lyrics"),
+        Item.Sw("lkeep30", "Keep lyrics longer", "Found lyrics are kept on this phone for 30 days instead of 7, so songs you play often don't look them up again. From Spicy Lyrics Mobile 0.20."),
+        Item.Ch("lstatic", "Auto-scroll for lyrics without timing", listOf("basic" to "Basic", "off" to "Off"), "Basic: lyrics without timing move with the song and hold still through quiet parts (3 s or more of silence the bars hear). Off: they stay where you leave them. From Spicy Lyrics Mobile 0.20."),
         Item.Sw("lnotice", "No lyrics notice", "Say so when a song has no lyrics."),
         Item.Sw("aPreload", "Get the next songs ready", "A few seconds into a song, the next ones in the queue (the next five in Spotify’s, the next one in the music app’s or your files’) have their lyrics, Canvas and cover looked up, so they show the moment one starts, also when you skip a few. One more request to Spotify a song."),
         Item.Sw("aUpNext", "Up next", "In a song’s last 30 seconds, the song that comes after it shows: on the Lyrics screen upright, a small line under the artist; elsewhere quietly at the top, where notices go, its cover beside its name and artist. Not on repeat-one. The queue is read once more as those 30 seconds begin (one more request to Spotify a song). From Spicy Lyrics 6.5.0."),
@@ -328,10 +330,8 @@ private fun pages(): List<Page> = listOf(
         Item.Txt("Lines already in the language you translate into are never translated. The lyric lines go to the service you pick. Japanese, Chinese, Korean, Cyrillic and Greek are romanized on the phone first; Google fills in what it can’t do."),
     ), sub = "Romanization, translation and the service it uses", group = 1),
     Page("spotify", "Music apps & Spotify", VIcons.spotify, listOf(
-        Item.Sub("Spotify"),
-        Item.Custom("Client ID redirect URI connect disconnect") { SpotifySection() },
         Item.Sub("The Spotify app on this phone"),
-        Item.Sw("aSession", "Exact timing and controls from the Spotify app", "When the Spotify app on this phone plays, the lyrics follow its player exactly, song changes show at once, fewer requests go to Spotify, and play, pause, skip and seek work without Premium."),
+        Item.Txt("Since 0.57.0 everything comes from this phone: the song, where it is, its cover and the controls (shuffle, repeat and the heart too, as the Spotify app gives them) are read from the Spotify app through Android, as from any music app. No Spotify account or Web API. Your server is only asked for what needs it (Spicy Lyrics, Spotify’s own lyrics, your Canvas). Music on another device shows while the Spotify app on this phone shows it."),
         Item.Sw("spRevive", "Bring Spotify back if Android closes it", "One UI sometimes closes the Spotify app in the background, mid-song. The app starts its player again (as a headphone button would); if that doesn't work, a notice offers to open Spotify."),
         Item.Custom("notification access") { SessionStatus() },
         Item.Sub("Your music"),
@@ -602,7 +602,6 @@ private fun needs(k: String): String? = when (k) {
     "xLiquid" -> if (android.os.Build.VERSION.SDK_INT < 33) "Needs Android 13 or newer" else if (S.low) "Off in Low performance mode" else if (S.calm) "Off with Motion sickness" else null
     "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
     "cvLyrA" -> if (!S.canvasOn) "Turn on Canvas first" else null
-    "aLike" -> if (!Spotify.connected) "Needs Spotify connected" else null
     "spRevive" -> if (!S.b("aSession")) "Needs Exact timing and controls from the Spotify app" else null
     else -> null
 }
@@ -732,8 +731,7 @@ private fun YourMusic() {
     val sp = E.src == "spotify"
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         VTonalButton(onClick = { E.haptic(); E.settingsPage = null; FilePicker.pickAudio() }) { Text("Play songs from your phone") }
-        if (!sp) VTonalButton(onClick = { E.haptic(); E.settingsPage = null; if (Spotify.connected) E.setSource("spotify") else E.spLogin() }) { Text(if (Spotify.connected) "Use Spotify" else "Connect Spotify") }
-        else VTonalButton(onClick = { E.haptic(); E.settingsPage = null; E.sheet = "devices" }) { Text("Choose where Spotify plays") }
+        if (!sp) VTonalButton(onClick = { E.haptic(); SpotifyApp.open(Vibe.app) }) { Text("Open Spotify") }
     }
 }
 
@@ -897,7 +895,7 @@ private fun CacheButtons() {
             }
         }
         row("Clear this song’s cache", "Remove everything saved for the song that’s playing (lyrics, romanization, translation) and fetch it again.", "Clear") { Lyr.clearSong() }
-        row("Clear stored lyrics", "Delete all lyrics and translations saved on this phone (normally kept for up to 7 days), and look up the song that’s playing again.", "Clear") { Lyr.clearStored() }
+        row("Clear stored lyrics", "Delete all lyrics and translations saved on this phone (kept for 7 days, or 30 with Keep lyrics longer), and look up the song that’s playing again.", "Clear") { Lyr.clearStored() }
         row("Reset this song’s lyrics", "Drop the playing song’s lyrics from memory only, so they load again.", "Reset") { Lyr.resetSong() }
     }
 }

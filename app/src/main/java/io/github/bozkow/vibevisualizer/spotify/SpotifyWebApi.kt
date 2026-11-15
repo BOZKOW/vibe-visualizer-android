@@ -88,7 +88,9 @@ object Spotify {
     private var likeTok = 0
     private var spLibOld = false
 
-    val connected get() = cfg.spAccess.isNotEmpty()
+    // Spotify's Web API isn't used since 0.57.0 (the owner: "everything local", what plays and its controls from Android; the
+    // Spotify app is followed as any music app, through its media session). The code stays, never connected
+    val connected get() = false
     fun hasScope(x: String) = cfg.spScope.isEmpty() || cfg.spScope.split(' ').contains(x)   // unknown (older logins): just try
 
     /* ================= login ================= */

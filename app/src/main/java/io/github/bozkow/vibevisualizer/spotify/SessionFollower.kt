@@ -124,7 +124,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         ctrl?.let { runCatching { it.unregisterCallback(cb) } }
         ctrl = c; stoppedAt = 0; main.removeCallbacks(recheck); pkg = c?.packageName ?: ""
         clock.reset(SystemClock.elapsedRealtime()); awaitingReport = false; resyncNext = false; endBuffering = null; backAt = 0
-        if (c == null) { connected.value = false; state = null; title = ""; artist = ""; album = ""; durMs = 0; art = null; artUri = ""; onState?.invoke(); return }
+        if (c == null) { connected.value = false; state = null; title = ""; artist = ""; album = ""; durMs = 0; art = null; artUri = ""; spotifyId = ""; onState?.invoke(); return }
         c.registerCallback(cb, main)
         connected.value = true
         state = c.playbackState
@@ -142,6 +142,10 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         durMs = m?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0
         art = m?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: m?.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: m?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
         artUri = m?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI) ?: m?.getString(MediaMetadata.METADATA_KEY_ART_URI) ?: m?.getString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI) ?: ""
+        // the Spotify song ID the player gives with it, if it gives one (Spicy Lyrics Mobile's sessionSpotifyId): the Canvas,
+        // Spicy Lyrics and Spotify's own lyrics are found by it, without asking Spotify's Web API
+        spotifyId = sequenceOf(m?.description?.mediaId, m?.getString(MediaMetadata.METADATA_KEY_MEDIA_ID), m?.description?.mediaUri?.toString())
+            .mapNotNull { spotifyTrackId(it) }.firstOrNull() ?: ""
         if (notify && changed && t.isNotEmpty()) { report(state, force = true, trackChanged = true); onTrack?.invoke() }
         if (notify) onMeta?.invoke()
     }
@@ -202,6 +206,38 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
     }
 
     /** The app's cover for what it plays now (readable: a hardware bitmap is copied). */
+    /** The Spotify song ID of what plays, when the player gives one ("" otherwise). */
+    var spotifyId = ""; protected set
+
+    /** The player's own buttons (shuffle, repeat, like…), as it publishes them with its state: (action, name, icon). */
+    class Custom(val action: String, val name: String, val icon: android.graphics.drawable.Drawable?) {
+        /** What it is, by its name, as Spicy Lyrics Mobile tells them (players only give a name). */
+        val kind get() = "$name $action".lowercase().let { t -> when {
+            "shuffle" in t -> "shuffle"
+            "repeat" in t || "loop" in t -> "repeat"
+            "like" in t || "heart" in t || "favo" in t || "liked songs" in t || "save" in t || "library" in t || "add to" in t || "remove from" in t -> "like"
+            else -> "other"
+        } }
+    }
+    private val icons = HashMap<String, android.graphics.drawable.Drawable?>()
+    /** The player's own buttons now. */
+    fun customs(): List<Custom> {
+        val s = ctrl?.playbackState ?: return emptyList()
+        val p = pkg
+        return s.customActions.orEmpty().map { a ->
+            val ic = if (a.icon == 0) null else icons.getOrPut("$p/${a.icon}") {
+                runCatching { io.github.bozkow.vibevisualizer.core.Vibe.app.packageManager.getResourcesForApplication(p).getDrawable(a.icon, null) }.getOrNull()
+            }
+            Custom(a.action, a.name?.toString().orEmpty(), ic)
+        }
+    }
+    /** Presses one of the player's own buttons. */
+    fun custom(action: String) {
+        val c = ctrl ?: return
+        val extras = c.playbackState?.customActions?.firstOrNull { it.action == action }?.extras
+        runCatching { c.transportControls.sendCustomAction(action, extras) }
+    }
+
     /** The picture's address, when the app gives one (a web address, or Spotify's own "spotify:image:…", as Spicy Lyrics reads it). */
     var artUri = ""; protected set
     fun artUrl(): String? = artUri.let { u -> when { u.startsWith("https://") -> u; u.startsWith("spotify:image:") -> "https://i.scdn.co/image/" + u.removePrefix("spotify:image:"); else -> null } }
@@ -275,4 +311,15 @@ object SpotifyApp : SessionFollower({ it == "com.spotify.music" }) {
     fun open(ctx: Context) {
         runCatching { ctx.packageManager.getLaunchIntentForPackage(PKG)?.let { ctx.startActivity(it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) } }
     }
+}
+
+/** A Spotify track ID in what a player gives ("spotify:track:…", an open.spotify.com address, or the ID itself), or null. */
+fun spotifyTrackId(v: String?): String? {
+    val t = v?.trim().orEmpty()
+    val c = when {
+        t.startsWith("spotify:track:") -> t.substringAfterLast(':')
+        "/track/" in t -> t.substringAfter("/track/").substringBefore('?').substringBefore('/')
+        else -> t
+    }
+    return c.takeIf { it.length == 22 && it.all(Char::isLetterOrDigit) }
 }
