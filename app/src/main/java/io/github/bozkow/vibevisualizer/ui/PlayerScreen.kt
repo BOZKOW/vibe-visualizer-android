@@ -338,7 +338,7 @@ private fun MovingCover(slot: androidx.compose.ui.geometry.Rect, area: androidx.
     Box(Modifier.offset { androidx.compose.ui.unit.IntOffset((x - origin.x).roundToInt(), (y - origin.y).roundToInt()) }.size(with(dens) { side.toDp() })
         .then(if (k > .01f) Modifier.ambientOut() else Modifier)) {
         // small, a soft shadow of its own; big, the big cover's (and its animated cover, if the album has one)
-        CoverArt(Modifier.fillMaxSize().then(if (k < .99f) Modifier.shadow(mix(8f, 24f).dp, shape, ambientColor = Color.Black, spotColor = Color.Black) else Modifier), corner = mix(10f, 22f).dp, small = k < .99f)
+        CoverArt(Modifier.fillMaxSize().then(if (k < .99f) Modifier.shadow(mix(8f, 24f).dp, shape, ambientColor = Color.Black, spotColor = Color.Black) else Modifier), corner = mix(10f, 22f).dp, small = k < .99f, motion = true)
     }
 }
 
@@ -1105,9 +1105,12 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
         if (sp) CtlIcon(Icons.Rounded.Shuffle, "Shuffle", size = 24.dp, enabled = Spotify.spState != null && "toggling_shuffle" !in Spotify.disallows, on = Spotify.shuffle, dot = true) { Spotify.toggleShuffle() }
         else if (shuf != null) CustomIcon(shuf)
         else CtlIcon(if (Local.muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, if (Local.muted) "Unmute" else "Mute", enabled = E.src == "file") { Local.muted = !Local.muted }
-        CtlIcon(Icons.Rounded.FastRewind, "Previous", size = main, enabled = E.src != "none", nudge = -1) { E.prev() }
-        PlayButton(if (big) 76.dp else if (mid) 68.dp else 58.dp)
-        CtlIcon(Icons.Rounded.FastForward, "Next", size = main, enabled = E.canNext(), nudge = 1) { E.next() }
+        // Spicy Lyrics Mobile's transport (0.58.0, the owner's pick): its glyphs, skips 52 dp wide, play / pause 9.25/12 of that,
+        // no round button; held they shrink to .9, let go they bounce
+        val skipW = if (big) 58.dp else if (mid) 52.dp else 44.dp
+        SpicyGlyph(SpicyGlyphs.skip, skipW, "Previous", E.src != "none", mirror = true, nudge = -1) { E.prev() }
+        SpicyPlay(skipW * (9.25f / 12f))
+        SpicyGlyph(SpicyGlyphs.skip, skipW, "Next", E.canNext(), nudge = 1) { E.next() }
         if (sp) {
             val r = Spotify.repeat
             CtlIcon(if (r == "track") Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat: " + when (r) { "context" -> "all"; "track" -> "this song"; else -> "off" },
@@ -1248,6 +1251,53 @@ private fun CtlIcon(icon: ImageVector, desc: String, size: Dp = 24.dp, enabled: 
     }
 }
 
+/** Spicy Lyrics Mobile's transport glyphs (its LyricsControls.kt SpicyIcons, AGPL-3.0). */
+private object SpicyGlyphs {
+    private fun icon(w: Float, h: Float, d: String) = ImageVector.Builder(defaultWidth = w.dp, defaultHeight = h.dp, viewportWidth = w, viewportHeight = h)
+        .addPath(androidx.compose.ui.graphics.vector.PathParser().parsePathString(d).toNodes(), fill = androidx.compose.ui.graphics.SolidColor(Color.White)).build()
+    val skip = icon(35f, 20f, "M 19.467 19.905 C 20.008 19.905 20.463 19.746 21.005 19.426 L 33.61 12.023 C 34.533 11.482 35 10.817 35 9.993 C 35 9.158 34.545 8.53 33.61 7.977 L 21.005 0.574 C 20.463 0.254 19.998 0.094 19.456 0.094 C 18.374 0.094 17.475 0.917 17.475 2.418 L 17.475 9.49 C 17.315 8.898 16.873 8.408 16.135 7.977 L 3.529 0.574 C 3 0.254 2.533 0.094 1.993 0.094 C 0.911 0.094 0 0.917 0 2.418 L 0 17.582 C 0 19.083 0.91 19.906 1.993 19.906 C 2.533 19.906 3 19.746 3.529 19.426 L 16.135 12.023 C 16.861 11.593 17.315 11.088 17.475 10.485 L 17.475 17.582 C 17.475 19.083 18.386 19.906 19.467 19.906 L 19.467 19.905 Z")
+    val play = icon(18f, 20f, "M 1.558 20 C 2.006 20 2.381 19.838 2.874 19.561 L 16.622 11.572 C 17.527 11.053 17.894 10.65 17.894 9.997 C 17.894 9.35 17.527 8.948 16.622 8.419 L 2.874 0.439 C 2.381 0.153 2.006 0 1.558 0 C 0.706 0 0.106 0.654 0.106 1.694 L 0.106 18.298 C 0.106 19.346 0.706 20 1.558 20 L 1.558 20 Z")
+    val pause = icon(15f, 20f, "M 4.427 19.963 C 5.513 19.963 6.06 19.416 6.06 18.33 L 6.06 1.66 C 6.06 0.545 5.513 0.037 4.427 0.037 L 1.633 0.037 C 0.548 0.037 0 0.575 0 1.66 L 0 18.331 C -0.009 19.416 0.538 19.963 1.633 19.963 L 4.427 19.963 Z M 13.377 19.963 C 14.462 19.963 15 19.416 15 18.33 L 15 1.66 C 15 0.545 14.462 0.037 13.376 0.037 L 10.573 0.037 C 9.487 0.037 8.949 0.575 8.949 1.66 L 8.949 18.331 C 8.949 19.416 9.487 19.963 10.573 19.963 L 13.376 19.963 L 13.377 19.963 Z")
+}
+
+/** One of Spicy Lyrics Mobile's transport glyphs, [width] wide (its height by its shape), a 48 dp touch at least: held it
+ *  shrinks to .9, let go it bounces back (its PressableGlyph); a skip slides out the way it goes and springs back in. */
+@Composable
+private fun SpicyGlyph(v: ImageVector, width: Dp, desc: String, enabled: Boolean, mirror: Boolean = false, nudge: Int = 0, onClick: () -> Unit) {
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val k = remember { Animatable(0f) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val h = width * (v.viewportHeight / v.viewportWidth)
+    Box(Modifier.size(width = maxOf(48.dp, width + 8.dp), height = maxOf(48.dp, h + 16.dp)).pressScale(src, .9f)
+        .quickClick(src, enabled, null) {
+            E.haptic(); onClick()
+            if (nudge != 0 && !Pop.calm) scope.launch { k.snapTo(0f); k.animateTo(1f, tween(130, easing = androidx.compose.animation.core.FastOutLinearInEasing)); k.snapTo(-1f); k.animateTo(0f, spring(.62f, 520f)) }
+        }
+        .semantics { contentDescription = desc }, contentAlignment = Alignment.Center) {
+        Icon(v, null, Modifier.size(width, h).graphicsLayer { scaleX = if (mirror) -1f else 1f; val x = k.value; translationX = x * nudge * width.toPx() * .3f; alpha = 1f - kotlin.math.abs(x) * .9f },
+            tint = if (enabled) Color.White else Color.White.copy(alpha = .3f))
+    }
+}
+
+/** Play / pause as Spicy Lyrics Mobile draws it: the glyph alone, the two swapping with a quick scale and fade. */
+@Composable
+private fun SpicyPlay(width: Dp) {
+    val playing = E.playingState
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val h = width * (20f / 15f)
+    Box(Modifier.size(width = maxOf(56.dp, width + 16.dp), height = maxOf(56.dp, h + 16.dp)).pressScale(src, .9f)
+        .quickClick(src, true, null) { E.haptic(); E.toggle() }
+        .semantics { contentDescription = if (playing) "Pause" else "Play" }, contentAlignment = Alignment.Center) {
+        AnimatedContent(playing, transitionSpec = {
+            if (Pop.calm) fadeIn(tween(120)) togetherWith fadeOut(tween(100))
+            else (fadeIn(tween(160)) + scaleIn(spring(.6f, 500f), initialScale = .6f)) togetherWith (fadeOut(tween(120)) + scaleOut(tween(140), targetScale = .6f))
+        }, label = "spicyplay") { p ->
+            val v = if (p) SpicyGlyphs.pause else SpicyGlyphs.play
+            Icon(v, null, Modifier.size(width * (v.viewportWidth / 15f), h), tint = Color.White)
+        }
+    }
+}
+
 @Composable private fun MaterialThemeAccent() = androidx.compose.material3.MaterialTheme.colorScheme.primary
 
 /** Play / pause: big and round; while music plays it morphs into a soft cookie shape (Material 3 Expressive). */
@@ -1283,7 +1333,7 @@ private fun SeekRow(inline: Boolean = false) {
     val d0 = drag   // while dragging, the times and the bubble follow the finger
     E.timeText   // the row itself is rebuilt with the time ticker (once a second or so): the times and a new song's length
     val dur = E.curDur()
-    val thick = when (S.str("aSeek")) { "thin" -> 6.dp; "thick" -> 18.dp; else -> 12.dp }   // Settings → Player screen → Seek bar
+    val thick = when (S.str("aSeek")) { "thin" -> 6.dp; "thick" -> 18.dp; else -> 10.dp }   // Settings → Player screen → Seek bar (normal: Spicy Lyrics Mobile's 10 dp)
     // Scrub preview (Experiments): while you drag, a bubble above your finger with the time you'd jump to, and the
     // times say the same; off, they show where the song really is until you let go
     val scrub = S.b("xScrub")
@@ -1298,8 +1348,10 @@ private fun SeekRow(inline: Boolean = false) {
         }
     }
     // the time moves on with the app's time ticker (a few times a second), not every frame
-    val now = @Composable { Text(fmtTime(if (d0 != null && scrub) d0 * dur else E.curTime()), fontSize = 14.sp, color = if (d0 != null && scrub) Color.White else dim, fontWeight = FontWeight.Medium) }
-    val end = @Composable { Text(if (d0 != null && scrub) "-" + fmtTime(dur - d0 * dur) else fmtTime(dur), fontSize = 14.sp, color = dim, fontWeight = FontWeight.Medium) }
+    // (Spicy Lyrics Mobile's times: 13 sp, medium, 60% white, figures of one width)
+    val tStyle = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFeatureSettings = "tnum")
+    val now = @Composable { Text(fmtTime(if (d0 != null && scrub) d0 * dur else E.curTime()), style = tStyle, color = if (d0 != null && scrub) Color.White else Color.White.copy(alpha = .6f)) }
+    val end = @Composable { Text(if (d0 != null && scrub) "-" + fmtTime(dur - d0 * dur) else fmtTime(dur), style = tStyle, color = Color.White.copy(alpha = .6f)) }
     // inline: the times on either side of the bar (under a cover in landscape)
     if (inline) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { now(); Spacer(Modifier.width(12.dp)); bar(Modifier.weight(1f)); Spacer(Modifier.width(12.dp)); end() }
     else Column(Modifier.fillMaxWidth()) {
@@ -1373,12 +1425,12 @@ private fun Modifier.canvasShrink(): Modifier {
 
 /** The cover, in its frame (the Canvas plays behind the player, not in here). */
 @Composable
-fun CoverArt(modifier: Modifier, corner: Dp, small: Boolean = false, tall: Boolean = false) {
+fun CoverArt(modifier: Modifier, corner: Dp, small: Boolean = false, tall: Boolean = false, motion: Boolean = !small) {
     val shape = RoundedCornerShape(corner * (S.i("aCoverR").coerceIn(0, 40) / 22f))   // Settings → Player screen → Cover corners (22: as designed)
     Box(modifier.then(if (small) Modifier else Modifier.shadow(24.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)).clip(shape).background(Color.White.copy(alpha = .08f))
         .then(if (S.b("aCoverLine")) Modifier.border(1.dp, Color.White.copy(alpha = .22f), shape) else Modifier)) {   // Settings → Player screen → Cover outline
         Cover(Modifier.fillMaxSize())
-        if (!small) MotionCoverLayer(tall)
+        if (motion) MotionCoverLayer(tall)   // ([motion]: Apple Music's animated cover over it, also in the song at the top of the Lyrics screen)
     }
 }
 

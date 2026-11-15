@@ -86,6 +86,7 @@ fun VibeRoot() {
                 AskDialog()
                 HeatWarning()
                 NoticeDetail()
+                UpdatedCard()
                 Snacks(Modifier.align(Alignment.BottomCenter).navBarsSpace().padding(bottom = 8.dp))
             }
             // errors and warnings: in picture-in-picture too, so their time runs out

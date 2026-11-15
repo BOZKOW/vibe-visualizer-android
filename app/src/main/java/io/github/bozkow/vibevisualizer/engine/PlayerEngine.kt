@@ -115,6 +115,8 @@ object E {
     /** Every message goes to the space at the top: hard errors with their one button, notices (good news, warnings,
      *  waits) as words alone, with nothing to press. */
     fun snack(n: Snack) {
+        // only errors are shown since 0.58.0 (the owner: "get rid of all the notifications except errors, not warnings")
+        if (n.kind != "err") return
         if (notes.any { it.msg == n.msg }) return
         notes.add(n); while (notes.size > 4) notes.removeAt(1)
         // good news (white: up to date, in sync, copied…) goes by itself after 5 s, its button unpressed; red and
@@ -170,8 +172,8 @@ object E {
         if (!homeScreen && nx != null && !inPip && !ambient) out.add(Prob(0, "next", "upnext", nx.title, nx.artist,
             steps = listOf("It plays after this song, as the queue has it now.", "Settings → Lyrics → Up next turns this off."), img = nx.cover.ifEmpty { null }))
         // what's still wrong stays at the top until it's solved: its OK only closes its screen (a one-off notice's OK
-        // puts it away)
-        return out
+        // puts it away). Only errors since 0.58.0: no warnings, waits, good news or Up next (it has its line upright)
+        return out.filter { it.k == "err" }
     }
 
     /** The notice whose detail screen is open (tapped at the top), or null. */
@@ -306,6 +308,10 @@ object E {
         mediaArt = setCoverBitmap(MediaApps.cover(), "From " + MediaApps.appName(), tok)
         // (what's on screen stays until there's something else: only with no cover in the end the default colours)
         if (!mediaArt) Vibe.scope.launch {
+            // no picture with it, but its address (the Spotify app's spotify:image:…, read as Spicy Lyrics reads it): covers
+            // went missing in 0.57.0, the owner's report
+            MediaApps.artUrl()?.let { u -> if (setCover(u, "From " + MediaApps.appName(), tok)) { mediaArt = true; return@launch } }
+            if (tok != coverTok || mediaArt) return@launch
             if (S.b("online")) { status = "Searching for cover…"; if (!findCover(meta, tok) && tok == coverTok) { status = "No cover found · using default"; if (!mediaArt) resetCover() } }
             else { delay(1500); if (tok == coverTok && !mediaArt) resetCover() }
         }
@@ -321,9 +327,15 @@ object E {
         val sid = MediaApps.spotifyId
         if (!dj && sid.isNotEmpty() && sid != mediaId) { mediaId = sid; mediaMeta?.let { m -> CanvasVideo.lookup(m.copy(id = sid, uri = "spotify:track:$sid"), coverTok) } }
         if (mediaArt && !dj) return
-        MediaApps.cover()?.let { mediaArt = setCoverBitmap(it, "From " + MediaApps.appName(), coverTok, quiet = false) }
+        val bm = MediaApps.cover()
+        if (bm != null) { mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false); return }
+        val u = MediaApps.artUrl() ?: return
+        if (u == mediaArtUrl) return
+        mediaArtUrl = u; val tok = coverTok
+        Vibe.scope.launch { if (tok == coverTok && setCover(u, "From " + MediaApps.appName(), tok)) mediaArt = true }
     }
     private var mediaId = ""
+    private var mediaArtUrl = ""
     private var mediaMeta: SongMeta? = null
 
     fun netKick() = Ping.kick()

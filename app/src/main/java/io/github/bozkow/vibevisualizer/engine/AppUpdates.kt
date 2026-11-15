@@ -54,7 +54,14 @@ object Updates {
     /** Whether a release (its tag, "android-v0.35.4") is the version installed. */
     fun isMine(tag: String) = tag.substringAfterLast("-v").removePrefix("v") == mine
 
-    private fun points(body: String) = body.lines().map { it.trim() }.filter { it.startsWith("- ") || it.startsWith("* ") }.map { it.drop(2).trim() }.take(20)
+    // (a point under another, indented in the notes, starts with SUB: drawn indented, 0.58.0)
+    private fun points(body: String) = bullets(body).take(30)
+    const val SUB = "\u0001"
+    fun bullets(body: String) = body.lines().filter { it.trim().startsWith("- ") || it.trim().startsWith("* ") }
+        .map { l -> (if (l.takeWhile { it == ' ' }.length >= 2) SUB else "") + l.trim().drop(2).trim() }
+
+    /** Just updated: (version, its notes' points), shown once as a card (AppRoot); null once it's closed. */
+    var updated by mutableStateOf<Pair<String, List<String>>?>(null)
 
     /** A release of this app, from GitHub's API or its release feed. */
     private class Rel(val tag: String, val apk: String, val note: Note)
@@ -214,10 +221,12 @@ object Updates {
         val last = prefs.getString("ran", "") ?: ""
         prefs.edit().putString("ran", BuildConfig.VERSION_NAME).apply()
         if (last.isEmpty() || last == BuildConfig.VERSION_NAME) return
-        // no request to GitHub here: the notes load when Help & about opens
+        // a card with what's new, at once (0.58.0, the owner's pick; it was a notice): the notes come with the app (its
+        // RELEASE_NOTES.md as an asset), no request to GitHub
         Vibe.scope.launch {
-            kotlinx.coroutines.delay(1500)
-            E.snack(E.Snack("Updated to ${BuildConfig.VERSION_NAME}", "ok", E.Act("What’s new") { E.openSettings("help") }, long = true))
+            kotlinx.coroutines.delay(800)
+            val text = runCatching { Vibe.app.assets.open("RELEASE_NOTES.md").bufferedReader().readText() }.getOrDefault("")
+            updated = BuildConfig.VERSION_NAME to bullets(text)
         }
     }
 

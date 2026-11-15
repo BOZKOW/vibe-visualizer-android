@@ -291,3 +291,30 @@ fun PipHeat() {
         }
     }
 }
+
+/** Just updated (0.58.0, the owner's pick: a card at once, not a notice): the version and what's new in it, from the notes that
+ *  come with the app; OK closes it, and it doesn't come again until the next update. */
+@Composable
+fun UpdatedCard() {
+    val u = io.github.bozkow.vibevisualizer.engine.Updates.updated
+    androidx.compose.animation.AnimatedVisibility(u != null, enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = .96f),
+        exit = androidx.compose.animation.fadeOut()) {
+        val last = androidx.compose.runtime.remember { arrayOfNulls<Pair<String, List<String>>>(1) }
+        if (u != null) last[0] = u
+        val (v, pts) = last[0] ?: return@AnimatedVisibility
+        val close = { io.github.bozkow.vibevisualizer.engine.Updates.updated = null }
+        androidx.activity.compose.BackHandler { close() }
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .55f)).clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) { close() },
+            contentAlignment = Alignment.Center) {
+            Column(Modifier.statusBarsSpace().navBarsSpace().padding(24.dp).widthIn(max = 460.dp).fillMaxWidth().glass(RoundedCornerShape(28.dp), strong = true)
+                .clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {}.padding(24.dp)) {
+                Text("App updated", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = .6f), letterSpacing = 1.sp)
+                Text("Vibe Visualizer $v", Modifier.padding(top = 4.dp), fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                if (pts.isNotEmpty()) Column(Modifier.padding(top = 12.dp).weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    pts.forEach { NotePoint(it, 14.sp) }
+                }
+                VButton(onClick = { close() }, Modifier.padding(top = 18.dp).fillMaxWidth().height(50.dp)) { Text("OK", fontSize = 16.sp) }
+            }
+        }
+    }
+}

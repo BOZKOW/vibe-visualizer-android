@@ -109,7 +109,11 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
     // that took a third of the phone's time and made every animation stutter
     val now by rememberUpdatedState(frac)
     val pct by remember { derivedStateOf { (now().coerceIn(0f, 1f) * 100).roundToInt() } }
-    Canvas(modifier.fillMaxWidth().height(30.dp)
+    // Spicy Lyrics Mobile's timeline (0.58.0, the owner's pick): it thickens by 4 dp while dragged, with a little overshoot
+    var held by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val grow by androidx.compose.animation.core.animateDpAsState(if (held) 4.dp else 0.dp,
+        androidx.compose.animation.core.tween(280, easing = androidx.compose.animation.core.CubicBezierEasing(.34f, 1.56f, .64f, 1f)), label = "seekgrow")
+    Canvas(modifier.fillMaxWidth().height(32.dp)
         .semantics {
             contentDescription = "Seek"; progressBarRangeInfo = ProgressBarRangeInfo(pct / 100f, 0f..1f)
             if (enabled) setProgress { v -> done(v.coerceIn(0f, 1f)); true }
@@ -117,15 +121,17 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
         .pointerInput(enabled) { if (!enabled) return@pointerInput; detectTapGestures(onLongPress = { }) { o -> done((o.x / size.width).coerceIn(0f, 1f)) } }   // (held and let go: no seek)
         .pointerInput(enabled) {
             if (!enabled) return@pointerInput
-            detectHorizontalDragGestures(onDragStart = { o -> last = (o.x / size.width).coerceIn(0f, 1f); drag(last) }, onDragEnd = { done(last) }, onDragCancel = { done(last) }) { ch, _ ->
+            detectHorizontalDragGestures(onDragStart = { o -> held = true; last = (o.x / size.width).coerceIn(0f, 1f); drag(last) }, onDragEnd = { held = false; done(last) }, onDragCancel = { held = false; done(last) }) { ch, _ ->
                 last = (ch.position.x / size.width).coerceIn(0f, 1f); drag(last)
             }
         }) {
-        val h = thick.toPx(); val y = (size.height - h) / 2; val r = CornerRadius(h / 2); val w = size.width
-        if (under != null) { clip.reset(); clip.addRoundRect(RoundRect(0f, y, w, y + h, r)); clipPath(clip) { under() } }
-        drawRoundRect(Color.White.copy(alpha = if (enabled) .14f else .07f), Offset(0f, y), Size(w, h), r)
-        drawRoundRect(Color.White.copy(alpha = .22f), Offset(.5f, y + .5f), Size(w - 1f, h - 1f), r, style = Stroke(1.dp.toPx()))
+        val h = (thick + grow).toPx(); val y = (size.height - h) / 2; val r = CornerRadius(h / 2); val w = size.width
+        clip.reset(); clip.addRoundRect(RoundRect(0f, y, w, y + h, r))
+        if (under != null) clipPath(clip) { under() }
+        // its glass: black at .1 with a 1 px white edge at .16, the white fill clipped to the capsule
+        drawRoundRect(Color.Black.copy(alpha = if (enabled) .1f else .05f), Offset(0f, y), Size(w, h), r)
+        drawRoundRect(Color.White.copy(alpha = .16f), Offset(.5f, y + .5f), Size(w - 1f, h - 1f), r, style = Stroke(1.dp.toPx()))
         val x = frac().coerceIn(0f, 1f) * w
-        if (x > 0f) drawRoundRect(Color.White, Offset(0f, y), Size(maxOf(x, h), h), r)
+        if (x > 0f) clipPath(clip) { drawRect(Color.White, Offset(0f, y), Size(x, h)) }
     }
 }

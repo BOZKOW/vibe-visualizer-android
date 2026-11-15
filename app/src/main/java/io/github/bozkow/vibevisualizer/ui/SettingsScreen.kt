@@ -972,7 +972,7 @@ private fun AppUpdates() {
         Hint("Update now downloads the new version from GitHub and installs it over this one; your settings and saved lyrics stay. The first time, Android asks you to allow it; after that, updates install by themselves.")
         if (Updates.notes.isNotEmpty()) {
             SectionLabel("Release notes")
-            Updates.notes.forEachIndexed { i, n -> NoteView(n, i < 2) }
+            Updates.notes.forEachIndexed { i, n -> NoteView(n, i == 0) }   // (the newest open, the rest a tap away)
         }
     }
 }
@@ -994,6 +994,17 @@ private fun md(s: String): androidx.compose.ui.text.AnnotatedString = androidx.c
     append(s.substring(at))
 }
 
+/** One point of a release's notes; one under another indented, with a hollow dot (they were all flat before 0.58.0). */
+@Composable
+fun NotePoint(p: String, size: androidx.compose.ui.unit.TextUnit = 13.sp) {
+    val sub = p.startsWith(Updates.SUB)
+    val t = p.removePrefix(Updates.SUB)
+    Row(Modifier.padding(top = 3.dp, start = if (sub) 16.dp else 0.dp)) {
+        Text(if (sub) "◦" else "•", fontSize = size, color = Color.White.copy(alpha = .8f), modifier = Modifier.width(14.dp))
+        Text(md(t), fontSize = size, color = Color.White.copy(alpha = .8f))
+    }
+}
+
 @Composable
 private fun NoteView(n: Updates.Note, open: Boolean) {
     // the version you have is marked, and open (Spicy Lyrics Mobile 0.17's changelog)
@@ -1007,7 +1018,7 @@ private fun NoteView(n: Updates.Note, open: Boolean) {
                 fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Text(n.date.take(10), fontSize = 12.sp, color = Color.White.copy(alpha = .5f))
         }
-        if (o) n.points.forEach { Text(md("•  $it"), fontSize = 13.sp, color = Color.White.copy(alpha = .8f), modifier = Modifier.padding(top = 3.dp)) }
+        if (o) n.points.forEach { NotePoint(it) }
         else if (n.points.isNotEmpty()) Text("${n.points.size} change" + (if (n.points.size > 1) "s" else "") + " ›", fontSize = 12.sp, color = Color.White.copy(alpha = .5f))
     }
 }
