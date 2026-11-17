@@ -1144,15 +1144,21 @@ private fun MediaLikeButton() {
     CustomIcon(c, 22.dp)
 }
 
-/** The music app's bottom row: five buttons you pick (Settings → Player screen → Buttons under the controls; by
- *  default where it plays · the bars · Lyrics timing · Resync · Look again), then Settings, always last: it's the way into them. */
+private val LocalBarCapsule = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** The music app's bottom row, in one capsule using the app's existing glass: five buttons you pick, then Settings,
+ *  always last (Settings → Player screen → Buttons under the controls). */
 @Composable
 private fun BottomBar(big: Boolean = true, mid: Boolean = false, lyricsToggles: Boolean = false) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = if (big) 6.dp else 2.dp, bottom = 4.dp)) {
     // six that fit with room between them (a narrow phone, or the largest display size), and round when the row gets less
     // height than they'd like (on its side: the large song name, a notice of two lines and the controls together)
-    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 40.dp) / 6, (maxHeight - (if (big) 10.dp else 6.dp)).coerceAtLeast(0.dp))
-    Row(Modifier.fillMaxWidth().padding(top = if (big) 6.dp else 2.dp, bottom = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    val inset = 4.dp
+    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 40.dp) / 6, (maxHeight - inset * 2).coerceAtLeast(0.dp))
+    val shape = RoundedCornerShape(50)
+    androidx.compose.runtime.CompositionLocalProvider(LocalBarCapsule provides true) {
+    Row(Modifier.fillMaxWidth().clip(shape).liquidFrost(radius = d / 2 + inset).drawBehind { glassBody(0f) }
+        .border(1.dp, GlassRim, shape).padding(inset), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         // (Lyrics and Visualizer were screens of their own until 0.38.0: a slot saved with Lyrics turns the bars on and
         // off now, one with the Visualizer opens Lyrics timing, so the old default row has no button twice)
         val picks = (1..5).map { i -> S.str("aBar$i").let { k -> when (k) { "lyrics" -> "bars"; "viz" -> "timing"; else -> k } } }
@@ -1162,6 +1168,7 @@ private fun BottomBar(big: Boolean = true, mid: Boolean = false, lyricsToggles: 
         val first = if (!lyricsToggles) emptyList() else listOfNotNull("tr".takeIf { Lyr.needTr && "tr" !in picks }, "rom".takeIf { Lyr.needRom && "rom" !in picks })
         for (k in (first + picks).take(5)) BarButton(k, d)
         BarIcon(Icons.Rounded.Settings, "Settings", false, d) { E.openSettings() }
+    }
     }
     }
 }
@@ -1214,6 +1221,7 @@ private var rotLock by mutableStateOf(false)
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp, text: String? = null, enabled: Boolean = true, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
+    val grouped = LocalBarCapsule.current
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val k by animateFloatAsState(if (on) 1f else 0f, tween(260), label = "baron")   // the highlight fades between screens
     val a by animateFloatAsState(if (enabled) 1f else .4f, tween(220), label = "barok")
@@ -1221,8 +1229,10 @@ private fun BarIcon(icon: ImageVector?, desc: String, on: Boolean, d: Dp = 54.dp
     val fg = androidx.compose.ui.graphics.lerp(Color.White, Color(0xFF111116), k)
     // off: the glass (0.55.0: the cover's colour, a sheen and a rim that catches the light, over the frost behind it)
     // (Liquid glass, the experiment: what's behind through a lens, clear)
-    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape).liquidFrost().drawBehind { glassBody(0f, 1f - k) }.background(Color.White.copy(alpha = .9f * k))
-        .border(1.dp, GlassRim, CircleShape)
+    Box(Modifier.size(d).alpha(a).pressScale(src).clip(CircleShape)
+        .then(if (grouped) Modifier else Modifier.liquidFrost().drawBehind { glassBody(0f, 1f - k) })
+        .background(Color.White.copy(alpha = .9f * k))
+        .then(if (grouped) Modifier else Modifier.border(1.dp, GlassRim, CircleShape))
         .quickClick(src, enabled, androidx.compose.material3.ripple(), onHold = onLongClick?.let { h -> { E.haptic(); h() } }) { E.haptic(); onClick() }
         .semantics { contentDescription = desc; selected = on }, contentAlignment = Alignment.Center) {
         if (icon != null) Icon(icon, null, Modifier.size(d * .42f), tint = fg)
