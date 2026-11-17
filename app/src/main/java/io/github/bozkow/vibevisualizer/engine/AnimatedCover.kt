@@ -68,6 +68,12 @@ internal object MotionSearch {
     /** The record's name without its edition ("(Deluxe)", "- Single"). */
     fun plain(name: String): String { var o = name; repeat(2) { o = EDITION.replace(o, "") }; return o.trim().ifEmpty { name } }
 
+    /** An edition may share its record's animation; a longer album name is not the same record. */
+    fun sameAlbum(a: String, b: String): Boolean {
+        val ka = akey(plain(a)); val kb = akey(plain(b))
+        return ka.isNotEmpty() && ka == kb
+    }
+
     /** The album pages worth opening, best first. The artist counts as much as the name (album names are far from unique,
      *  and a loose match would hang another artist's video on this record); among equal names the explicit edition goes
      *  first, the one Apple usually animates. */
@@ -75,7 +81,7 @@ internal object MotionSearch {
         val name = album.ifBlank { title }
         return hits.asSequence().filter {
             it.url.isNotEmpty() && loose(artist, it.artist) &&
-                (loose(name, it.name) || (album.isBlank() && title.isNotBlank() && akey(plain(title)) == akey(plain(it.track))))
+                (sameAlbum(name, it.name) || (album.isBlank() && title.isNotBlank() && akey(plain(title)) == akey(plain(it.track))))
         }
             .sortedWith(compareBy<AlbumHit> { when { akey(it.name) == akey(name) -> 0; akey(plain(it.name)) == akey(plain(name)) -> 1; else -> 2 } }.thenBy { !it.explicit })
             .distinctBy { albumId(it.url) }.map { it.url }.toList()
@@ -118,8 +124,8 @@ internal object MotionSearch {
 /** Apple Music's animated covers: the looping video on an album's page, played over the still cover where an album has
  *  one. No account and no key: iTunes' public search says which album it is, and the album's public music.apple.com page
  *  has the stream. That page's format is Apple's and undocumented, so everything here is best effort: any failure ends
- *  with no video, and the still cover stays. It's only asked for and streamed while a big cover is on screen, and never
- *  beside a Canvas (one video at a time). Settings → Player screen → Animated covers. */
+ *  with no video, and the still cover stays. It's only asked for and streamed while a cover is on screen; a Canvas can
+ *  play behind it. Settings → Player screen → Animated covers. */
 @OptIn(UnstableApi::class)
 object AnimatedCover {
     private const val MISS_MS = 30L * 24 * 3600 * 1000   // an album with none is asked about again after a month
@@ -127,15 +133,14 @@ object AnimatedCover {
     private val prefs by lazy { Vibe.app.getSharedPreferences("motioncovers", android.content.Context.MODE_PRIVATE) }   // key → "when|video|tall" (MotionSearch.Entry)
     private val searchVersionLock = Any()
     private val searchVersionKey = "_search_version"
-    private val searchVersion = 3   // retry misses from before song matching worked without an album name
+    private val searchVersion = 4   // older hits may belong to another album whose name only partially matched
     private val http by lazy { Net.http.newBuilder().cache(null).build() }   // album pages are big: not for the small answers' cache
     private var lookupNote = "not requested"
     private var lookupError = ""
 
     fun debugInfo() = "animated cover: $lookupNote" + (if (lookupError.isEmpty()) "" else " · $lookupError") +
         " · enabled=${io.github.bozkow.vibevisualizer.core.S.b("aMotionCover")}" +
-        " · before Canvas=${io.github.bozkow.vibevisualizer.core.S.b("aMotionFirst")}" +
-        " · Canvas=${CanvasVideo.active} · ready=$ready · surface=${view?.get()?.isAvailable == true}" +
+        " · Canvas=${CanvasVideo.active} · Canvas ready=${CanvasVideo.hasVideo} · ready=$ready · surface=${view?.get()?.isAvailable == true}" +
         " · playing=${player?.isPlaying == true}"
 
     /** The record's stream, or null: none, can't tell now, or another song came first (the caller's cancelled then). */
@@ -198,13 +203,13 @@ object AnimatedCover {
         return entry
     }
 
-    /** Old negative results can hide the cover after Apple's page changes; keep valid hits but retry old misses. */
+    /** Before version 4 even a hit could be another album's video: recheck those, not the cached video files. */
     private fun refreshSearchCache() = synchronized(searchVersionLock) {
         val p = prefs
         if (p.getInt(searchVersionKey, 0) >= searchVersion) return@synchronized
         val edit = p.edit()
         p.all.forEach { (key, value) ->
-            if (key != searchVersionKey && value is String && MotionSearch.parseEntry(value).url.isEmpty()) edit.remove(key)
+            if (key != searchVersionKey && value is String) edit.remove(key)
         }
         edit.putInt(searchVersionKey, searchVersion).apply()
     }

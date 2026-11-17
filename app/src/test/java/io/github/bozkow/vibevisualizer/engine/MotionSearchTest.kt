@@ -21,6 +21,20 @@ class MotionSearchTest {
         assertEquals(listOf("3", "2", "1"), r.map { MotionSearch.albumId(it) })
     }
 
+    @Test fun oneAlbumMustNotBorrowAnotherAlbumsAnimation() {
+        val hits = listOf(
+            hit(1, "The Record", "Band"),
+            hit(2, "The Record Monster", "Band"),
+            hit(3, "The Record (Deluxe Edition)", "Band"),
+            hit(4, "The Record II", "Band"),
+        )
+        assertEquals(listOf("2"), MotionSearch.rankAlbums(hits, "Band", "The Record Monster (Deluxe Edition)").map { MotionSearch.albumId(it) })
+        assertEquals(listOf("1", "3"), MotionSearch.rankAlbums(hits, "Band", "The Record").map { MotionSearch.albumId(it) })
+        // A matching track title doesn't authorize borrowing another record's video when the album is known.
+        val songOnAnotherAlbum = hits[0].copy(track = "The Song")
+        assertTrue(MotionSearch.rankAlbums(listOf(songOnAnotherAlbum), "Band", "The Record Monster", "The Song").isEmpty())
+    }
+
     @Test fun editionsComeOff() {
         assertEquals("Album", MotionSearch.plain("Album (Deluxe Edition)"))
         assertEquals("Song", MotionSearch.plain("Song - Single"))

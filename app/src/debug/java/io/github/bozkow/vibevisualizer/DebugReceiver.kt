@@ -18,7 +18,7 @@ import io.github.bozkow.vibevisualizer.lyrics.Person
  *  adb shell am broadcast -n io.github.bozkow.vibevisualizer/.DebugReceiver --es set lstyle --es to focus
  *  … --es page lyrics (or close) · … --es sheet timing (or close) · … --es year 2024 · … --es dj 1 (Spotify's DJ starts talking) · … --es canvas 1 (look up a Canvas for this song)
  *  · … --es files content://media/external/file/1,content://… (play these files one after another: Up next) · … --es seek 150 (s)
- *  · … --es debugInfo 1 (Copy debug info in logcat, tag VV-dbg) */
+ *  · … --es debugInfo 1 (Copy debug info in logcat, tag VV-dbg) · … --es orientation landscape|portrait|auto */
 class DebugReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
         val set = i.getStringExtra("set"); val to = i.getStringExtra("to")
@@ -50,6 +50,11 @@ class DebugReceiver : BroadcastReceiver() {
             }
             i.getStringExtra("seek")?.toDoubleOrNull()?.let { io.github.bozkow.vibevisualizer.media.Local.seek((it * 1000).toLong()) }
             if (i.hasExtra("debugInfo")) android.util.Log.i("VV-dbg", Lyr.debugInfo())
+            i.getStringExtra("orientation")?.let { o -> E.activity?.requestedOrientation = when (o) {
+                "landscape" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                "portrait" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            } }
             if (page != null) { if (page == "close") E.settingsPage = null else E.openSettings(page) }
             if (sheet != null) E.sheet = if (sheet == "close") null else sheet
         }

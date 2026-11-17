@@ -1438,7 +1438,7 @@ fun CoverArt(modifier: Modifier, corner: Dp, small: Boolean = false, tall: Boole
 }
 
 /** Over the still cover: the album's animated cover from Apple Music, where it has one (it fades in on its first frame;
- *  none, or it fails, and the still cover is simply what shows). Never beside a Canvas: one video at a time. [tall]: a
+ *  none, or it fails, and the still cover is simply what shows). Canvas can play behind it. [tall]: a
  *  cover that grows taller for Apple's tall (3:4) stream, where the record has one (Spicy Lyrics Mobile 0.19.0). */
 @Composable
 private fun MotionCoverLayer(tall: Boolean = false) {
@@ -1452,7 +1452,7 @@ private fun MotionCoverLayer(tall: Boolean = false) {
     AndroidView({ ctx -> TextureView(ctx) }, Modifier.fillMaxSize().graphicsLayer { alpha = a }, update = { AnimatedCover.attach(it, u) }, onRelease = { AnimatedCover.detach(it) })
 }
 
-private fun motionCoverOn() = S.b("aMotionCover") && !S.low && !CanvasVideo.active && !E.dj && E.src != "none" && E.title != "Nothing playing"
+private fun motionCoverOn() = S.b("aMotionCover") && !S.low && !E.dj && E.src != "none" && E.title != "Nothing playing"
 
 /** How wide the upright big cover is for its height: 1 (square), or Apple's tall shape while its tall stream plays. */
 @Composable

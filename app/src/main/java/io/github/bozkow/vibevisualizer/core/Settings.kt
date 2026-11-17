@@ -79,7 +79,7 @@ object Defaults {
         "aTopLine" to true,     // the line at the top: where it plays from and on
         "aYear" to true,        // the release year beside the artist
         "aMotionCover" to true, // Apple Music's animated covers, where an album has one
-        "aMotionFirst" to false, // a song with both: its animated cover instead of its Canvas (Spicy Lyrics Mobile 0.19.0)
+        "aMotionFirst" to false, // legacy backup key; Canvas and animated covers now play together where a cover shows
         "aBgHex" to "",         // the Color background: #RRGGBB, or empty for the cover's
         "ljoinPace" to false,   // Join split words: each syllable's letters at that syllable's own speed
         "ljoinMode" to "off",   // Join split words (Spicy Lyrics 6.5.0): off, full (all words), steady (steadily sung), held (held words); off by default again as in 6.5.10
