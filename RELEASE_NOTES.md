@@ -1,3 +1,4 @@
-Vibe Visualizer for Android 0.58.4 (beta). Android 12 or newer; it installs over 0.58.3 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.58.5 (beta). Android 12 or newer; it installs over 0.58.4 (Settings → Help & about → Update now).
 
-- **A steady DJ:** the cover and colours no longer flicker as if the song changed every second while the DJ talks or a song starts. Spotify sends the same picture many times, and now only a different one changes the cover.
+- **Animated covers:** songs can find their Apple Music animation without an album name, and old failed searches are tried again.
+- **Play and pause:** cover animations follow the music app when playback stops or resumes.

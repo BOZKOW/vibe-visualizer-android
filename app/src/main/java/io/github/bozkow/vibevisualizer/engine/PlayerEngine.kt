@@ -270,7 +270,7 @@ object E {
     val mediaVer = androidx.compose.runtime.mutableIntStateOf(0)
     fun onMediaState() {
         mediaVer.intValue++
-        if (src == "media") { updPlay(); poke(); if (MediaApps.connected.value.not()) { title = "Nothing playing"; artist = "Play something in a music app"; resetCover(); Lyr.clear("") }; return }
+        if (src == "media") { updPlay(); CanvasVideo.syncPlay(); poke(); if (MediaApps.connected.value.not()) { title = "Nothing playing"; artist = "Play something in a music app"; resetCover(); Lyr.clear("") }; return }
         if (!S.b("aOtherApps") || !MediaApps.playing || MediaApps.title.isEmpty()) return
         val busy = (src == "file" && Local.playing()) || (src == "spotify" && Spotify.spPlaying())
         if (!busy) setSource("media")

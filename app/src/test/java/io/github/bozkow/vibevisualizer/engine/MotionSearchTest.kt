@@ -45,11 +45,41 @@ class MotionSearchTest {
         assertTrue(MotionSearch.parseAlbums("not json").isEmpty())
     }
 
+    @Test fun aSongFindsItsAlbumWhenThePlayerHasNoAlbumName() {
+        val hits = MotionSearch.parseAlbums("""{"results":[
+            {"wrapperType":"track","collectionViewUrl":"https://music.apple.com/us/album/a/11?i=12","collectionName":"The Record","artistName":"The Artist","trackName":"The Song"},
+            {"wrapperType":"track","collectionViewUrl":"https://music.apple.com/us/album/b/22?i=23","collectionName":"Another Record","artistName":"Another Artist","trackName":"The Song"},
+            {"wrapperType":"track","collectionViewUrl":"https://music.apple.com/us/album/c/33?i=34","collectionName":"Other Songs","artistName":"The Artist","trackName":"The Song Goes On"}]}""")
+        assertEquals(listOf("https://music.apple.com/us/album/a/11"), MotionSearch.rankAlbums(hits, "The Artist", "", "The Song"))
+        // A supplied album must still match: a track result mustn't override the requested record/edition.
+        assertTrue(MotionSearch.rankAlbums(hits, "The Artist", "Different Record", "The Song").isEmpty())
+    }
+
     @Test fun theVideoOnAnAlbumPage() {
         val page = """<div><amp-ambient-video class="x" data-testid="video" src="https://mvod.itunes.apple.com/itunes-assets/a/b/P123_Anull_video_gr698_sdr_1080x1080-.m3u8" poster="p.jpg"></amp-ambient-video></div>"""
         assertTrue(MotionSearch.ambientVideo(page)!!.endsWith("1080x1080-.m3u8"))
         assertNull(MotionSearch.ambientVideo("<html>no video here</html>"))
         assertEquals(listOf("123", "456"), MotionSearch.albumIds("""href="https://music.apple.com/us/album/a/123" x music.apple.com/us/album/b/456?i=1 music.apple.com/us/album/a/123"""))
+    }
+
+    @Test fun applePageVariantsKeepTheSignedStreamIntact() {
+        assertEquals("https://a/square.m3u8?one=1&two=2", MotionSearch.ambientVideo("""
+            <amp-ambient-video
+                src = 'https://a/square.m3u8?one=1&amp;two=2'>
+            </amp-ambient-video>
+        """))
+        assertEquals("https://a/tall.m3u8?one=1&two=2", MotionSearch.tallVideo("""
+            {"motionDetailTall": {
+                "previewFrame": {"height": 2732},
+                "video": "https:\/\/a\/tall.m3u8?one=1\u0026two=2"
+            }}
+        """))
+        assertEquals("https://a/square.m3u8?one=1&two=2", MotionSearch.ambientVideo("""
+            {"motionDetailSquare": {
+                "previewFrame": {"url": "https://a/still.jpg"},
+                "video": "https:\/\/a\/square.m3u8?one=1\u0026two=2"
+            }}
+        """))
     }
 
     @Test fun theTallStreamComesFromThePageDataPastItsPreviewFrame() {

@@ -841,6 +841,7 @@ object Lyr {
         "song: " + (cur?.m?.let { it.artist + " – " + it.title + (Spotify.spId?.let { id -> " ($id)" } ?: "") } ?: "—"),
         "lyrics: " + (if (L.isNotEmpty()) (if (lsync) "synced" else "not synced") + " from " + (PROVS[prov() ?: ""]?.name ?: "?") else "none") + " · offset ${S.loff} ms · this song ${songOffMs} ms · ${Outputs.route.label} ${Outputs.offMs} ms" + (if (Outputs.here(E.src)) "" else " (not playing here)"),
         "cover: " + E.coverNote.ifEmpty { "—" },
+        AnimatedCover.debugInfo(),
         "song changes: " + (when (E.src) { "spotify" -> Spotify.paceNote(); "media" -> "follows " + io.github.bozkow.vibevisualizer.media.MediaApps.appName() + " (" + io.github.bozkow.vibevisualizer.media.MediaApps.pkg + ")"; else -> "—" }),
         "camera cutout: " + io.github.bozkow.vibevisualizer.ui.cutoutNote(E.activity?.window?.decorView),
         "screen: " + (E.activity?.display?.let { d -> "${d.refreshRate.toInt()} Hz now · modes " + d.supportedModes.map { it.refreshRate.toInt() }.distinct().sorted().joinToString(", ") } ?: "?") + (if (E.ambient) " · Ambient mode" else ""),

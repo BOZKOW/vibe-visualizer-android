@@ -37,12 +37,12 @@ import kotlin.math.max
 
 /** What finding an animated cover reads, without Android or the network. */
 internal object MotionSearch {
-    data class AlbumHit(val url: String, val name: String, val artist: String, val explicit: Boolean = false)
+    data class AlbumHit(val url: String, val name: String, val artist: String, val explicit: Boolean = false, val track: String = "")
 
     private val AMBIENT_TAG = Regex("<amp-ambient-video\\b[^>]*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private val VIDEO_SRC = Regex("\\bsrc\\s*=\\s*[\"']([^\"']+?\\.m3u8(?:\\?[^\"']*)?)[\"']", RegexOption.IGNORE_CASE)
     private val SQUARE_VIDEO = Regex("\"motionDetailSquare\"\\s*:\\s*\\{.{0,5000}?\"video\"\\s*:\\s*\"([^\"]+?\\.m3u8(?:\\?[^\"]*)?)\"", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
-    private val TALL_VIDEO = Regex("\"motionDetailTall\":\\{.{0,3000}?\"video\":\"([^\"]+\\.m3u8)\"")
+    private val TALL_VIDEO = Regex("\"motionDetailTall\"\\s*:\\s*\\{.{0,5000}?\"video\"\\s*:\\s*\"([^\"]+?\\.m3u8(?:\\?[^\"]*)?)\"", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private val ALBUM_LINK = Regex("music\\.apple\\.com/[a-z]{2}/album/[^/\"?]+/(\\d+)")
     private val EDITION = Regex("\\s*(?:[(\\[][^()\\[\\]]*(?:deluxe|edition|version|remaster|expanded|anniversary|special|bonus|explicit|reissue)[^()\\[\\]]*[)\\]]" +
         "|-\\s*(?:single|ep|deluxe\\b.*|.*\\bedition\\b.*|.*\\bversion\\b.*))\\s*$", RegexOption.IGNORE_CASE)
@@ -71,10 +71,15 @@ internal object MotionSearch {
     /** The album pages worth opening, best first. The artist counts as much as the name (album names are far from unique,
      *  and a loose match would hang another artist's video on this record); among equal names the explicit edition goes
      *  first, the one Apple usually animates. */
-    fun rankAlbums(hits: List<AlbumHit>, artist: String, name: String): List<String> =
-        hits.asSequence().filter { it.url.isNotEmpty() && loose(name, it.name) && loose(artist, it.artist) }
+    fun rankAlbums(hits: List<AlbumHit>, artist: String, album: String, title: String = ""): List<String> {
+        val name = album.ifBlank { title }
+        return hits.asSequence().filter {
+            it.url.isNotEmpty() && loose(artist, it.artist) &&
+                (loose(name, it.name) || (album.isBlank() && title.isNotBlank() && akey(plain(title)) == akey(plain(it.track))))
+        }
             .sortedWith(compareBy<AlbumHit> { when { akey(it.name) == akey(name) -> 0; akey(plain(it.name)) == akey(plain(name)) -> 1; else -> 2 } }.thenBy { !it.explicit })
             .distinctBy { albumId(it.url) }.map { it.url }.toList()
+    }
 
     /** iTunes' answer (a song stands for the album it's on). */
     fun parseAlbums(json: String): List<AlbumHit> = runCatching {
@@ -82,7 +87,7 @@ internal object MotionSearch {
         (0 until a.length()).mapNotNull { i ->
             val o = a.getJSONObject(i)
             if (o.optString("wrapperType") !in setOf("collection", "track")) return@mapNotNull null
-            AlbumHit(o.optString("collectionViewUrl").substringBefore('?'), o.optString("collectionName"), o.optString("artistName"), o.optString("collectionExplicitness") == "explicit")
+            AlbumHit(o.optString("collectionViewUrl").substringBefore('?'), o.optString("collectionName"), o.optString("artistName"), o.optString("collectionExplicitness") == "explicit", o.optString("trackName"))
         }
     }.getOrDefault(emptyList())
 
@@ -101,7 +106,7 @@ internal object MotionSearch {
         .replace("&amp;", "&", ignoreCase = true)
 
     /** The record's tall (3:4) stream, in the page's data: its own player only shows the square one (Mobile 0.19.0). */
-    fun tallVideo(html: String) = TALL_VIDEO.find(html)?.groupValues?.get(1)
+    fun tallVideo(html: String) = TALL_VIDEO.find(html)?.groupValues?.get(1)?.let(::cleanVideoUrl)
 
     /** A record as remembered: when, its square stream ("" none) and its tall one ("" none, null: from before they were read). */
     data class Entry(val at: Long, val url: String, val tall: String?)
@@ -122,8 +127,16 @@ object AnimatedCover {
     private val prefs by lazy { Vibe.app.getSharedPreferences("motioncovers", android.content.Context.MODE_PRIVATE) }   // key → "when|video|tall" (MotionSearch.Entry)
     private val searchVersionLock = Any()
     private val searchVersionKey = "_search_version"
-    private val searchVersion = 2
+    private val searchVersion = 3   // retry misses from before song matching worked without an album name
     private val http by lazy { Net.http.newBuilder().cache(null).build() }   // album pages are big: not for the small answers' cache
+    private var lookupNote = "not requested"
+    private var lookupError = ""
+
+    fun debugInfo() = "animated cover: $lookupNote" + (if (lookupError.isEmpty()) "" else " · $lookupError") +
+        " · enabled=${io.github.bozkow.vibevisualizer.core.S.b("aMotionCover")}" +
+        " · before Canvas=${io.github.bozkow.vibevisualizer.core.S.b("aMotionFirst")}" +
+        " · Canvas=${CanvasVideo.active} · ready=$ready · surface=${view?.get()?.isAvailable == true}" +
+        " · playing=${player?.isPlaying == true}"
 
     /** The record's stream, or null: none, can't tell now, or another song came first (the caller's cancelled then). */
     suspend fun find(artists: String, album: String, title: String): String? = lookup(artists, album, title, tall = false)?.url?.ifEmpty { null }
@@ -135,18 +148,20 @@ object AnimatedCover {
     private suspend fun lookup(artists: String, album: String, title: String, tall: Boolean): MotionSearch.Entry? {
         refreshSearchCache()
         val artist = MotionSearch.leadArtist(artists)
-        val key = MotionSearch.key(artist, album, title) ?: return null
+        val key = MotionSearch.key(artist, album, title) ?: run { lookupNote = "missing artist or title"; return null }
+        lookupError = ""
         val known = prefs.getString(key, null)?.let(MotionSearch::parseEntry)
         if (known != null) {
-            if (known.url.isNotEmpty() && (known.tall != null || !tall)) return known
-            if (known.url.isEmpty() && wall() - known.at < MISS_MS) return known
+            if (known.url.isNotEmpty() && (known.tall != null || !tall)) { lookupNote = "saved stream"; return known }
+            if (known.url.isEmpty() && wall() - known.at in 0L until MISS_MS) { lookupNote = "saved: no animation"; return known }
         }
+        lookupNote = "searching Apple" + if (album.isBlank()) " by song (no album supplied)" else " by album"
         delay(800)   // skipping through songs: only the one you stop on is asked about
         var failed = false
         suspend fun get(u: String): String? = try {
             val req = Request.Builder().url(u).header("User-Agent", UA).header("Accept-Language", "en-US,en;q=0.9").build()
-            withContext(Dispatchers.IO) { http.newCall(req).await().use { r -> if (r.isSuccessful) r.body.string() else { failed = true; null } } }   // (read and closed off the main thread)
-        } catch (e: CancellationException) { throw e } catch (e: Exception) { failed = true; null }
+            withContext(Dispatchers.IO) { http.newCall(req).await().use { r -> if (r.isSuccessful) r.body.string() else { failed = true; lookupError = "${req.url.host}: HTTP ${r.code}"; null } } }   // (read and closed off the main thread)
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { failed = true; lookupError = e.javaClass.simpleName; null }
         fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
         fun tidy(s: String) = s.split(Regex("\\s+")).filter { it.isNotEmpty() }.joinToString(" ")
         suspend fun itunes(term: String, entity: String) = get("https://itunes.apple.com/search?term=${enc(term)}&entity=$entity&limit=10")?.let(MotionSearch::parseAlbums).orEmpty()
@@ -164,7 +179,7 @@ object AnimatedCover {
         )
         val tried = HashSet<String>(); var found: Pair<String, String?>? = null
         run search@{
-            for (stage in stages) for (u in MotionSearch.rankAlbums(stage(), artist, name)) {
+            for (stage in stages) for (u in MotionSearch.rankAlbums(stage(), artist, album, title)) {
                 if (!tried.add(MotionSearch.albumId(u))) continue
                 val page = get(u) ?: continue
                 val square = MotionSearch.ambientVideo(page) ?: continue
@@ -172,12 +187,13 @@ object AnimatedCover {
             }
         }
         // a failed request isn't "none": asked again next time (a record already known keeps its stream meanwhile)
-        if (found == null && failed) return known?.takeIf { it.url.isNotEmpty() }
+        if (found == null && failed) { lookupNote = "lookup incomplete (not saved as a miss)"; return known?.takeIf { it.url.isNotEmpty() } }
         val entry = when {
             found != null -> MotionSearch.Entry(wall(), found!!.first, found!!.second.orEmpty())
             known != null && known.url.isNotEmpty() -> MotionSearch.Entry(known.at, known.url, "")   // remembered from before tall ones were read
             else -> MotionSearch.Entry(wall(), "", "")
         }
+        lookupNote = if (entry.url.isEmpty()) "no matching animation found" else "found stream"
         prefs.edit().putString(key, MotionSearch.storeEntry(entry)).apply(); trim()
         return entry
     }
@@ -196,7 +212,7 @@ object AnimatedCover {
     private fun trim() {
         val all = prefs.all; if (all.size <= 800) return
         val e = prefs.edit()
-        all.entries.sortedBy { (it.value as? String)?.substringBefore('|')?.toLongOrNull() ?: 0L }.take(all.size - 700).forEach { e.remove(it.key) }
+        all.entries.filter { it.key != searchVersionKey }.sortedBy { (it.value as? String)?.substringBefore('|')?.toLongOrNull() ?: 0L }.take(all.size - 700).forEach { e.remove(it.key) }
         e.apply()
     }
 
@@ -211,12 +227,13 @@ object AnimatedCover {
     private val cache by lazy { SimpleCache(File(Vibe.app.cacheDir, "motion"), LeastRecentlyUsedCacheEvictor(150L shl 20), CanvasVideo.cacheDb) }   // a loop is a few MB
 
     private val listener = object : Player.Listener {
-        override fun onRenderedFirstFrame() { ready = true; colors.start() }
+        override fun onRenderedFirstFrame() { ready = true; sync(); colors.start() }
         override fun onVideoSizeChanged(s: VideoSize) {
             if (s.width > 0 && s.height > 0) { vw = s.width.toFloat(); vh = s.height.toFloat(); aspect = vw * s.pixelWidthHeightRatio / vh; view?.get()?.let(::fit) }
         }
         override fun onPlayerError(error: PlaybackException) {   // remembered, but gone: looked up again next time; the still cover stays
             android.util.Log.w("VV-cover", "can't play: ${error.errorCodeName}")
+            lookupError = "playback: ${error.errorCodeName}"
             val bad = cur ?: return; ready = false; cur = null
             prefs.all.filterValues { (it as? String)?.split('|')?.drop(1)?.contains(bad) == true }.keys.forEach { prefs.edit().remove(it).apply() }
         }
