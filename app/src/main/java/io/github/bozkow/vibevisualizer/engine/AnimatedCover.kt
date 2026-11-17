@@ -39,7 +39,9 @@ import kotlin.math.max
 internal object MotionSearch {
     data class AlbumHit(val url: String, val name: String, val artist: String, val explicit: Boolean = false)
 
-    private val AMBIENT_VIDEO = Regex("<amp-ambient-video[^>]+src=\"([^\"]+\\.m3u8)\"")
+    private val AMBIENT_TAG = Regex("<amp-ambient-video\\b[^>]*>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+    private val VIDEO_SRC = Regex("\\bsrc\\s*=\\s*[\"']([^\"']+?\\.m3u8(?:\\?[^\"']*)?)[\"']", RegexOption.IGNORE_CASE)
+    private val SQUARE_VIDEO = Regex("\"motionDetailSquare\"\\s*:\\s*\\{.{0,5000}?\"video\"\\s*:\\s*\"([^\"]+?\\.m3u8(?:\\?[^\"]*)?)\"", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     private val TALL_VIDEO = Regex("\"motionDetailTall\":\\{.{0,3000}?\"video\":\"([^\"]+\\.m3u8)\"")
     private val ALBUM_LINK = Regex("music\\.apple\\.com/[a-z]{2}/album/[^/\"?]+/(\\d+)")
     private val EDITION = Regex("\\s*(?:[(\\[][^()\\[\\]]*(?:deluxe|edition|version|remaster|expanded|anniversary|special|bonus|explicit|reissue)[^()\\[\\]]*[)\\]]" +
@@ -86,7 +88,17 @@ internal object MotionSearch {
 
     fun albumIds(html: String) = ALBUM_LINK.findAll(html).map { it.groupValues[1] }.distinct().take(12).toList()
     fun albumId(url: String) = url.substringAfterLast('/')
-    fun ambientVideo(html: String) = AMBIENT_VIDEO.find(html)?.groupValues?.get(1)
+    fun ambientVideo(html: String): String? {
+        val tag = AMBIENT_TAG.find(html)?.value
+        val inTag = tag?.let { VIDEO_SRC.find(it)?.groupValues?.get(1) }
+        val fromPageData = SQUARE_VIDEO.find(html)?.groupValues?.get(1)
+        return (inTag ?: fromPageData)?.let(::cleanVideoUrl)
+    }
+
+    private fun cleanVideoUrl(url: String) = url
+        .replace("\\/", "/")
+        .replace("\\u0026", "&", ignoreCase = true)
+        .replace("&amp;", "&", ignoreCase = true)
 
     /** The record's tall (3:4) stream, in the page's data: its own player only shows the square one (Mobile 0.19.0). */
     fun tallVideo(html: String) = TALL_VIDEO.find(html)?.groupValues?.get(1)
@@ -108,6 +120,9 @@ object AnimatedCover {
     private const val MISS_MS = 30L * 24 * 3600 * 1000   // an album with none is asked about again after a month
     private const val UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     private val prefs by lazy { Vibe.app.getSharedPreferences("motioncovers", android.content.Context.MODE_PRIVATE) }   // key → "when|video|tall" (MotionSearch.Entry)
+    private val searchVersionLock = Any()
+    private val searchVersionKey = "_search_version"
+    private val searchVersion = 2
     private val http by lazy { Net.http.newBuilder().cache(null).build() }   // album pages are big: not for the small answers' cache
 
     /** The record's stream, or null: none, can't tell now, or another song came first (the caller's cancelled then). */
@@ -118,6 +133,7 @@ object AnimatedCover {
         lookup(artists, album, title, tall = true)?.let { it.tall?.ifEmpty { null } ?: it.url.ifEmpty { null } }
 
     private suspend fun lookup(artists: String, album: String, title: String, tall: Boolean): MotionSearch.Entry? {
+        refreshSearchCache()
         val artist = MotionSearch.leadArtist(artists)
         val key = MotionSearch.key(artist, album, title) ?: return null
         val known = prefs.getString(key, null)?.let(MotionSearch::parseEntry)
@@ -166,6 +182,17 @@ object AnimatedCover {
         return entry
     }
 
+    /** Old negative results can hide the cover after Apple's page changes; keep valid hits but retry old misses. */
+    private fun refreshSearchCache() = synchronized(searchVersionLock) {
+        val p = prefs
+        if (p.getInt(searchVersionKey, 0) >= searchVersion) return@synchronized
+        val edit = p.edit()
+        p.all.forEach { (key, value) ->
+            if (key != searchVersionKey && value is String && MotionSearch.parseEntry(value).url.isEmpty()) edit.remove(key)
+        }
+        edit.putInt(searchVersionKey, searchVersion).apply()
+    }
+
     private fun trim() {
         val all = prefs.all; if (all.size <= 800) return
         val e = prefs.edit()
@@ -203,7 +230,7 @@ object AnimatedCover {
             // Apple offers up to 1080² (1080 × 1440 tall) at 10 Mbit/s: one steady rendition below that keeps a loop to a few MB
             // and caches cleanly
             trackSelectionParameters = trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
-                .setMaxVideoSize(1080, 1440).setMaxVideoBitrate(3_600_000).setForceHighestSupportedBitrate(true).build()
+                .setMaxVideoSize(1080, 1440).setMaxVideoBitrate(3_600_000).build()
             addListener(listener); player = this
         }
     }
@@ -233,7 +260,8 @@ object AnimatedCover {
     /** It moves while the music plays, on screen; otherwise it holds its frame. */
     fun sync() {
         val p = player ?: return
-        if (view?.get() != null && cur != null && E.visible && !E.ambient && E.playing()) p.play() else p.pause()
+        // A paused song still gets the cover's first frame. Once drawn, keep the loop in step with music playback.
+        if (view?.get() != null && cur != null && E.visible && !E.ambient && (!ready || E.playing())) p.play() else p.pause()
     }
 
     /** object-fit: cover (square, or 3:4 in a cover grown to it). */
