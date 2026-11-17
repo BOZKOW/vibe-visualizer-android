@@ -17,7 +17,8 @@ import io.github.bozkow.vibevisualizer.lyrics.Person
  *  directly, as Settings would, without finding them on screen:
  *  adb shell am broadcast -n io.github.bozkow.vibevisualizer/.DebugReceiver --es set lstyle --es to focus
  *  … --es page lyrics (or close) · … --es sheet timing (or close) · … --es year 2024 · … --es dj 1 (Spotify's DJ starts talking) · … --es canvas 1 (look up a Canvas for this song)
- *  · … --es files content://media/external/file/1,content://… (play these files one after another: Up next) · … --es seek 150 (s) */
+ *  · … --es files content://media/external/file/1,content://… (play these files one after another: Up next) · … --es seek 150 (s)
+ *  · … --es debugInfo 1 (Copy debug info in logcat, tag VV-dbg) */
 class DebugReceiver : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
         val set = i.getStringExtra("set"); val to = i.getStringExtra("to")
@@ -48,6 +49,7 @@ class DebugReceiver : BroadcastReceiver() {
                 }
             }
             i.getStringExtra("seek")?.toDoubleOrNull()?.let { io.github.bozkow.vibevisualizer.media.Local.seek((it * 1000).toLong()) }
+            if (i.hasExtra("debugInfo")) android.util.Log.i("VV-dbg", Lyr.debugInfo())
             if (page != null) { if (page == "close") E.settingsPage = null else E.openSettings(page) }
             if (sheet != null) E.sheet = if (sheet == "close") null else sheet
         }
