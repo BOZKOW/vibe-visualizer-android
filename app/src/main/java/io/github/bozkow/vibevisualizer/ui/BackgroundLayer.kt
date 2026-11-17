@@ -281,6 +281,7 @@ val LocalFrost = staticCompositionLocalOf { false }
 
 object Frost {
     var video by mutableStateOf<GraphicsLayer?>(null)   // the Canvas, blurred ([CanvasBlur])
+    var coverBlur by mutableStateOf<GraphicsLayer?>(null) // landscape cover, including its transition and motion video
     var videoSharp: GraphicsLayer? = null               // the Canvas as it plays (CanvasBackdrop's), for Liquid glass's clear glass
     var videoAlpha = 1f                                 // ...and how much of it shows there
     var screen = IntSize.Zero                           // the size that's drawn at
@@ -300,6 +301,30 @@ fun DrawScope.screenGrade(w: Float, h: Float, top: Float, shade: Float, k: Float
     if (shade > 0f) {
         val tf = (top / h).coerceIn(.02f, .45f); val a = .45f * shade * k
         drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = a), tf to Color.Transparent, .55f to Color.Transparent, 1f to Color.Black.copy(alpha = a), startY = 0f, endY = h), size = androidx.compose.ui.geometry.Size(w, h))
+    }
+}
+
+/** Record the actual landscape cover once; all controls reuse its finished GPU blur. */
+fun Modifier.liveCoverFrost(): Modifier = composed {
+    if (S.low) return@composed Modifier
+    val picture = rememberGraphicsLayer()
+    val small = rememberGraphicsLayer()
+    val done = rememberGraphicsLayer()
+    DisposableEffect(done) { Frost.coverBlur = done; onDispose { if (Frost.coverBlur === done) Frost.coverBlur = null } }
+    this.drawWithContent {
+        if (!E.quiet && E.playingState && io.github.bozkow.vibevisualizer.engine.AnimatedCover.ready) E.drawTick
+        picture.record { this@drawWithContent.drawContent() }
+        drawLayer(picture)
+        if (!E.quiet && size.width > 0f && size.height > 0f) {
+            val f = 8f
+            val sw = (size.width / f).roundToInt().coerceAtLeast(1)
+            val sh = (size.height / f).roundToInt().coerceAtLeast(1)
+            val r = 48.dp.toPx() / f
+            small.renderEffect = BlurEffect(r, r, TileMode.Clamp)
+            small.record(IntSize(sw, sh)) { scale(1f / f, 1f / f, pivot = Offset.Zero) { drawLayer(picture) } }
+            done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+            done.record(IntSize(sw, sh)) { drawLayer(small) }
+        }
     }
 }
 
@@ -358,6 +383,11 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
     val v = Frost.video; val scr = Frost.screen
     if (v != null && v.size.width > 0 && scr.width > 0) {
         translate(-at.x, -at.y) { scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) } }
+    } else if (Frost.coverBlur?.let { it.size.width > 0 } == true) {
+        val layer = Frost.coverBlur!!; val c = Frost.cover
+        translate(c.left - at.x, c.top - at.y) {
+            scale(c.width / layer.size.width, c.height / layer.size.height, pivot = Offset.Zero) { drawLayer(layer) }
+        }
     } else if (img != null) {
         val c = Frost.cover; val iw = img.width; val ih = img.height
         val k = iw / (if (c.width > 0f) c.width else maxOf(size.width, 1f))

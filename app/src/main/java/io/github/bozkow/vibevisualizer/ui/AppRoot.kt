@@ -73,9 +73,10 @@ fun VibeRoot() {
             val qK by animateFloatAsState(if (win && !S.low) 1f else 0f, tween(260), label = "qblur")
             // Settings blur too while a window is open over them (it blurred only the player, under Settings' own blur)
             val wK by animateFloatAsState(if (win && !S.low && E.settingsPage != null) 1f else 0f, tween(260), label = "wblur")
+            val settingsBackground = rememberBackdrop()
             if (E.inPip) { BackgroundLayer(); PipCanvas(); PipScreen(); PipHeat() }
             else {
-                if (!covered) Box(Modifier.fillMaxSize().cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) { BackgroundLayer(); PlayerScreen() }
+                if (!covered) Box(Modifier.fillMaxSize().backdropSource(settingsBackground, E.settingsPage != null && SettingsUi.live).cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) { BackgroundLayer(); PlayerScreen() }
                 if (S.b("fps")) Text(E.fpsText, Modifier.align(Alignment.TopEnd).statusBarsSpace().padding(top = 60.dp, end = 12.dp), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = Color.White.copy(alpha = .7f))
                 // Ambient mode: the waking touch only wakes (nothing under it is tapped or seeked)
                 if (E.ambient) Box(Modifier.fillMaxSize().pointerInput(Unit) {
@@ -83,7 +84,7 @@ fun VibeRoot() {
                 })
                 // Settings and the setup guide grow out of the button that opened them, and shrink back into it
                 val setFrom = rememberPopOrigin(setT.targetState)
-                AnimatedVisibility(setT, enter = popIn(setFrom), exit = popOut(setFrom)) { Box(popClip().cheapBlur(wK, 22.dp, .25f * wK)) { SettingsScreen() } }
+                AnimatedVisibility(setT, enter = popIn(setFrom), exit = popOut(setFrom)) { Box(popClip().cheapBlur(wK, 22.dp, .25f * wK)) { SettingsScreen(settingsBackground) } }
                 val wizFrom = rememberPopOrigin(wizT.targetState)
                 AnimatedVisibility(wizT, enter = popIn(wizFrom), exit = popOut(wizFrom)) { Box(popClip()) { SetupWizard() } }
                 Sheets()

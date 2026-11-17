@@ -227,6 +227,8 @@ fun PlayerScreen() {
 @Composable
 private fun NowPlaying(noLyricsNote: Boolean = false) {
     val hidden = E.uiHidden
+    val hiddenGap by androidx.compose.animation.core.animateDpAsState(if (hidden) 16.dp else 0.dp,
+        if (Pop.calm) tween(0) else tween(300), label = "controlsGap")
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         // while music plays untouched, the controls slide away (as in Spicy Lyrics Mobile): the cover, the song and the
         // seek bar stay; a tap brings the rest back
@@ -237,10 +239,10 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
         }
         if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(64.dp).padding(bottom = 6.dp))   // (48 dp tall until 0.46.1; edge to edge in 0.46.2 only, the owner preferred it inside the margins)
         SongInfo(big = true, note = noLyricsNote)
-        AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
+        AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top, clip = false) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top, clip = false) + fadeOut()) {
             Column { Transport(big = true); if (S.b("volshow")) VolumeRow(); BottomBar() }
         }
-        if (hidden) Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(hiddenGap))
     }
 }
 
@@ -262,6 +264,8 @@ private fun LyricsScreen() {
 @Composable
 private fun LyricsWithLyrics() {
     val hidden = E.uiHidden
+    val hiddenGap by androidx.compose.animation.core.animateDpAsState(if (hidden) 16.dp else 0.dp,
+        if (Pop.calm) tween(0) else tween(300), label = "controlsGap")
     val withCover = S.b("aLyrCover")
     var slot by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the cover's place in the song at the top (in the root)
     var area by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the lyrics' area (in the root)
@@ -284,7 +288,7 @@ private fun LyricsWithLyrics() {
                 TitleRow(big = false, bleed = true, cover = withCover, header = true, coverSlot = { slot = it }, textAway = if (withCover) rk else 0f)
                 // while the cover is out in a long break, the name and artist centred at the top (the owner's pick: beside an
                 // empty spot they looked off), crossfading with the ones beside the cover
-                if (withCover && rk > .01f) Column(Modifier.fillMaxWidth().onGloballyPositioned { nameAt = it.boundsInRoot() }.graphicsLayer { alpha = rk.coerceIn(0f, 1f) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                if (withCover) Column(Modifier.fillMaxWidth().onGloballyPositioned { nameAt = it.boundsInRoot() }.graphicsLayer { alpha = rk.coerceIn(0f, 1f) }, horizontalAlignment = Alignment.CenterHorizontally) {
                     androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
                         val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }
                         Scrolling(E.title, 24f.times(k).sp, FontWeight.Bold, Color.White, (-.3).sp)
@@ -303,13 +307,15 @@ private fun LyricsWithLyrics() {
                 }
             }
             // (lined up with the seek bar and the lyrics, 24 dp in: they reached 12 dp further out on both sides, the owner's pick)
-            if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(if (hidden) 80.dp else 56.dp).padding(horizontal = 24.dp))
+            val barsHeight by androidx.compose.animation.core.animateDpAsState(if (hidden) 80.dp else 56.dp,
+                if (Pop.calm) tween(0) else tween(300), label = "controlsBars")
+            if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(barsHeight).padding(horizontal = 24.dp))
             Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, lyrics = true, name = false, restCover = rest) }
-            AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()) {
+            AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top, clip = false) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top, clip = false) + fadeOut()) {
                 // (higher above the gesture bar: the owner found them too low)
                 Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 18.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true, lyricsToggles = true) }
             }
-            if (hidden) Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(hiddenGap))
         }
         if (withCover && slot.width > 0f) MovingCover(slot, area, rk, origin, nameAt.bottom)
         // notices over the cover and the name, taking no room
@@ -391,8 +397,8 @@ private fun Tablet() {
 @Composable
 private fun LandscapePhone() = LandscapeSplit()
 
-private val showCtl = expandVertically(expandFrom = Alignment.Top) + fadeIn()
-private val hideCtl = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+private val showCtl = expandVertically(expandFrom = Alignment.Top, clip = false) + fadeIn()
+private val hideCtl = shrinkVertically(shrinkTowards = Alignment.Top, clip = false) + fadeOut()
 
 /** A phone on its side: while a Canvas plays, as on the desktop (the video over the left half, the cover smaller and
  *  the song centred over it, the lyrics on the right); otherwise the cover as tall as the screen on the left. */
@@ -446,7 +452,7 @@ private fun LandscapeCover() {
     // further in on the camera's side: the owner's phone still had the cover in the hole with the room it reports
     Row(Modifier.fillMaxSize().padding(start = if (cameraOnLeft()) 48.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(side).ambientOut().onGloballyPositioned { Frost.cover = it.boundsInWindow() }) {
-            CoverArt(Modifier.fillMaxSize(), corner = 18.dp)
+            CoverArt(Modifier.fillMaxSize().liveCoverFrost(), corner = 18.dp)
             var headH by remember { mutableFloatStateOf(0f) }
             var footH by remember { mutableFloatStateOf(0f) }
             // drawn behind both, reaching past them and fading out over the cover (nothing at the head: no shade there);
@@ -965,8 +971,18 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
     val busyRight = (toggles && (Lyr.needTr || Lyr.needRom)) || (E.src == "spotify" && like && S.b("aLike"))
     val bl = if (bleed && ck < .01f) 24.dp else 0.dp; val br = if (bleed && !busyRight) 24.dp else 0.dp
     val a = remember { Animatable(1f) }
-    LaunchedEffect(ver) { if (!S.low && !E.reduceMotion()) { a.snapTo(0f); a.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) } }
-    Row(Modifier.fillMaxWidth().graphicsLayer { alpha = a.value; translationY = (1 - a.value) * 10f * density }, verticalAlignment = Alignment.CenterVertically) {
+    var shownVer by remember { mutableStateOf(ver) }
+    LaunchedEffect(ver) {
+        if (shownVer != ver) {
+            shownVer = ver
+            if (!Pop.calm) { a.snapTo(0f); a.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
+            else a.snapTo(1f)
+        }
+    }
+    // Keep the cover's measured slot fixed: a draw-only translation on this Row wasn't reflected reliably in its
+    // onGloballyPositioned callback, so the separately travelling cover could jump during a song change.
+    val songText = Modifier.graphicsLayer { alpha = a.value; translationY = (1 - a.value) * 10f * density }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         if (ck > .01f) {
             // [header]: the Lyrics screen's song at the top, its big cover drawn by MovingCover at the place kept here
             if (header && coverSlot != null) Box(Modifier.size(headerCoverSize() * ck).onGloballyPositioned { coverSlot(it.boundsInRoot()) })
@@ -976,7 +992,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
         // [header]: the buttons on the name's line and the heart on the artist's (the owner's sketch), so the artist and Up next
         // have the column's whole width; the name and the artist still slide in step
         if (header) {
-            Column(Modifier.weight(1f).graphicsLayer { alpha = (1f - textAway).coerceIn(0f, 1f) }) {
+            Column(Modifier.weight(1f).then(songText).graphicsLayer { alpha = (1f - textAway).coerceIn(0f, 1f) }) {
                 androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
                     val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
                     // (they slide out right up to the cover's edge, fading there: from the column's own edge they faded 16 dp short
@@ -1002,7 +1018,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
         }
         // the name and the artist slide in step (Spicy Lyrics 6.5.0's TextScroller): they leave together, the shorter waits
         // at its end, and they come back together
-        Column(Modifier.weight(1f), horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
+        Column(Modifier.weight(1f).then(songText), horizontalAlignment = if (center) Alignment.CenterHorizontally else Alignment.Start) {
             androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
                 val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
                 Scrolling(E.title, (if (big) 27f else 19f).times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, bl, br)
@@ -1037,9 +1053,11 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
     val iter = if (E.settingsPage == null) Int.MAX_VALUE else 0
     val scroll = if (over) Modifier.edgeMarquee(bleedL, bleedR, 14.dp, if (bleedR > 0.dp) 18.dp else 24.dp, iter)
         else Modifier.pingPong(iter)
-    Box(Modifier.onSizeChanged { boxW = it.width }) {
-        Text(text, scroll, style = TextStyle(shadow = textShadow),
-            fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
+    androidx.compose.runtime.key(text) {
+        Box(Modifier.onSizeChanged { boxW = it.width }) {
+            Text(text, scroll, style = TextStyle(shadow = textShadow),
+                fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
+        }
     }
 }
 
@@ -1096,26 +1114,34 @@ private fun LikeButton() {
 private fun Transport(big: Boolean, mid: Boolean = false) {
     Spotify.version
     val sp = E.src == "spotify"
-    val main = if (big) 56.dp else if (mid) 50.dp else 42.dp
+    // Stable transport geometry in every player layout.
     // a music app's own shuffle and repeat (the Spotify app's too, since 0.57.0: all local), as it publishes them, its icons
     // showing whether they're on
     val customs = if (E.src == "media") remember(E.mediaVer.intValue, MediaApps.title) { MediaApps.customs() } else emptyList()
     val shuf = customs.firstOrNull { it.kind == "shuffle" }; val rep = customs.firstOrNull { it.kind == "repeat" }
-    Row(Modifier.fillMaxWidth().padding(vertical = if (big) 6.dp else 0.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        if (sp) CtlIcon(Icons.Rounded.Shuffle, "Shuffle", size = 24.dp, enabled = Spotify.spState != null && "toggling_shuffle" !in Spotify.disallows, on = Spotify.shuffle, dot = true) { Spotify.toggleShuffle() }
-        else if (shuf != null) CustomIcon(shuf)
+    Row(Modifier.fillMaxWidth().layout { measurable, constraints ->
+        // Fit the whole transport uniformly on narrow landscape covers; never squeeze only the final button.
+        val width = maxOf(constraints.maxWidth, 300.dp.roundToPx())
+        val child = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+        val scale = constraints.maxWidth.toFloat() / width
+        layout(constraints.maxWidth, (child.height * scale).roundToInt()) {
+            child.placeWithLayer(0, 0) { scaleX = scale; scaleY = scale; transformOrigin = TransformOrigin(0f, 0f) }
+        }
+    }.padding(vertical = if (big) 6.dp else 0.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        if (sp) CtlIcon(Icons.Rounded.Shuffle, "Shuffle", size = 40.dp, enabled = Spotify.spState != null && "toggling_shuffle" !in Spotify.disallows, on = Spotify.shuffle, dot = true) { Spotify.toggleShuffle() }
+        else if (shuf != null) CustomIcon(shuf, 40.dp)
         else CtlIcon(if (Local.muted) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp, if (Local.muted) "Unmute" else "Mute", enabled = E.src == "file") { Local.muted = !Local.muted }
         // Spicy Lyrics Mobile's transport (0.58.0, the owner's pick): its glyphs, skips 52 dp wide, play / pause 9.25/12 of that,
         // no round button; held they shrink to .9, let go they bounce
-        val skipW = if (big) 58.dp else if (mid) 52.dp else 44.dp
+        val skipW = 52.dp
         SpicyGlyph(SpicyGlyphs.skip, skipW, "Previous", E.src != "none", mirror = true, nudge = -1) { E.prev() }
         SpicyPlay(skipW * (9.25f / 12f))
         SpicyGlyph(SpicyGlyphs.skip, skipW, "Next", E.canNext(), nudge = 1) { E.next() }
         if (sp) {
             val r = Spotify.repeat
             CtlIcon(if (r == "track") Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat: " + when (r) { "context" -> "all"; "track" -> "this song"; else -> "off" },
-                size = 24.dp, enabled = Spotify.spState != null, on = r != "off", dot = true) { Spotify.cycleRepeat() }
-        } else if (rep != null) CustomIcon(rep) else Box(Modifier.size(48.dp))
+                size = 32.dp, enabled = Spotify.spState != null, on = r != "off", dot = true) { Spotify.cycleRepeat() }
+        } else if (rep != null) CustomIcon(rep, 32.dp) else Box(Modifier.size(48.dp))
     }
 }
 
@@ -1123,7 +1149,7 @@ private fun Transport(big: Boolean, mid: Boolean = false) {
 @Composable
 private fun CustomIcon(c: io.github.bozkow.vibevisualizer.spotify.SessionFollower.Custom, size: Dp = 24.dp) {
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    Box(Modifier.size(maxOf(48.dp, size + 12.dp)).pressScale(src, .86f).clip(CircleShape)
+    Box(Modifier.size(maxOf(48.dp, size + 16.dp)).pressScale(src, .86f).clip(CircleShape)
         .quickClick(src, true, androidx.compose.material3.ripple()) { E.haptic(); MediaApps.custom(c.action); E.poke() }
         .semantics { contentDescription = c.name.ifEmpty { c.kind } }, contentAlignment = Alignment.Center) {
         val d = c.icon
@@ -1154,7 +1180,7 @@ private fun BottomBar(big: Boolean = true, mid: Boolean = false, lyricsToggles: 
     // six that fit with room between them (a narrow phone, or the largest display size), and round when the row gets less
     // height than they'd like (on its side: the large song name, a notice of two lines and the controls together)
     val inset = 4.dp
-    val d = minOf(if (big) 54.dp else if (mid) 50.dp else 44.dp, (maxWidth - 40.dp) / 6, (maxHeight - inset * 2).coerceAtLeast(0.dp))
+    val d = minOf(50.dp, (maxWidth - 40.dp) / 6, (maxHeight - inset * 2).coerceAtLeast(0.dp))
     val shape = RoundedCornerShape(50)
     androidx.compose.runtime.CompositionLocalProvider(LocalBarCapsule provides true) {
     Row(Modifier.fillMaxWidth().clip(shape).liquidFrost(radius = d / 2 + inset).drawBehind { glassBody(0f) }
@@ -1250,7 +1276,7 @@ private fun CtlIcon(icon: ImageVector, desc: String, size: Dp = 24.dp, enabled: 
     val k = remember { Animatable(0f) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     // (a round button as IconButton is, but only a quick tap counts: quickClick)
-    Box(Modifier.size(maxOf(48.dp, size + 12.dp)).pressScale(src, .86f).clip(CircleShape)
+    Box(Modifier.size(maxOf(48.dp, size + 16.dp)).pressScale(src, .86f).clip(CircleShape)
         .quickClick(src, enabled, androidx.compose.material3.ripple()) {
             E.haptic(); onClick()
             if (nudge != 0 && !Pop.calm) scope.launch { k.snapTo(0f); k.animateTo(1f, tween(130, easing = androidx.compose.animation.core.FastOutLinearInEasing)); k.snapTo(-1f); k.animateTo(0f, spring(.62f, 520f)) }
@@ -1278,7 +1304,7 @@ private fun SpicyGlyph(v: ImageVector, width: Dp, desc: String, enabled: Boolean
     val k = remember { Animatable(0f) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val h = width * (v.viewportHeight / v.viewportWidth)
-    Box(Modifier.size(width = maxOf(48.dp, width + 8.dp), height = maxOf(48.dp, h + 16.dp)).pressScale(src, .9f)
+    Box(Modifier.size(60.dp, 76.dp).pressScale(src, .9f)
         .quickClick(src, enabled, null) {
             E.haptic(); onClick()
             if (nudge != 0 && !Pop.calm) scope.launch { k.snapTo(0f); k.animateTo(1f, tween(130, easing = androidx.compose.animation.core.FastOutLinearInEasing)); k.snapTo(-1f); k.animateTo(0f, spring(.62f, 520f)) }
@@ -1295,19 +1321,22 @@ private fun SpicyPlay(width: Dp) {
     val playing = E.playingState
     val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val h = width * (20f / 15f)
-    Box(Modifier.size(width = maxOf(56.dp, width + 16.dp), height = maxOf(56.dp, h + 16.dp)).pressScale(src, .9f)
+    Box(Modifier.size(76.dp).pressScale(src, .9f)
         .quickClick(src, true, null) { E.haptic(); E.toggle() }
         .semantics { contentDescription = if (playing) "Pause" else "Play" }, contentAlignment = Alignment.Center) {
         // (the swap your round button had: a quarter turn, a springy scale and a fade; the owner: "not 1:1 like Mobile")
         AnimatedContent(playing, transitionSpec = {
-            if (Pop.calm) fadeIn(tween(120)) togetherWith fadeOut(tween(100))
-            else (fadeIn(tween(140)) + scaleIn(spring(.55f, 500f), initialScale = .45f)) togetherWith (fadeOut(tween(110)) + scaleOut(tween(150), targetScale = .45f))
-        }, label = "spicyplay") { p ->
+            (if (Pop.calm) fadeIn(tween(120)) togetherWith fadeOut(tween(100))
+            else (fadeIn(tween(140)) + scaleIn(spring(.55f, 500f), initialScale = .45f)) togetherWith (fadeOut(tween(110)) + scaleOut(tween(150), targetScale = .45f)))
+                .using(SizeTransform(clip = false))
+        }, modifier = Modifier.size(76.dp), contentAlignment = Alignment.Center, label = "spicyplay") { p ->
             val turn by transition.animateFloat(transitionSpec = { spring(.6f, 420f) }, label = "playturn") { st ->
                 if (Pop.calm) 0f else when (st) { androidx.compose.animation.EnterExitState.PreEnter -> -90f; androidx.compose.animation.EnterExitState.PostExit -> 90f; else -> 0f }
             }
             val v = if (p) SpicyGlyphs.pause else SpicyGlyphs.play
-            Icon(v, null, Modifier.size(width * (v.viewportWidth / 15f), h).graphicsLayer { rotationZ = turn }, tint = Color.White)
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(v, null, Modifier.size(width * (v.viewportWidth / 15f), h).graphicsLayer { rotationZ = turn }, tint = Color.White)
+            }
         }
     }
 }

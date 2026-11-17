@@ -401,7 +401,7 @@ private fun pages(): List<Page> = listOf(
 /** Settings: categories (with a search box), each a page; two panes on a wide screen. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(background: Backdrop? = null) {
     val all = remember { pages() }
     var page by remember { mutableStateOf<String?>(E.settingsPage?.takeIf { p -> all.any { it.id == p } }) }
     var q by remember { mutableStateOf("") }
@@ -436,20 +436,20 @@ fun SettingsScreen() {
                 val edges = Modifier.fillMaxSize().fadeEdges(statusH + 12.dp, navH + 24.dp)
                 @Composable fun ListPane(m: Modifier) {
                     val resState = rememberLazyListState()
-                    val under = rememberBackdrop()   // the list, for the island's glass
+                    val under = rememberBackdrop(if (SettingsUi.live) background else null)   // the list, for the island's glass
                     val k by collapse(if (q.isNotEmpty() && !wide) resState else listState, 64.dp)
                     var headRest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
                     val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
                     val pad = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + (if (short) 12.dp else 22.dp), bottom = navH + 28.dp)
                     Box(m) {
-                    if (q.isNotEmpty() && !wide) SearchResults(all, q, edges.backdropSource(under, k > 0f), head, navH, resState)
-                    else LazyColumn(edges.backdropSource(under, k > 0f), state = listState, contentPadding = pad) {
+                    if (q.isNotEmpty() && !wide) SearchResults(all, q, edges.backdropSource(under, k > 0f && !S.low), head, navH, resState)
+                    else LazyColumn(edges.backdropSource(under, k > 0f && !S.low), state = listState, contentPadding = pad) {
                         cardPages(all, page, wide) { open(it) }
                     }
                     Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {
                         val close = @Composable { IconButton(onClick = { E.settingsPage = null }, Modifier.then(if (k > .5f) Modifier.padding(4.dp).glassChip(k) else Modifier)) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
                         val search = @Composable { sm: Modifier, x: Boolean ->
-                            TextField(q, { q = it }, sm.glassIsland(under, k).glass(RoundedCornerShape(28.dp), lift = false), singleLine = true,
+                            TextField(q, { q = it }, sm.glassIsland(under, k, baseGlass = true), singleLine = true,
                                 placeholder = { Text("Search settings", color = Color.White.copy(alpha = .55f)) },
                                 // (an island: the close button comes into it, the title it was beside being gone)
                                 leadingIcon = { if (x) close() else Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = .7f)) },
@@ -470,12 +470,12 @@ fun SettingsScreen() {
                 }
                 @Composable fun PagePane(pg: Page) {
                     val st = rememberLazyListState()
-                    val under = rememberBackdrop()
+                    val under = rememberBackdrop(if (SettingsUi.live) background else null)
                     val k by collapse(st, 48.dp)
                     var headRest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
                     val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
                     Box(Modifier.fillMaxSize()) {
-                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges.backdropSource(under, k > 0f), head, navH, st)
+                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges.backdropSource(under, k > 0f && !S.low), head, navH, st)
                         // the page's title row: scrolled, an island too (back and the name, smaller, on frosted glass)
                         // (the notice under it belongs to the header: the list starts under both)
                         Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {

@@ -87,7 +87,7 @@ import io.github.bozkow.vibevisualizer.engine.E
    little shade so white words read on anything, a touch of the cover's colour, a sheen from the top, and a rim that catches
    the light along the top and again faintly at the foot; a soft shadow under the pieces that float. It looked "cheap" as a
    flat white film with an even thin edge. Never a live blur of its own. ---- */
-val GlassFill = Color.White.copy(alpha = .12f)
+val GlassFill = Color.Black.copy(alpha = .16f)
 val GlassEdge = Color.White.copy(alpha = .22f)
 
 /** The rim: bright along the top, fading down the sides, a faint line of light again at the foot. With Liquid glass (the
@@ -112,11 +112,9 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .1
             topLeft = Offset(0f, size.height - e), size = androidx.compose.ui.geometry.Size(size.width, e))
         return
     }
-    // Spicy Lyrics Mobile 0.19's glass: over what's blurred behind it, a 10% black fill and nothing else (no colour wash, no
-    // sheen: its colour is what shows through, the Canvas's or the cover's); a card or plate ([shade] > 0, not over a blur of
-    // its own) is its near-black plate at that strength with its cards' 6% white
-    if (shade > 0f) { drawRect(Color(0xFF161616).copy(alpha = shade * k)); drawRect(Color.White.copy(alpha = .06f * k)) }
-    else drawRect(Color.Black.copy(alpha = .1f * k))
+    // One material throughout the app: the player's capsule, over each surface's existing backdrop.
+    // Keep shade in the API for callers; panels no longer get a separate opaque plate.
+    drawRect(GlassFill.copy(alpha = GlassFill.alpha * k))
     // your own touch over it (0.58.1, the owner: "not 1:1 like Spicy Lyrics Mobile"): a light wash of the song's colour
     // (the Canvas's while one plays)
     drawRect(io.github.bozkow.vibevisualizer.engine.Visuals.glassTint.copy(alpha = .08f * k))
@@ -125,8 +123,7 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .1
 /** The glass's body drawn behind something ([shade] as in [glassBody]). */
 fun Modifier.drawGlassBody(shade: Float = .16f): Modifier = this.drawBehind { glassBody(shade) }
 
-/** Glass on a card or panel ([strong]: more shade, for panels over busy content); [lift]: a soft shadow under it (not for
- *  tiles that touch each other). */
+/** Shared capsule glass on cards and panels; [lift] adds a shadow to pieces that float. */
 fun Modifier.glass(shape: Shape, strong: Boolean = false, lift: Boolean = true): Modifier = this
     .then(if (lift) Modifier.shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF080A12).copy(alpha = .42f), spotColor = Color(0xFF080A12).copy(alpha = .42f)) else Modifier)
     .clip(shape)
@@ -149,10 +146,8 @@ fun VTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Bo
 /** The main button: frosted glass tinted with the cover's colour (still the one to press). */
 @Composable
 fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-    val acc = MaterialTheme.colorScheme.primary
-    // (the glass more of the cover's colour: still the one to press)
     androidx.compose.material3.Button(onClick, modifier.glassFace(ButtonDefaults.shape, enabled), enabled, border = BorderStroke(1.dp, if (enabled) GlassRim else GlassRimFaint),
-        colors = ButtonDefaults.buttonColors(containerColor = if (liquidOn()) Color.Transparent else acc.copy(alpha = .22f), contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
 
 /** A fainter frosted button. */
@@ -211,48 +206,55 @@ fun Modifier.fadeEdges(top: Dp = 28.dp, bottom: Dp = 0.dp, clear: Dp = 0.dp): Mo
 
 /** What lies under a floating island (the Settings list, all of Settings under a notice), recorded as it's drawn so the
  *  island can show it blurred behind its glass ([glassIsland]). */
-class Backdrop(internal val layer: androidx.compose.ui.graphics.layer.GraphicsLayer) { internal var at = Offset.Zero }
+class Backdrop(internal val layer: androidx.compose.ui.graphics.layer.GraphicsLayer, internal val behind: Backdrop? = null) { internal var at = Offset.Zero }
 
 @Composable
-fun rememberBackdrop(): Backdrop { val l = androidx.compose.ui.graphics.rememberGraphicsLayer(); return remember(l) { Backdrop(l) } }
+fun rememberBackdrop(behind: Backdrop? = null): Backdrop { val l = androidx.compose.ui.graphics.rememberGraphicsLayer(); return remember(l, behind) { l.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen; Backdrop(l, behind) } }
 
 /** Records what this draws for the islands over it ([b]; null, or [on] false while no island shows: nothing recorded). */
 fun Modifier.backdropSource(b: Backdrop?, on: Boolean = true): Modifier = if (b == null || !on) this else this
     .onGloballyPositioned { b.at = it.positionInRoot() }
-    .drawWithContent { b.layer.record { this@drawWithContent.drawContent() }; drawLayer(b.layer) }
+    .drawWithContent {
+        b.layer.record {
+            // Record the complete view behind the header, including transparent rows over the actual screen below.
+            b.behind?.let { bg ->
+                if (bg.layer.size.width > 0) translate(bg.at.x - b.at.x, bg.at.y - b.at.y) { drawLayer(bg.layer) }
+            }
+            this@drawWithContent.drawContent()
+        }
+        drawLayer(b.layer)
+    }
 
 /** Frosted glass for a floating island (Settings' header islands, notices over Settings): what's under it ([b]) blurred,
  *  a tint so its words read on anything ([tint]), Glass's fill, a light edge, a soft highlight along its top and a shadow
  *  under it. [k]: how much of an island it is (0: none, as the header rests). Without [b], the tint alone. The blur is
  *  worked out at a quarter of the size, as Settings' own (a full-size one each frame stuttered). */
 @Composable
-fun Modifier.glassIsland(b: Backdrop?, k: Float = 1f, shape: Shape = RoundedCornerShape(28.dp), tint: Float = .42f): Modifier {
+fun Modifier.glassIsland(b: Backdrop?, k: Float = 1f, shape: Shape = RoundedCornerShape(28.dp), tint: Float = .42f, baseGlass: Boolean = false): Modifier {
     val blur = androidx.compose.ui.graphics.rememberGraphicsLayer()
     val at = remember { floatArrayOf(0f, 0f) }
     val fx = remember { androidx.compose.ui.graphics.BlurEffect(6f, 6f, androidx.compose.ui.graphics.TileMode.Clamp) }
     val liquid = liquidOn()
     val lens = rememberLens()
-    if (k <= 0f) return this
+    if (k <= 0f || S.low) return if (baseGlass || k > 0f) this.glass(shape, lift = false) else this
     return this.shadow(10.dp * k, shape, clip = false, ambientColor = Color.Black, spotColor = Color.Black)
         .onGloballyPositioned { val p = it.positionInRoot(); at[0] = p.x; at[1] = p.y }
         .clip(shape)
         .drawBehind {
             if (b != null && b.layer.size.width > 0) {
-                // a solid base first (0.58.0): the list recorded behind it has see-through tiles, so the real, sharp list showed
-                // through its blurred copy (the owner: "no fake blur"); the base takes a little of the song's colour, as the
-                // blurred player behind Settings has it
-                drawRect(androidx.compose.ui.graphics.lerp(Color(0xFF14141B), io.github.bozkow.vibevisualizer.engine.Visuals.glassTint, .22f).copy(alpha = k))
                 // (Liquid glass: what's under it sharp, at full size, bent at the edges; otherwise a quarter-size blur)
                 val f = if (liquid) 1f else 4f; val sw = (size.width / f).toInt() + 2; val sh = (size.height / f).toInt() + 2
                 blur.renderEffect = if (liquid) lens.effect(size.width, size.height, minOf(size.width, size.height) / 2) else fx; blur.alpha = k
                 blur.record(androidx.compose.ui.unit.IntSize(sw, sh)) {
-                    scale(1f / f, 1f / f, pivot = Offset.Zero) { translate(b.at.x - at[0], b.at.y - at[1]) { drawLayer(b.layer) } }
+                    scale(1f / f, 1f / f, pivot = Offset.Zero) {
+                        translate(b.at.x - at[0], b.at.y - at[1]) { drawLayer(b.layer) }
+                    }
                 }
                 scale(f, f, pivot = Offset.Zero) { drawLayer(blur) }
             }
-            glassBody(if (b != null) tint else .8f, k)
+            glassBody(if (b != null) tint else .8f, if (baseGlass) 1f else k)
         }
-        .border(1.dp, if (k >= .99f) GlassRim else Brush.verticalGradient(0f to Color.White.copy(alpha = .5f * k), .3f to Color.White.copy(alpha = .17f * k), .7f to Color.White.copy(alpha = .08f * k), 1f to Color.White.copy(alpha = .2f * k)), shape)
+        .border(1.dp, if (baseGlass || k >= .99f) GlassRim else Brush.verticalGradient(0f to Color.White.copy(alpha = .36f * k), .14f to Color.White.copy(alpha = .16f * k), .86f to Color.White.copy(alpha = .16f * k), 1f to Color.White.copy(alpha = .18f * k)), shape)
 }
 
 /** A round button's symbol on an island: frosted as the island's ([k]: how much of an island it is). */

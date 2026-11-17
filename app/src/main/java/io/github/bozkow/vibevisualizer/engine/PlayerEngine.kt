@@ -270,7 +270,7 @@ object E {
     val mediaVer = androidx.compose.runtime.mutableIntStateOf(0)
     fun onMediaState() {
         mediaVer.intValue++
-        if (src == "media") { updPlay(); CanvasVideo.syncPlay(); poke(); if (MediaApps.connected.value.not()) { title = "Nothing playing"; artist = "Play something in a music app"; resetCover(); Lyr.clear("") }; return }
+        if (src == "media") { updPlay(); CanvasVideo.syncPlay(); if (MediaApps.connected.value.not()) { title = "Nothing playing"; artist = "Play something in a music app"; resetCover(); Lyr.clear("") }; return }
         if (!S.b("aOtherApps") || !MediaApps.playing || MediaApps.title.isEmpty()) return
         val busy = (src == "file" && Local.playing()) || (src == "spotify" && Spotify.spPlaying())
         if (!busy) setSource("media")
@@ -610,7 +610,7 @@ object E {
         return SongMeta(title = t, artist = a, album = tags?.album ?: "", duration = (tags?.durationMs ?: 0L) / 1000.0, file = name, year = tags?.year ?: "")
     }
 
-    fun onFileState() { updPlay(); CanvasVideo.syncPlay(); poke() }
+    fun onFileState() { updPlay(); CanvasVideo.syncPlay() }
 
     /* ================= cover pipeline ================= */
 
@@ -758,14 +758,16 @@ object E {
     }
 
     /** Checked a few times a second (it used to be decided only at a touch, so when the music started later, they never
-     *  hid): three seconds untouched while music plays and they go; paused or with something open, they're back. */
+     *  hid): three seconds untouched while music plays and they go; touch brings them back. */
     private fun hideTick() {
         val amb = canAmbient()
         if (!ambient && amb && wall() - activeAt > (S.str("aAmbientSec").toIntOrNull() ?: 30) * 1000L) { ambient = true; CanvasVideo.syncPlay() }   // the Canvas rests
         else if (ambient && !amb) { ambient = false; CanvasVideo.syncPlay() }
         val can = canHide() || ambient
         if (!uiHidden && can && wall() - activeAt > (S.str("aHideSec").toIntOrNull() ?: 3) * 1000L) uiHidden = true
-        else if (uiHidden && !can) uiHidden = false
+        // Playback/session reports can briefly pause or disconnect without a touch. They must not reveal the controls.
+        // Touch and keyboard actions wake through poke(); opening a screen or disabling auto-hide still reveals them.
+        else if (uiHidden && (S.str("uiHide") == "never" || settingsPage != null || sheet != null || wizard)) uiHidden = false
     }
 
     @Suppress("UNUSED_PARAMETER") fun show(s: String) { poke() }   // (one screen: a shortcut or a key just wakes it)

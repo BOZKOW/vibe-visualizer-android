@@ -1,3 +1,5 @@
-Vibe Visualizer for Android 0.60.0 (beta). Android 12 or newer; it installs over 0.59.0 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.60.1 (beta). Android 12 or newer; it installs over 0.60.0 (Settings → Help & about → Update now).
 
-- **Grouped controls:** the bottom buttons share one rounded bar, keeping your chosen buttons and the app’s existing glass.
+- **Consistent glass:** shared darker glass across the app, with floating Settings bars blurring the full view behind them.
+- **Better controls:** larger shuffle and repeat buttons, consistent sizing, and fixes for clipped animations and controls appearing without touch.
+- **Smoother transitions:** steadier cover travel, title and artist scrolling, timeline movement, and landscape glass that follows the cover.
