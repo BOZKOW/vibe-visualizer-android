@@ -490,7 +490,21 @@ object E {
 
     /** The Spotify app's details changed without a new name (its picture often comes after the name): while the DJ talks,
      *  the picture is the DJ's own, which the Web API never gives (the owner: "the DJ keeps the last cover"). */
-    fun onAppMeta() { if (dj && src == "spotify") djCover() }
+    fun onAppMeta() {
+        if (src != "spotify") return
+        if (dj) { djCover(); return }
+        // Metadata artwork often arrives after the song name, or after a failed network lookup. Fill only this
+        // song's missing artwork; don't restart an already loaded cover's transition on repeated Spotify metadata.
+        if (loadedCoverTok == coverTok || !SpotifyApp.matches(title, curDur() * 1000)) return
+        val tok = coverTok
+        SpotifyApp.artFor(title, curDur() * 1000)?.let { bm ->
+            if (setCoverBitmap(bm, "From the Spotify app", tok)) appArt = true
+            return
+        }
+        SpotifyApp.artUrl()?.let { u -> Vibe.scope.launch {
+            if (tok == coverTok && loadedCoverTok != tok && setCover(u, "From the Spotify app", tok)) appArt = true
+        } }
+    }
     private var djArtKey = ""
     /** The DJ's picture from the Spotify app: its bitmap, or the address it gives (loaded); each picture once. */
     private fun djCover() {
@@ -547,8 +561,8 @@ object E {
             if (tok == coverTok) coverNote = if (ok) "from Spotify" else if (m.cover.isEmpty()) "Spotify gave none" else "Spotify’s didn’t load: " + Images.lastError
             // no cover from Spotify (or it didn't load): the Spotify app on this phone shows one for the same song
             if (!ok && tok == coverTok) SpotifyApp.artFor(m.title, m.duration * 1000)?.let { ok = setCoverBitmap(it, "From the Spotify app", tok); if (ok) coverNote += " · from the Spotify app" }
-            if (!ok && tok == coverTok) {
-                if (S.b("online")) { status = "Searching for cover…"; ok = findCover(m, tok); if (!ok && tok == coverTok) { status = "No cover found · using default"; resetCover() } }
+            if (!ok && tok == coverTok && loadedCoverTok != tok) {
+                if (S.b("online")) { status = "Searching for cover…"; ok = findCover(m, tok); if (!ok && tok == coverTok && loadedCoverTok != tok) { status = "No cover found · using default"; resetCover() } }
                 else resetCover()
                 if (tok == coverTok) coverNote += if (ok) " · found online" else " · none online"
             }
@@ -623,16 +637,18 @@ object E {
 
     /** Where this song's cover came from, or why none did (Settings → Help & about → debug info). */
     var coverNote = ""; private set
+    private var loadedCoverTok = -1
 
     fun setCoverBitmap(bm: android.graphics.Bitmap?, label: String, tok: Int, quiet: Boolean = false): Boolean {
         if (bm == null || tok != coverTok) return false
+        loadedCoverTok = tok
         Visuals.setCover(bm, quiet)
         if (label.isNotEmpty() || src != "spotify") status = label
         if (S.bgStyle != "dynamic") Background.applyStill()
         return true
     }
 
-    fun resetCover() { Visuals.setCover(null); if (S.bgStyle != "dynamic") Background.applyStill() }
+    fun resetCover() { loadedCoverTok = -1; Visuals.setCover(null); if (S.bgStyle != "dynamic") Background.applyStill() }
 
     // Apple Music artwork via Apple's official iTunes Search API (no key needed)
     private suspend fun appleCover(q: String, tok: Int, want: SongMeta? = null): Boolean {
@@ -831,10 +847,15 @@ object E {
 
     private var slowAt = 0.0; private var slowDt = 0.0
 
+    private var sessionCheckAt = 0.0
     private fun uiTick(t: Double) {
         if (t - lastUi < 240) return
         lastUi = t
         SpicyStatus.tick()
+        if (visible && t - sessionCheckAt >= 15_000) {
+            sessionCheckAt = t
+            SpotifyApp.refresh(Vibe.app, rebind = false); MediaApps.refresh(Vibe.app, rebind = false)
+        }
         updPlay()
         val d = curDur(); val c = curTime()
         val tt = fmtTime(c) + " / " + fmtTime(d)

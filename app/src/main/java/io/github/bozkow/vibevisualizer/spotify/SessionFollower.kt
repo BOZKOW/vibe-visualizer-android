@@ -19,7 +19,11 @@ import io.github.bozkow.vibevisualizer.media.LyricClock
  *  their controls). No notification is read. */
 class SessionListener : NotificationListenerService() {
     override fun onListenerConnected() { current = this; SpotifyApp.refresh(this); io.github.bozkow.vibevisualizer.media.MediaApps.refresh(this) }
-    override fun onListenerDisconnected() { if (current === this) current = null }
+    override fun onListenerDisconnected() {
+        if (current === this) current = null
+        SpotifyApp.stop(); io.github.bozkow.vibevisualizer.media.MediaApps.stop()
+        requestRebind(ComponentName(this, SessionListener::class.java))
+    }
     companion object { var current: SessionListener? = null; private set }
 }
 
@@ -73,11 +77,27 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
     open fun onLost(pkg: String) {}
     private fun lost() { val was = state?.state == PlaybackState.STATE_PLAYING; val p = pkg; attach(null); if (was && p.isNotEmpty()) onLost(p) }
 
-    fun refresh(ctx: Context) {
+    fun refresh(ctx: Context, rebind: Boolean = true) {
         val app = ctx.applicationContext
         SpotifyApp.access.value = SpotifyApp.hasAccess(app)
         if (!SpotifyApp.access.value) { stop(); return }
-        if (listening) { runCatching { pick(msm?.getActiveSessions(comp)) }; return }
+        if (listening) {
+            runCatching {
+                pick(msm?.getActiveSessions(comp))
+                ctrl?.let { c ->
+                    // A surviving token does not prove callbacks are current after backgrounding or a service restart.
+                    if (rebind) { c.unregisterCallback(cb); c.registerCallback(cb, main) }
+                    val live = c.playbackState
+                    val changed = state?.state != live?.state || state?.position != live?.position ||
+                        state?.lastPositionUpdateTime != live?.lastPositionUpdateTime || state?.playbackSpeed != live?.playbackSpeed
+                    state = live
+                    readMeta(c.metadata, true)
+                    report(state)
+                    if (rebind || changed) onState?.invoke()
+                }
+            }.onFailure { listening = false; runCatching { msm?.removeOnActiveSessionsChangedListener(sessions) } }
+            if (listening) return
+        }
         msm = app.getSystemService(MediaSessionManager::class.java)
         comp = ComponentName(app, SessionListener::class.java)
         runCatching {
@@ -129,7 +149,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         c.registerCallback(cb, main)
         connected.value = true
         state = c.playbackState
-        readMeta(c.metadata, false)
+        readMeta(c.metadata, true)
         report(state, force = true, snap = true)
         onState?.invoke()
     }
@@ -146,9 +166,10 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
 
     private fun readMeta(m: MediaMetadata?, notify: Boolean) {
         val t = m?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
-        val changed = t != title
+        val a = m?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+        val changed = t != title || a != artist
         title = t
-        artist = m?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
+        artist = a
         album = m?.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
         durMs = m?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0
         art = m?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: m?.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: m?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)

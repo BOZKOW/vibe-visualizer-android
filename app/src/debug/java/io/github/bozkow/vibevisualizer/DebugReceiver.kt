@@ -24,6 +24,7 @@ class DebugReceiver : BroadcastReceiver() {
         val set = i.getStringExtra("set"); val to = i.getStringExtra("to")
         val page = i.getStringExtra("page"); val sheet = i.getStringExtra("sheet")
         Handler(Looper.getMainLooper()).post {
+            if (i.hasExtra("sessionRecovery")) SessionRecoveryProbe.run(c.applicationContext)
             if (set != null && to != null) Defaults.S[set]?.let { d ->
                 S.set(set, when (d) { is Boolean -> to == "true"; is Int -> to.toInt(); else -> to })
             }
