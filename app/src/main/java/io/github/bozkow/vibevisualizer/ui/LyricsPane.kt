@@ -19,6 +19,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -240,18 +241,7 @@ fun LyricsPane(modifier: Modifier = Modifier, areaHeightPx: Float = 0f, compact:
                 if (n > 0 && !compact && S.credPos == "lyrics" && S.b("xRefCred")) {
                     val c = Lyr.credit
                     if (c != null) {
-                        // Focus mode: the lines fly in from the bottom and away at the top, so the credits wait for the end (the
-                        // corner ones show meanwhile) and then come in the middle, where the lines were; pinned to the foot
-                        // they sat on the lines flying in there
-                        val focus = S.xFocus && !view.isStatic
-                        val a by animateFloatAsState(if (focus) (if (view.allsung) 1f else 0f) else if (view.allsung || view.isStatic) 1f else .55f, tween(600), label = "lcr")
-                        // (in this area only: they're for reading, and out there they'd lie sharp behind the rest)
-                        if (a > 0f) Box(Modifier.fillMaxSize().clipToBounds()) {
-                            Box(Modifier.fillMaxWidth().then(if (focus) Modifier.align(Alignment.CenterStart) else Modifier.offset { IntOffset(0, view.creditsY.roundToInt()) })
-                                .padding(start = padStart.dp, end = padEnd.dp).alpha(a)) {
-                                RefinedCredits(c, view.lineCount() > 0 && Lyr.L.lastOrNull { !it.dots }?.opp == true && S.b("lcredLast"))
-                            }
-                        }
+                        RefinedCreditsLayer(c, padStart, padEnd)
                     }
                 }
                     }
@@ -399,6 +389,31 @@ fun CreditsLine(c: Credit, modifier: Modifier = Modifier) {
                 c.uploader?.let { Text("·", color = soft, fontSize = 12.sp); Who(it, "Uploaded by") }
             }
             if (c.source == "unison") c.uploader?.let { Text("·", color = soft, fontSize = 12.sp); Who(it, "Synced by") }
+        }
+    }
+}
+
+/** Keep pinned attribution until this measured block is actually readable, rather than guessing from song state. */
+@Composable
+private fun RefinedCreditsLayer(c: Credit, padStart: Float, padEnd: Float) {
+    val view = Lyr.view
+    val owner = remember(c) { Any() }
+    var height by remember(c) { mutableIntStateOf(0) }
+    val focus = S.xFocus && !view.isStatic
+    val a by animateFloatAsState(if (focus && !view.allsung) 0f else if (view.allsung || view.isStatic) 1f else .55f,
+        tween(if (S.low || E.reduceMotion()) 0 else 600), label = "lcr")
+    androidx.compose.runtime.DisposableEffect(owner) { onDispose { view.clearCredits(owner) } }
+    BoxWithConstraints(Modifier.fillMaxSize().clipToBounds()) {
+        val viewport = with(LocalDensity.current) { maxHeight.toPx() }
+        val top = if (focus) (viewport - height) / 2f else view.creditsY.roundToInt().toFloat()
+        androidx.compose.runtime.SideEffect {
+            view.reportCredits(owner, height.toFloat(), io.github.bozkow.vibevisualizer.lyrics.creditsReadable(top, height.toFloat(), viewport, a))
+        }
+        // Measure even while Focus waits for the final line, so the footer's space is known before revealing it.
+        Box(Modifier.fillMaxWidth().then(if (focus) Modifier.align(Alignment.CenterStart) else Modifier.offset { IntOffset(0, view.creditsY.roundToInt()) })
+            .wrapContentHeight(unbounded = true).onSizeChanged { height = it.height }
+            .padding(start = padStart.dp, end = padEnd.dp).alpha(a)) {
+            RefinedCredits(c, view.lineCount() > 0 && Lyr.L.lastOrNull { !it.dots }?.opp == true && S.b("lcredLast"))
         }
     }
 }

@@ -169,7 +169,16 @@ class LyricsRenderer {
     var pressed = -1
     var creditsY by mutableStateOf(0f); private set    // where credits under the lyrics go (screen y inside the view)
     /** The credits under the last line are on screen (clear of the fade at the view's foot). */
-    fun creditsShown() = H > 0 && creditsY < H - F * 2
+    private var creditsOwner: Any? = null
+    private var creditsHeight = 0f
+    private var creditsVisible by mutableStateOf(false)
+    fun creditsShown() = creditsVisible
+    fun reportCredits(owner: Any, height: Float, visible: Boolean) {
+        creditsOwner = owner
+        creditsVisible = visible
+        if (abs(height - creditsHeight) > .5f) { creditsHeight = height; lActKey = "x"; bump() }
+    }
+    fun clearCredits(owner: Any) { if (creditsOwner === owner) { creditsOwner = null; creditsVisible = false; creditsHeight = 0f; lActKey = "x"; bump() } }
 
     val isStatic get() = !sync && lines.isNotEmpty()
     val empty get() = lines.isEmpty()
@@ -191,6 +200,7 @@ class LyricsRenderer {
 
     fun set(ls: List<Line>, isSync: Boolean, quiet: Boolean) {
         linePos = -1.0
+        creditsVisible = false
         release()
         lines = ls; sync = isSync
         duet = ls.any { it.opp }
@@ -638,7 +648,12 @@ class LyricsRenderer {
             return
         }
         val top = if (lineAtTop()) hh * topAt() else hh * .16f; if (el.top + y < top) y = top - el.top   // a tall line moves down so its top stays out of the fade
-        setLyY(fitLine(el, y, pos), t)
+        var target = fitLine(el, y, pos)
+        if (allsung && !S.xFocus && !pipScroll() && S.credPos == "lyrics" && S.b("xRefCred")) {
+            val bottom = lv.lastOrNull()?.let { it.top + it.h } ?: 0f
+            target = creditsEndTarget(target, bottom + F * .5f, creditsHeight, H, F * .25f)
+        }
+        setLyY(target, t)
     }
 
     /** Two lines sung at once that don't fit in view together with the lines between them (a duet's long line under the

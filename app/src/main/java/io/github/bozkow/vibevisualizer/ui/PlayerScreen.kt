@@ -933,7 +933,7 @@ private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = fal
         val v = Lyr.view
         val under by remember { derivedStateOf { v.creditsShown() } }
         val refined = lyrics && S.credPos == "lyrics" && S.b("xRefCred") && !restCover &&
-            (if (S.xFocus && !v.isStatic) v.allsung else v.allsung || v.isStatic || under)
+            under
         AnimatedVisibility(c != null && Lyr.lines > 0 && !refined, enter = fadeIn(tween(600)) + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             if (c != null) CreditsLine(c, Modifier.fillMaxWidth().padding(bottom = 4.dp))
         }
@@ -1449,7 +1449,7 @@ private fun LyricsCredits() {
     val c = Lyr.credit
     // in the corner, unless Refined credits are under the lyrics; in Focus mode those only come at the end, so the corner
     // ones show until then (where the lyrics are from is always on screen)
-    val show = c != null && Lyr.lines > 0 && (S.credPos == "corner" || !S.b("xRefCred") || (S.xFocus && Lyr.lsync && !Lyr.view.allsung))
+    val show = c != null && Lyr.lines > 0 && (S.credPos == "corner" || !S.b("xRefCred") || !Lyr.view.creditsShown())
     AnimatedVisibility(show, enter = fadeIn(tween(600)), exit = fadeOut()) {
         if (c != null) CornerCredits(c, Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 6.dp), alignEnd = S.credPos == "lyrics" && S.b("lcredLast") && Lyr.L.lastOrNull { !it.dots }?.opp == true)
     }
@@ -1700,7 +1700,7 @@ private fun CanvasView() {
 
 /** A long break on the upright Lyrics screen: the cover takes the lyrics' place (not while you scroll them, nor while a
  *  Canvas plays with the cover hidden). */
-private fun restCover() = Lyr.view.rest && !Lyr.view.lyFree && !(CanvasVideo.cvmode && S.b("cvNoArt"))
+private fun restCover() = Lyr.view.rest && !(Lyr.view.allsung && S.credPos == "lyrics" && S.b("xRefCred")) && !Lyr.view.lyFree && !(CanvasVideo.cvmode && S.b("cvNoArt"))
 
 /** The lookup is done and found no lyrics: the cover takes their place (what's wrong, if anything, is at the top). */
 private fun noLyrics() = Lyr.empty && Lyr.lines == 0
