@@ -1,4 +1,3 @@
-Vibe Visualizer for Android 0.60.3 (beta). Android 12 or newer; it installs over 0.60.2 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.60.4 (beta). Android 12 or newer; it installs over 0.60.3 (Settings → Help & about → Update now).
 
-- **Visible lyrics credits:** keeps attribution visible until the refined footer is readable, including Focus and static lyrics.
-- **End-of-song credits:** makes room for the full credit block after the final line and prevents the outro cover from hiding Focus credits.
+- **Romanized lyrics wrap properly:** long Japanese readings can use another row at normal text size instead of shrinking into one line. Applies to replacement text, romanization below the lyrics, and romanized background vocals.

@@ -71,8 +71,14 @@ class LyricsRenderer {
         var scale = Double.NaN; var yo = 0.0          // NaN: the resting pose from the CSS
         var slm = -50.0                               // refreshed simple mode: the soft edge
     }
-    inner class Row(val kind: Int, val fs: Float, val lh: Float, val mt: Float, val weight: Int) {
+    inner class Row(val kind: Int, val fs: Float, val lh: Float, val mt: Float, val weight: Int, val romanized: Boolean = false) {
         var pieces: List<Pc>? = null
+            set(value) {
+                field = if (!romanized) value else value?.flatMap { pc ->
+                    val words = romanizedWordPieces(pc.text, pc.ts)
+                    if (words.size == 1) listOf(pc) else words.map { (text, time) -> Pc(text, time) }
+                }
+            }
         var text: String? = null
         var oneTs: TS? = null
         var layout: StaticLayout? = null
@@ -232,8 +238,8 @@ class LyricsRenderer {
             val l = d.l
             if (l.dots) continue
             val idx = d.i
-            val main = Row(0, 1f, 1.18f, 0f, 700)
             val romOnly = romMode == "replace" && l.rom != null
+            val main = Row(0, 1f, 1.18f, 0f, 700, romanized = romOnly)
             val ws = l.words
             if (ws != null && ws.isNotEmpty() && sync) {
                 val nt = lines.getOrNull(idx + 1)?.t ?: Double.POSITIVE_INFINITY
@@ -255,7 +261,7 @@ class LyricsRenderer {
                 val romOn = romMode == "replace" && (l.rom != null || !nonLatin(l.text))
                 val romW = romOn && bwds?.any { it.rom != null } == true
                 val romB = romOn && b.rom != null && !romW
-                val r = Row(1, .75f, 1.18f, .1f, 600)
+                val r = Row(1, .75f, 1.18f, .1f, 600, romanized = romW)
                 // the brackets go by Background vocals in brackets: on, as the lyrics have them (added where they have
                 // none); off, none, even where the lyrics came with them (a TTML file's "(…)": they showed whatever the setting)
                 val enclosed = BRACKETED.matches(b.text)
@@ -278,7 +284,7 @@ class LyricsRenderer {
                 // Romanization below: its own romanization right under it, word by word with it where it has words (kind 4:
                 // small, tucked away and out with it); the line's romanization under the line never had them
                 if (romMode == "below" && nonLatin(b.text) && (b.rom != null || bwds?.any { it.rom != null } == true)) {
-                    val rRow = Row(4, .4f, 1.25f, .05f, 700)
+                    val rRow = Row(4, .4f, 1.25f, .05f, 700, romanized = true)
                     if (sync && bwds != null && bwds.isNotEmpty() && bwds.any { it.rom != null }) {
                         val bts = bwds.mapIndexed { k, w -> TS(w.t, w.end ?: if (k + 1 < bwds.size) bwds[k + 1].t else w.t + 1) }
                         rRow.pieces = bwds.mapIndexed { k, w -> val t = w.rom ?: w.text; Pc(t + if ((w.sp || w.romSp) && t.isNotBlank()) " " else "", bts[k]) }
@@ -307,7 +313,7 @@ class LyricsRenderer {
             fun timed(kind: Int, text: String, words: List<Pair<String, Boolean>>?) {
                 // a translation as Spicy Lyric Translator draws one in Spicy Lyrics (0.46.2): extra bold, .45 of the line, a line
                 // height of 1.18; the romanization as before
-                val r = if (kind == 3) Row(kind, .45f, 1.18f, .22f, 900) else Row(kind, .46f, 1.3f, .22f, 700)
+                val r = if (kind == 3) Row(kind, .45f, 1.18f, .22f, 900) else Row(kind, .46f, 1.3f, .22f, 700, romanized = kind == 2)
                 val lw = l.words
                 if (!sync || l.t == null) r.text = text
                 else if (words != null && lw != null && words.size == lw.size) {
