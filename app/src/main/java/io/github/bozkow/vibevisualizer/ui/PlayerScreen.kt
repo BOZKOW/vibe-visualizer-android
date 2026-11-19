@@ -337,14 +337,21 @@ private fun MovingCover(slot: androidx.compose.ui.geometry.Rect, area: androidx.
     // (clear of the bars under it too: their tallest reach above their own room)
     val top = (if (nameBottom > 0f) nameBottom else area.top) + padV; val bottom = area.bottom - with(dens) { 28.dp.toPx() }
     val bigSide = (minOf(area.width - 2 * padH, bottom - top) * cvk).coerceAtLeast(slot.width)
-    fun mix(a: Float, b: Float) = a + (b - a) * k
-    val side = mix(slot.width, bigSide)
-    val x = mix(slot.left, area.center.x - bigSide / 2); val y = mix(slot.top, (top + bottom) / 2 - bigSide / 2)
-    val shape = RoundedCornerShape(mix(10f, 22f).dp)
-    Box(Modifier.offset { androidx.compose.ui.unit.IntOffset((x - origin.x).roundToInt(), (y - origin.y).roundToInt()) }.size(with(dens) { side.toDp() })
-        .then(if (k > .01f) Modifier.ambientOut() else Modifier)) {
-        // small, a soft shadow of its own; big, the big cover's (and its animated cover, if the album has one)
-        CoverArt(Modifier.fillMaxSize().then(if (k < .99f) Modifier.shadow(mix(8f, 24f).dp, shape, ambientColor = Color.Black, spotColor = Color.Black) else Modifier), corner = mix(10f, 22f).dp, small = k < .99f, motion = true)
+    // A stable surface avoids resizing the TextureView on every spring frame, and keeps fractional travel positions.
+    val surface = (area.width - 2 * padH).coerceAtLeast(slot.width).coerceAtLeast(1f)
+    val pose = coverTravelPose(slot.left, slot.top, slot.width,
+        area.center.x - bigSide / 2, (top + bottom) / 2 - bigSide / 2, bigSide, surface, k)
+    val scale = pose.scale.coerceAtLeast(.001f)
+    val corner = (pose.corner / scale).dp
+    val shape = RoundedCornerShape(corner)
+    Box(Modifier.size(with(dens) { surface.toDp() }).graphicsLayer {
+        transformOrigin = TransformOrigin(0f, 0f)
+        translationX = pose.x - origin.x; translationY = pose.y - origin.y
+        scaleX = scale; scaleY = scale
+    }.ambientOut()) {
+        // Shadow and corners scale back to the same on-screen sizes, without swapping layers at the travel endpoints.
+        CoverArt(Modifier.fillMaxSize().shadow((pose.shadow / scale).dp, shape, ambientColor = Color.Black, spotColor = Color.Black),
+            corner = corner, small = true, motion = true)
     }
 }
 
@@ -744,6 +751,13 @@ private fun TopText(text: String, size: androidx.compose.ui.unit.TextUnit, weigh
  *  stays on the one you left it on. Only a hard error has a button. */
 @Composable
 private fun NoticeSpace(home: Boolean, row: Boolean = false, upNext: Boolean = true) {
+    val host = LocalPlayerNotices.current
+    if (host == null) PlayerNoticeContent(home, row, upNext) else PlayerNoticeSlot(host, home, row, upNext)
+}
+
+@Composable
+internal fun PlayerNoticeContent(home: Boolean, row: Boolean = false, upNext: Boolean = true) {
+    val behind = LocalNoticeBackdrop.current
     // ([upNext] false: the upright Lyrics screen, where Up next has its line in the song at the top instead)
     val all = E.notices(home).let { l -> if (upNext) l else l.filter { it.id != "upnext" } }
     val ids = all.map { it.id }
@@ -784,10 +798,11 @@ private fun NoticeSpace(home: Boolean, row: Boolean = false, upNext: Boolean = t
             val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
             Box(Modifier.padding(top = if (row) 2.dp else 6.dp, bottom = 4.dp).padding(horizontal = 8.dp).widthIn(max = 560.dp).pressScale(press, .96f)
                 .graphicsLayer { alpha = quiet }
-                .shadow(8.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = .4f), spotColor = Color.Black.copy(alpha = .5f))
-                .clip(shape).liquidFrost(radius = if (row) 14.dp else 18.dp)
-                .then(if (S.low) Modifier.background(Color(0xFF101018).copy(alpha = .7f)) else Modifier)   // (no frost: it's over the lyrics)
-                .drawBehind { glassBody(0f) }.border(1.dp, GlassRim, shape)
+                .then(if (behind != null && !S.low) Modifier else Modifier.shadow(8.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = .4f), spotColor = Color.Black.copy(alpha = .5f)))
+                .then(if (behind != null && !S.low) Modifier.glassIsland(behind, shape = shape, tint = 0f)
+                    else Modifier.clip(shape).liquidFrost(radius = if (row) 14.dp else 18.dp)
+                        .then(if (S.low) Modifier.background(Color(0xFF101018).copy(alpha = .7f)) else Modifier)
+                        .drawBehind { glassBody(0f) }.border(1.dp, GlassRim, shape))
                 .then(if (!many) Modifier else Modifier.pointerInput(Unit) {
                     // byHand already at the start: a turn by itself under the finger made the swipe land back on the same one
                     detectHorizontalDragGestures(onDragStart = { byHand = true }, onDragEnd = {
@@ -1085,7 +1100,10 @@ private fun UpNextLine(center: Boolean = false) {
 
 /** A song's cover as a notice's icon (Up next), rounded; a note while it loads or when the song has none. */
 @Composable
-fun NoticeCover(url: String?, size: Dp) {
+fun NoticeCover(url: String?, size: Dp) = androidx.compose.runtime.key(url) { NoticeCoverImage(url, size) }
+
+@Composable
+private fun NoticeCoverImage(url: String?, size: Dp) {
     val bm by produceState(url?.let { Images.cached("$it@128") }, url) { value = url?.let { Images.load(it, 128) } }
     Box(Modifier.size(size).clip(RoundedCornerShape(size * .22f)).background(GlassFill).border(1.dp, GlassEdge, RoundedCornerShape(size * .22f)), contentAlignment = Alignment.Center) {
         val b = bm
@@ -1516,14 +1534,24 @@ fun Cover(modifier: Modifier = Modifier) {
         prev = if (calm) null else cur; cur = nb
         k.snapTo(0f); k.animateTo(1f, tween(if (calm) 1 else 1100, easing = FastOutSlowInEasing)); prev = null
     }
-    val p = k.value
+    val hasPrevious = prev != null
     Box(modifier, contentAlignment = Alignment.Center) {
         if (cur == null && prev == null) Icon(VIcons.bars, null, Modifier.fillMaxSize(.36f), tint = Color.White.copy(alpha = .35f))
-        prev?.let { Image(it, null, Modifier.fillMaxSize().graphicsLayer { alpha = 1 - p; scaleX = 1 + .14f * p; scaleY = 1 + .2f * p; translationY = size.height * .07f * p }.blur((22 * p).dp), contentScale = ContentScale.Crop) }
-        cur?.let {
+        prev?.let { Image(it, null, Modifier.fillMaxSize().graphicsLayer {
+            val p = k.value
+            alpha = 1 - p; scaleX = 1 + .14f * p; scaleY = 1 + .2f * p; translationY = size.height * .07f * p
+            val radius = 22.dp.toPx() * p
+            renderEffect = if (radius > .01f) BlurEffect(radius, radius, TileMode.Decal) else null
+            clip = true
+        }, contentScale = ContentScale.Crop) }
+        cur?.let { Image(it, "Album cover", Modifier.fillMaxSize().graphicsLayer {
+            val p = k.value
             val sc = if (p < .6f) .9f + (1.015f - .9f) * (p / .6f) else 1.015f - .015f * ((p - .6f) / .4f)
-            Image(it, "Album cover", Modifier.fillMaxSize().graphicsLayer { scaleX = sc; scaleY = sc; alpha = if (prev == null) 1f else (p * 1.6f).coerceAtMost(1f) }.blur((16 * (1 - (p / .6f).coerceAtMost(1f))).dp), contentScale = ContentScale.Crop)
-        }
+            scaleX = sc; scaleY = sc; alpha = if (!hasPrevious) 1f else (p * 1.6f).coerceAtMost(1f)
+            val radius = 16.dp.toPx() * (1 - (p / .6f).coerceAtMost(1f))
+            renderEffect = if (radius > .01f) BlurEffect(radius, radius, TileMode.Decal) else null
+            clip = true
+        }, contentScale = ContentScale.Crop) }
     }
 }
 

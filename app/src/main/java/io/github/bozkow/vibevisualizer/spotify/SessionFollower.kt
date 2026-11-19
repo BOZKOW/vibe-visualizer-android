@@ -290,14 +290,20 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
     }
 
     /** The next song in the app's queue, when the app shares it: (title, artist, length in ms or 0). */
-    fun nextInQueue(): Triple<String, String, Long>? {
+    data class QueueSong(val title: String, val artist: String, val durationMs: Long, val cover: String, val album: String, val id: String, val uri: String)
+    fun nextInQueue(): QueueSong? {
         val c = ctrl ?: return null
         val q = runCatching { c.queue }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return null
         val at = c.playbackState?.activeQueueItemId ?: return null
         val i = q.indexOfFirst { it.queueId == at }; if (i < 0) return null
-        val d = q.getOrNull(i + 1)?.description ?: return null
+        val item = q.getOrNull(i + 1) ?: return null
+        val d = item.description
         val t = d.title?.toString().orEmpty(); if (t.isEmpty()) return null
-        return Triple(t, d.subtitle?.toString().orEmpty(), d.extras?.getLong(MediaMetadata.METADATA_KEY_DURATION, 0L) ?: 0L)
+        val cover = d.iconBitmap?.takeUnless { it.isRecycled }?.let { io.github.bozkow.vibevisualizer.engine.Images.retainCover("$pkg/${item.queueId}", it) }
+            ?: mediaArtworkAddress(d.iconUri?.toString()).ifEmpty { mediaArtworkAddress(d.extras?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)) }
+        val uri = d.mediaUri?.toString() ?: d.mediaId.orEmpty()
+        return QueueSong(t, d.subtitle?.toString().orEmpty(), d.extras?.getLong(MediaMetadata.METADATA_KEY_DURATION, 0L) ?: 0L,
+            cover, d.extras?.getString(MediaMetadata.METADATA_KEY_ALBUM).orEmpty(), spotifyTrackId(d.mediaId) ?: spotifyTrackId(uri).orEmpty(), uri)
     }
 
     fun play() = ctrl?.transportControls?.play()

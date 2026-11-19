@@ -18,11 +18,24 @@ object Images {
 
     fun cached(url: String): Bitmap? = mem.get(url)
 
+    /** Retain a small media-session/file thumbnail without encoding it or writing it to storage. */
+    fun retainCover(key: String, bitmap: Bitmap): String {
+        val uri = "vv-artwork://" + key.hashCode().toUInt().toString(16) + "/" + bitmap.generationId
+        if (mem.get("$uri@128") == null) {
+            val size = maxOf(bitmap.width, bitmap.height)
+            val small = if (size > 128) Bitmap.createScaledBitmap(bitmap,
+                (bitmap.width * 128 / size).coerceAtLeast(1), (bitmap.height * 128 / size).coerceAtLeast(1), true) else bitmap
+            mem.put("$uri@128", small)
+        }
+        return uri
+    }
+
     /** Why the last picture didn't load (for the debug info). */
     var lastError = ""; private set
 
     suspend fun load(url: String, max: Int = 1000, fresh: Boolean = false): Bitmap? {
         if (url.isEmpty()) { lastError = "no address"; return null }
+        if (url.startsWith("vv-artwork:")) return mem.get("$url@128")
         if (!fresh) mem.get("$url@$max")?.let { return it }
         val bytes: ByteArray = if (url.startsWith("content:") || url.startsWith("file:") || url.startsWith("android.resource:"))
             withContext(Dispatchers.IO) { runCatching { Vibe.app.contentResolver.openInputStream(Uri.parse(url))?.use { it.readBytes() } }.getOrNull() } ?: run { lastError = "couldn’t open it"; return null }

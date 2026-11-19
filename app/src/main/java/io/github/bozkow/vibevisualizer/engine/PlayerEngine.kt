@@ -650,6 +650,26 @@ object E {
 
     fun resetCover() { loadedCoverTok = -1; Visuals.setCover(null); if (S.bgStyle != "dynamic") Background.applyStill() }
 
+    /** A missing queue cover is looked up separately; it never replaces the currently playing song's artwork. */
+    suspend fun upcomingCover(want: SongMeta): String? {
+        if (want.artist.isBlank()) return null
+        return try {
+            val q = firstArtist(want.artist) + " " + want.title
+            val data = Net.getJson("https://itunes.apple.com/search?media=music&entity=song&limit=10&term=" + URLEncoder.encode(q, "UTF-8"))
+            val results = data.optJSONArray("results") ?: return null
+            val artist = Match.key(firstArtist(want.artist))
+            val hits = (0 until results.length()).map { results.getJSONObject(it) }.filter {
+                Match.key(it.optString("artistName")) == artist && Match.sameTitle(it.optString("trackName"), want.title)
+            }.sortedByDescending { want.album.isNotEmpty() && Match.key(it.optString("collectionName")) == Match.key(want.album) }
+            hits.take(3).firstNotNullOfOrNull { hit ->
+                hit.optString("artworkUrl100").takeIf { it.isNotEmpty() }?.let { url ->
+                    if (Images.load(url, 128) != null) url else null
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (_: Exception) { null }
+    }
+
     // Apple Music artwork via Apple's official iTunes Search API (no key needed)
     private suspend fun appleCover(q: String, tok: Int, want: SongMeta? = null): Boolean {
         try {

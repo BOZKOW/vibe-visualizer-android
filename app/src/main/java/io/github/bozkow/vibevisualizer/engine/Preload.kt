@@ -57,7 +57,10 @@ object Preload {
         "media" -> listOfNotNull(MediaApps.nextSong())
         "file" -> listOfNotNull(Local.nextItem()?.let { (u, name) -> E.fileSong(name, Files.tags(u)) })
         else -> emptyList()
-    }.filter { it.title.isNotEmpty() }
+    }.filter { it.title.isNotEmpty() }.map { m ->
+        if (m.cover.isNotEmpty() || !S.b("online") || m.artist.isBlank()) m
+        else m.copy(cover = E.upcomingCover(m).orEmpty())
+    }
 
     /** A song started: in a few seconds (after its own lookups), find the next ones and get them ready. */
     fun songStarted() {

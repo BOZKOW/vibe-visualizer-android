@@ -74,9 +74,16 @@ fun VibeRoot() {
             // Settings blur too while a window is open over them (it blurred only the player, under Settings' own blur)
             val wK by animateFloatAsState(if (win && !S.low && E.settingsPage != null) 1f else 0f, tween(260), label = "wblur")
             val settingsBackground = rememberBackdrop()
+            val noticeBackdrop = rememberBackdrop()
+            val noticeHost = androidx.compose.runtime.remember(noticeBackdrop) { PlayerNoticeHost(noticeBackdrop) }
             if (E.inPip) { BackgroundLayer(); PipCanvas(); PipScreen(); PipHeat() }
             else {
-                if (!covered) Box(Modifier.fillMaxSize().backdropSource(settingsBackground, E.settingsPage != null && SettingsUi.live).cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) { BackgroundLayer(); PlayerScreen() }
+                if (!covered) Box(Modifier.fillMaxSize().backdropSource(settingsBackground, E.settingsPage != null && SettingsUi.live).cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalPlayerNotices provides noticeHost) {
+                        Box(Modifier.fillMaxSize().backdropSource(noticeBackdrop, !S.low && noticeHost.hasNotices())) { BackgroundLayer(); PlayerScreen() }
+                        PlayerNoticeOverlay(noticeHost)
+                    }
+                }
                 if (S.b("fps")) Text(E.fpsText, Modifier.align(Alignment.TopEnd).statusBarsSpace().padding(top = 60.dp, end = 12.dp), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = Color.White.copy(alpha = .7f))
                 // Ambient mode: the waking touch only wakes (nothing under it is tapped or seeked)
                 if (E.ambient) Box(Modifier.fillMaxSize().pointerInput(Unit) {

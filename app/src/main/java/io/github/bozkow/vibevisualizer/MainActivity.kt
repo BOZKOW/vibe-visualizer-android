@@ -78,7 +78,7 @@ class MainActivity : ComponentActivity() {
         // Low performance mode: no animations at all. Every one of Compose's, in one place, as Android's own "remove animations"
         readAndroidAnim()
         val motion = object : androidx.compose.ui.MotionDurationScale {
-            override val scaleFactor get() = if (S.low) 0f else androidAnim   // (otherwise Android's own setting, as Compose does by itself)
+            override val scaleFactor get() = io.github.bozkow.vibevisualizer.ui.playerMotionScale(S.low, S.str("anim"), androidAnim)   // (otherwise Android's own setting, as Compose does by itself)
         }
         setContent(parent = window.decorView.createRecomposer(motion)) { VibeRoot() }
         handle(intent)

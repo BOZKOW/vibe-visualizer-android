@@ -54,6 +54,19 @@ object SessionRecoveryProbe {
             check(follower.cover()?.getPixel(0, 0) == android.graphics.Color.RED && metadata > oldMeta && tracks == 2) { "late artwork was lost or restarted the track" }
             follower.refresh(ctx, rebind = false)
             check(tracks == 2) { "unchanged snapshots restarted the track" }
+            val current = android.media.MediaDescription.Builder().setMediaId("probe-current").setTitle("Current fixture").build()
+            val queued = android.media.MediaDescription.Builder().setMediaId("probe-next").setTitle("Next fixture").setSubtitle("Fixture artist").setIconBitmap(art).build()
+            session.setQueue(listOf(MediaSession.QueueItem(current, 1), MediaSession.QueueItem(queued, 2)))
+            session.setPlaybackState(PlaybackState.Builder().setState(PlaybackState.STATE_PAUSED, 1200, 0f).setActiveQueueItemId(1).build())
+            delay(200)
+            val next = follower.nextInQueue()
+            check(next?.title == "Next fixture" && next.cover.startsWith("vv-artwork:")) { "queue artwork was discarded" }
+            check(io.github.bozkow.vibevisualizer.engine.Images.cached("${next.cover}@128")?.getPixel(0, 0) == android.graphics.Color.RED) { "queue thumbnail was not retained" }
+            val uriOnly = android.media.MediaDescription.Builder().setTitle("URI fixture").setIconUri(android.net.Uri.parse("spotify:image:fixture-image")).build()
+            session.setQueue(listOf(MediaSession.QueueItem(current, 1), MediaSession.QueueItem(uriOnly, 2)))
+            delay(200)
+            check(follower.nextInQueue()?.cover == "https://i.scdn.co/image/fixture-image") { "Spotify image URI was lost" }
+            Log.i("VV-queue", "PASS: queue bitmap retained and Spotify artwork URI preserved")
             Log.i("VV-recovery", "PASS: initial song, missed callbacks, artist change, playback state, late artwork, stable track")
         } catch (e: Exception) {
             Log.e("VV-recovery", "FAIL: ${e.message}", e)

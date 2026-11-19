@@ -358,12 +358,12 @@ class LyricsRenderer {
     /* ================= layout ================= */
 
     fun size(w: Float, h: Float, area: Float, scrW: Float, scrH: Float, density: Float, font: Float, pl: Float, pr: Float) {
-        if (w == W && h == H && font == F && area == areaH && pl == padL && pr == padR) return
-        // a new height (a notice's room, the controls hiding): the lines are placed again on the next frame, as after a line
-        // change (they kept the old place until the next line: with a notice, sometimes moved, sometimes not, 0.46.1)
-        if (h != H || area != areaH) lActKey = "x"
+        if (w == W && h == H && font == F && area == areaH && pl == padL && pr == padR && density == dens && scrW == screenW && scrH == screenH) return
+        val textChanged = w != W || font != F || pl != padL || pr != padR || density != dens
+        // A height animation changes placement, not word wrapping or the recorded pictures of every lyric line.
+        lActKey = "x"
         W = w; H = h; areaH = area; screenW = scrW; screenH = scrH; dens = density; F = font; padL = pl; padR = pr
-        laidOut = false; lv.forEach { it.dirty = true }; shadowCache.clear()
+        if (textChanged) { laidOut = false; lv.forEach { it.dirty = true }; shadowCache.clear() }
         bump()
     }
 
