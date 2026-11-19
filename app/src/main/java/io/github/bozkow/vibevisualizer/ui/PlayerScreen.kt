@@ -37,6 +37,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
@@ -267,10 +268,13 @@ private fun LyricsWithLyrics() {
     val hiddenGap by androidx.compose.animation.core.animateDpAsState(if (hidden) 16.dp else 0.dp,
         if (Pop.calm) tween(0) else tween(300), label = "controlsGap")
     val withCover = S.b("aLyrCover")
+    val liftHeader = withCover && !S.low
+    val headerPicture = rememberGraphicsLayer()
+    var headerAt by remember { mutableStateOf(Offset.Zero) }
     var slot by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the cover's place in the song at the top (in the root)
     var area by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the lyrics' area (in the root)
     var origin by remember { mutableStateOf(Offset.Zero) }
-    var nameAt by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the name centred at the top in a break (in the root)
+    var nameAt by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the moving name/artist block (in the root)
     // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
     val rest = restCover()
     val rk by animateFloatAsState(if (rest) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, if (rest) Spring.StiffnessVeryLow else Spring.StiffnessLow), label = "rest")
@@ -284,19 +288,10 @@ private fun LyricsWithLyrics() {
             TopBar(Modifier.padding(horizontal = 24.dp), floatNotice = true, line = false, upNext = false, report = false, notices = false)
             // (the song at the top is where the top's shade and the Canvas's blur reach down to, as the top line was and the
             // controls are: the owner's ask)
-            Box(Modifier.reportTop().padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
-                TitleRow(big = false, bleed = true, cover = withCover, header = true, coverSlot = { slot = it }, textAway = if (withCover) rk else 0f)
-                // while the cover is out in a long break, the name and artist centred at the top (the owner's pick: beside an
-                // empty spot they looked off), crossfading with the ones beside the cover
-                if (withCover) Column(Modifier.fillMaxWidth().onGloballyPositioned { nameAt = it.boundsInRoot() }.graphicsLayer { alpha = rk.coerceIn(0f, 1f) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
-                        val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }
-                        Scrolling(E.title, 24f.times(k).sp, FontWeight.Bold, Color.White, (-.3).sp)
-                        val by = E.byLine()
-                        if (by.isNotEmpty()) Scrolling(by, 16f.times(k).sp, FontWeight.SemiBold, dim)
-                    }
-                    if (S.b("aUpNext")) UpNextLine(center = true)
-                }
+            Box(Modifier.reportTop().onGloballyPositioned { headerAt = it.positionInRoot() }
+                .then(if (liftHeader) Modifier.drawWithContent { headerPicture.record { this@drawWithContent.drawContent() } } else Modifier)
+                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
+                TitleRow(big = false, bleed = true, cover = withCover, header = true, coverSlot = { slot = it }, textSlot = { nameAt = it }, coverTravel = if (withCover) rk else 0f)
             }
             var areaH by remember { mutableFloatStateOf(0f) }
             Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }.onGloballyPositioned { area = it.boundsInRoot() }) {   // (under all the rest: the lyrics run behind it)
@@ -318,6 +313,11 @@ private fun LyricsWithLyrics() {
             Spacer(Modifier.height(hiddenGap))
         }
         if (withCover && slot.width > 0f) MovingCover(slot, area, rk, origin, nameAt.bottom)
+        // The cover travels behind the readable header, never across the first letters of a moving title.
+        // Record once in its real layout and draw once here; its controls keep their original hit areas.
+        if (liftHeader) Canvas(Modifier.fillMaxSize()) {
+            translate(headerAt.x - origin.x, headerAt.y - origin.y) { drawLayer(headerPicture) }
+        }
         // notices over the cover and the name, taking no room
         Box(Modifier.fillMaxWidth().padding(horizontal = 24.dp).align(Alignment.TopCenter)) { NoticeSpace(false, upNext = false) }
     }
@@ -976,7 +976,8 @@ private fun MoreButton() {
 
 @Composable
 private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center, bleed: Boolean = false, cover: Boolean = false,
-                     header: Boolean = false, coverSlot: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null, textAway: Float = 0f) {
+                     header: Boolean = false, coverSlot: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
+                     textSlot: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null, coverTravel: Float = 0f) {
     val ver = E.trackVer
     // [cover]: the Lyrics screen upright, where the big cover only shows in long breaks: a small one beside the name, so
     // it's always in sight; it steps aside while the big one shows
@@ -1007,14 +1008,16 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
         // [header]: the buttons on the name's line and the heart on the artist's (the owner's sketch), so the artist and Up next
         // have the column's whole width; the name and the artist still slide in step
         if (header) {
-            Column(Modifier.weight(1f).then(songText).graphicsLayer { alpha = (1f - textAway).coerceIn(0f, 1f) }) {
+            Column(Modifier.weight(1f)
+                .coverTitleTravel(coverTravel, (headerCoverSize() + 16.dp) * ck)
+                .onGloballyPositioned { textSlot?.invoke(it.boundsInRoot()) }.then(songText)) {
                 androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
                     val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
                     // (they slide out right up to the cover's edge, fading there: from the column's own edge they faded 16 dp short
                     // of it, the owner's screenshot)
                     val hl = if (ck > .01f) 16.dp * ck else bl
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.weight(1f)) { Scrolling(E.title, 24f.times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, hl, if (toggles && (Lyr.needTr || Lyr.needRom)) 0.dp else br) }
+                        Box(Modifier.weight(1f)) { Scrolling(E.title, 24f.times(k).sp, FontWeight.Bold, Color.White, (-.3).sp, hl, if (toggles && (Lyr.needTr || Lyr.needRom)) 0.dp else br, centerProgress = coverTravel) }
                         if (toggles) {
                             if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
                             if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
@@ -1023,11 +1026,14 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
                     val by = E.byLine()
                     val heart = (E.src == "spotify" || E.src == "media") && like && S.b("aLike")
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.weight(1f)) { if (by.isNotEmpty()) Scrolling(by, 16f.times(k).sp, FontWeight.SemiBold, dim, bleedL = hl, bleedR = if (heart) 0.dp else br) }
-                        if (heart) { if (E.src == "media") MediaLikeButton() else LikeButton() }
+                        Box(Modifier.weight(1f)) { if (by.isNotEmpty()) Scrolling(by, 16f.times(k).sp, FontWeight.SemiBold, dim, bleedL = hl, bleedR = if (heart) 0.dp else br, centerProgress = coverTravel) }
+                        if (heart) Box(Modifier.coverControlSlot(coverTravel)) {
+                            if (coverTravel >= .999f) Spacer(Modifier.size(48.dp))
+                            else if (E.src == "media") MediaLikeButton() else LikeButton()
+                        }
                     }
                 }
-                if (S.b("aUpNext")) UpNextLine()
+                if (S.b("aUpNext")) UpNextLine(centerProgress = coverTravel)
             }
             return@Row
         }
@@ -1050,15 +1056,44 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
     }
 }
 
+/** Expand into the empty cover slot while moving the same title/artist block, keeping the cover's measured slot fixed. */
+private fun Modifier.coverTitleTravel(progress: Float, space: Dp): Modifier = this.then(Modifier.layout { measurable, constraints ->
+    val shift = space.toPx() * progress.coerceIn(0f, 1f)
+    val extra = shift.roundToInt()
+    val child = measurable.measure(constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra))
+    layout(constraints.maxWidth, child.height) {
+        child.placeWithLayer(0, 0) { translationX = -shift }
+    }
+})
+
+/** Each short label slides toward the same screen centre; long labels retain their existing marquee viewport. */
+private fun Modifier.centerDuringCoverTravel(progress: Float): Modifier = this.layout { measurable, constraints ->
+    val child = measurable.measure(constraints.copy(minWidth = 0))
+    val width = if (constraints.hasBoundedWidth) constraints.maxWidth else child.width
+    layout(width, child.height) {
+        child.placeWithLayer(0, 0) { translationX = (width - child.width).coerceAtLeast(0) * .5f * progress.coerceIn(0f, 1f) }
+    }
+}
+
+/** Keep the heart's drawing size steady while its reserved space and opacity disappear into the centred header. */
+private fun Modifier.coverControlSlot(progress: Float): Modifier = this.layout { measurable, constraints ->
+    val child = measurable.measure(constraints)
+    val remaining = 1f - progress.coerceIn(0f, 1f)
+    layout((child.width * remaining).roundToInt(), (child.height * remaining).roundToInt()) {
+        child.placeWithLayer(0, 0) { alpha = remaining }
+    }
+}
+
 /** A name that slides to its end and back when it's too long for its row, fading out at both sides (it rests under Settings). */
 @Composable
 private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, weight: FontWeight, color: Color, spacing: androidx.compose.ui.unit.TextUnit = 0.sp,
-                      bleedL: Dp = 0.dp, bleedR: Dp = 0.dp) {
+                      bleedL: Dp = 0.dp, bleedR: Dp = 0.dp, centerProgress: Float? = null) {
+    val placement = if (centerProgress != null) Modifier.centerDuringCoverTravel(centerProgress) else Modifier
     var boxW by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var textW by remember(text) { androidx.compose.runtime.mutableIntStateOf(0) }
     val over = boxW > 0 && textW > boxW
     if (!S.b("aMarquee") || S.low || S.calm) {   // Settings → Player screen → Scroll long names, off (or Low performance mode, or Motion sickness): it ends in "…"
-        Text(text, style = TextStyle(shadow = textShadow), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, modifier = placement, style = TextStyle(shadow = textShadow), fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
         return
     }
     // too long: it slides within its own row, or out to the screen's side where [bleedL] / [bleedR] say nothing else is
@@ -1070,7 +1105,7 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
         else Modifier.pingPong(iter)
     androidx.compose.runtime.key(text) {
         Box(Modifier.onSizeChanged { boxW = it.width }) {
-            Text(text, scroll, style = TextStyle(shadow = textShadow),
+            Text(text, placement.then(scroll), style = TextStyle(shadow = textShadow),
                 fontSize = size, fontWeight = weight, letterSpacing = spacing, color = color, maxLines = 1, onTextLayout = { textW = it.size.width })
         }
     }
@@ -1080,12 +1115,12 @@ private fun Scrolling(text: String, size: androidx.compose.ui.unit.TextUnit, wei
  *  under the artist, the next song's cover and name, in a song's last 30 s. Its room is always kept, empty otherwise, so the
  *  name doesn't shift when it comes. */
 @Composable
-private fun UpNextLine(center: Boolean = false) {
+private fun UpNextLine(center: Boolean = false, centerProgress: Float = if (center) 1f else 0f) {
     val nx = Preload.shown?.takeIf { !E.inPip && !E.ambient }
     var last by remember { mutableStateOf<io.github.bozkow.vibevisualizer.lyrics.SongMeta?>(null) }
     if (nx != null) last = nx
-    Box(Modifier.fillMaxWidth().height(24.dp).padding(top = 4.dp), contentAlignment = if (center) Alignment.Center else Alignment.CenterStart) {
-        androidx.compose.animation.AnimatedVisibility(nx != null, enter = fadeIn(tween(400)), exit = fadeOut(tween(250))) {
+    Box(Modifier.fillMaxWidth().height(24.dp).padding(top = 4.dp), contentAlignment = Alignment.CenterStart) {
+        androidx.compose.animation.AnimatedVisibility(nx != null, modifier = Modifier.centerDuringCoverTravel(centerProgress), enter = fadeIn(tween(400)), exit = fadeOut(tween(250))) {
             val m = last ?: return@AnimatedVisibility
             Row(verticalAlignment = Alignment.CenterVertically) {
                 NoticeCover(m.cover.ifEmpty { null }, 18.dp)
