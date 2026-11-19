@@ -287,7 +287,8 @@ object E {
         djSettle?.cancel()
         val tn = TrackNameCleaner.clean(t0, MediaApps.artist)
         val nt = tn.title.ifEmpty { t0 }; val na = tn.artist.ifEmpty { MediaApps.artist }
-        if (!force && nt == title && na == artist) return
+        if (!force && nt == title && na == artist && !io.github.bozkow.vibevisualizer.spotify.sessionRecordingChanged(
+                mediaId, MediaApps.spotifyId, album, MediaApps.album, ((mediaMeta?.duration ?: 0.0) * 1000).toLong(), MediaApps.durMs)) return
         curArtistId = ""
         // Spotify's DJ talking (the Spotify app names it "Up next" by "DJ X", a few seconds long): its note and its own picture
         if (MediaApps.pkg == SpotifyApp.PKG && isDjItem(MediaApps.artist, MediaApps.durMs)) {
@@ -318,22 +319,22 @@ object E {
         Lyr.load(meta, tok)
         if (sid.isNotEmpty()) CanvasVideo.lookup(meta, tok)
         Preload.songStarted()
-        // the player's picture, unless it's a placeholder (the Spotify app's grey disc comes before the real cover: it stayed,
-        // the owner's screenshot); a real one may come later (onMediaMeta)
+        // The player's own artwork is authoritative, including black-and-white covers. Later metadata can refine it.
+        mediaArtUrl = ""
         val bm0 = MediaApps.cover()
         keepPic(bm0)
-        mediaArt = bm0 != null && !placeholder(bm0) && setCoverBitmap(bm0, "From " + MediaApps.appName(), tok)
+        mediaArt = bm0 != null && setCoverBitmap(bm0, "From " + MediaApps.appName(), tok)
         // (what's on screen stays until there's something else: only with no cover in the end the default colours)
         if (!mediaArt) Vibe.scope.launch {
             delay(700)   // (the real picture often follows the name within a moment)
             if (tok != coverTok || mediaArt) return@launch
             // no picture with it, but its address (the Spotify app's spotify:image:…, read as Spicy Lyrics reads it): covers
             // went missing in 0.57.0, the owner's report
-            MediaApps.artUrl()?.let { u -> if (setCover(u, "From " + MediaApps.appName(), tok)) { mediaArt = true; return@launch } }
+            MediaApps.artUrl()?.let { u -> if (setCover(u, "From " + MediaApps.appName(), tok, canApply = { !mediaArt })) { mediaArt = true; return@launch } }
             if (tok != coverTok || mediaArt) return@launch
-            // nothing found: the player's own picture after all (a black and white cover looks like a placeholder), else the defaults
+            // Nothing found: take any artwork that arrived meanwhile, else the defaults.
             val last = { if (!mediaArt) { val b = MediaApps.cover(); if (b != null) setCoverBitmap(b, "From " + MediaApps.appName(), tok) else resetCover() } }
-            if (S.b("online")) { status = "Searching for cover…"; if (!findCover(meta, tok) && tok == coverTok) { status = "No cover found · using default"; last() } }
+            if (S.b("online")) { status = "Searching for cover…"; if (!findCover(meta, tok, canApply = { !mediaArt }) && tok == coverTok) { status = "No cover found · using default"; last() } }
             else { delay(1500); if (tok == coverTok) last() }
         }
         updPlay()
@@ -344,22 +345,33 @@ object E {
     fun onMediaMeta() {
         mediaVer.intValue++
         if (src != "media") return
-        // the Spotify song ID can come after the name: the Canvas is looked up then
+        MediaApps.album.takeIf { it.isNotBlank() }?.let { album = it }
+        mediaMeta = mediaMeta?.let { m -> m.copy(album = MediaApps.album.ifBlank { m.album },
+            duration = if (MediaApps.durMs > 0) MediaApps.durMs / 1000.0 else m.duration) }
+        // An exact Spotify ID arriving after a name search must refine both lyrics and Canvas.
         val sid = MediaApps.spotifyId
-        if (!dj && sid.isNotEmpty() && sid != mediaId) { mediaId = sid; mediaMeta?.let { m -> CanvasVideo.lookup(m.copy(id = sid, uri = "spotify:track:$sid"), coverTok) } }
+        if (!dj && sid.isNotEmpty() && sid != mediaId) {
+            mediaId = sid
+            mediaMeta?.let { old ->
+                val exact = old.copy(id = sid, uri = "spotify:track:$sid", album = MediaApps.album.ifBlank { old.album },
+                    duration = if (MediaApps.durMs > 0) MediaApps.durMs / 1000.0 else old.duration)
+                mediaMeta = exact
+                Lyr.load(exact, coverTok); CanvasVideo.lookup(exact, coverTok)
+            }
+        }
         val bm = MediaApps.cover()
         // a new picture for the same song (the real cover after the placeholder) replaces it; the same one again doesn't
         val news = if (bm != null) picNews(bm) else 0
-        if (bm != null && news > 0 && !placeholder(bm)) {
+        if (bm != null && news > 0) {
             keepPic(bm)
             mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = news == 1) || mediaArt; return
         }
-        if (mediaArt) return   // (the DJ too: its picture changes only with a new one, above)
-        if (bm != null && !placeholder(bm)) { mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false); return }
+        if (mediaArt && bm != null) return   // Native bitmaps take priority over all URL/search results.
+        if (bm != null) { mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false); return }
         val u = MediaApps.artUrl() ?: return
         if (u == mediaArtUrl) return
         mediaArtUrl = u; val tok = coverTok
-        Vibe.scope.launch { if (tok == coverTok && setCover(u, "From " + MediaApps.appName(), tok)) mediaArt = true }
+        Vibe.scope.launch { if (tok == coverTok && setCover(u, "From " + MediaApps.appName(), tok, canApply = { MediaApps.artUrl() == u && !MediaApps.hasCover() })) mediaArt = true }
     }
     private var djSettle: kotlinx.coroutines.Job? = null
     private var mediaId = ""
@@ -399,14 +411,6 @@ object E {
         return d / a.size < 10   // (on average less than 10 of 255 apart)
     }
 
-    /** A player's stand-in picture rather than a cover: nearly no colour at all (the Spotify app's grey disc). A black and
-     *  white cover is taken for one too, and then looked up online, which finds the same cover. */
-    private fun placeholder(bm: android.graphics.Bitmap): Boolean = runCatching {
-        val s = android.graphics.Bitmap.createScaledBitmap(bm, 16, 16, true)
-        var sat = 0f; val hsv = FloatArray(3)
-        for (y in 0 until 16) for (x in 0 until 16) { android.graphics.Color.colorToHSV(s.getPixel(x, y), hsv); sat += hsv[1] }
-        sat / 256 < .05f
-    }.getOrDefault(false)
     private var mediaMeta: SongMeta? = null
 
     fun netKick() = Ping.kick()
@@ -621,11 +625,12 @@ object E {
 
     /* ================= cover pipeline ================= */
 
-    suspend fun setCover(url: String, label: String, tok: Int, fresh: Boolean = false, quiet: Boolean = false): Boolean {
+    suspend fun setCover(url: String, label: String, tok: Int, fresh: Boolean = false, quiet: Boolean = false, canApply: () -> Boolean = { true }): Boolean {
+        if (tok != coverTok || !canApply()) return false
         // skipping through songs: only the cover of the one you stop on is loaded and its colours worked out
         if (quickChange && tok == coverTok && !fresh) { kotlinx.coroutines.delay(400); if (tok != coverTok) return false }
         val bm = Images.load(url, fresh = fresh) ?: return false
-        return setCoverBitmap(bm, label, tok, quiet)
+        return if (canApply()) setCoverBitmap(bm, label, tok, quiet) else false
     }
 
     /** Where this song's cover came from, or why none did (Settings → Help & about → debug info). */
@@ -664,22 +669,22 @@ object E {
     }
 
     // Apple Music artwork via Apple's official iTunes Search API (no key needed)
-    private suspend fun appleCover(q: String, tok: Int, want: SongMeta? = null): Boolean {
+    private suspend fun appleCover(q: String, tok: Int, want: SongMeta? = null, canApply: () -> Boolean = { true }): Boolean {
         try {
             val d = Net.getJson("https://itunes.apple.com/search?media=music&entity=song&limit=10&term=" + URLEncoder.encode(q, "UTF-8"))
             val a = d.optJSONArray("results") ?: return false
             var res = (0 until a.length()).map { a.getJSONObject(it) }
             if (want != null) {   // only the same song: its title (with or without a version note) and, when known, its artist
-                val ar = Match.key(firstArtist(want.artist))
-                fun titleOk(r: JSONObject) = Match.sameTitle(r.optString("trackName"), want.title) || Match.sameTitle(want.title, r.optString("trackName"))
-                fun artistOk(r: JSONObject) = ar.isEmpty() || Match.key(r.optString("artistName")).contains(ar)
                 fun albumOk(r: JSONObject) = want.album.isNotEmpty() && Match.key(r.optString("collectionName")) == Match.key(want.album)
-                res = res.filter { titleOk(it) && artistOk(it) }.sortedByDescending { albumOk(it) }.take(3)
+                val matched = res.filter { coverSearchMatch(want, it.optString("trackName"), it.optString("artistName"), it.optString("collectionName")) }
+                // Without an album, several different releases are ambiguous: do not guess their cover.
+                res = if (want.album.isBlank() && matched.map { Match.key(it.optString("collectionName")) }.distinct().size > 1) emptyList()
+                    else matched.sortedByDescending { albumOk(it) }.take(3)
             }
             for (r in res) {
-                if (tok != coverTok) return true
+                if (tok != coverTok || !canApply()) return true
                 val u = r.optString("artworkUrl100").replace("100x100bb", "1000x1000bb")
-                if (u.isNotEmpty() && setCover(u, "Found online · " + r.optString("artistName") + " – " + r.optString("trackName"), tok)) return true
+                if (u.isNotEmpty() && setCover(u, "Found online · " + r.optString("artistName") + " – " + r.optString("trackName"), tok, canApply = canApply)) return true
             }
         } catch (_: Exception) {}
         return false
@@ -687,9 +692,11 @@ object E {
 
     /** A cover found online, only when it's this song's: the first search result used to be taken as it came, so
      *  another song's cover often showed. */
-    suspend fun findCover(want: SongMeta, tok: Int): Boolean {
-        if (want.title.isEmpty()) return false
-        if (appleCover((if (want.artist.isNotEmpty()) firstArtist(want.artist) + " " else "") + want.title, tok, want)) return true
+    suspend fun findCover(want: SongMeta, tok: Int, canApply: () -> Boolean = { true }): Boolean {
+        if (want.title.isEmpty() || want.artist.isBlank()) return false
+        if (tok != coverTok || !canApply()) return true
+        if (appleCover((if (want.artist.isNotEmpty()) firstArtist(want.artist) + " " else "") + want.title, tok, want, canApply)) return true
+        if (tok != coverTok || !canApply()) return true
         // MusicBrainz by the album, when there is one (a release is an album, not a song)
         if (want.album.isEmpty() || want.artist.isEmpty()) return false
         try {
@@ -698,11 +705,11 @@ object E {
             val a = d.optJSONArray("releases") ?: return false
             val ar = Match.key(firstArtist(want.artist))
             for (i in 0 until a.length()) {
-                if (tok != coverTok) return true
+                if (tok != coverTok || !canApply()) return true
                 val r = a.getJSONObject(i)
                 val credit = r.optJSONArray("artist-credit")?.let { c -> (0 until c.length()).joinToString(" ") { c.optJSONObject(it)?.optString("name") ?: "" } } ?: ""
-                if (Match.key(r.optString("title")) != Match.key(want.album) || !Match.key(credit).contains(ar)) continue
-                if (setCover("https://coverartarchive.org/release/" + r.optString("id") + "/front-500", "Found online · " + r.optString("title"), tok)) return true
+                if (Match.key(r.optString("title")) != Match.key(want.album) || Match.key(firstArtist(credit)) != ar) continue
+                if (setCover("https://coverartarchive.org/release/" + r.optString("id") + "/front-500", "Found online · " + r.optString("title"), tok, canApply = canApply)) return true
             }
         } catch (_: Exception) {}
         return false
@@ -860,11 +867,16 @@ object E {
 
     private var slowAt = 0.0; private var slowDt = 0.0
 
+    private var sessionPositionAt = 0.0
     private var sessionCheckAt = 0.0
     private fun uiTick(t: Double) {
         if (t - lastUi < 240) return
         lastUi = t
         SpicyStatus.tick()
+        if (visible && t - sessionPositionAt >= 500) {
+            sessionPositionAt = t
+            when (src) { "spotify" -> SpotifyApp.pollPosition(); "media" -> MediaApps.pollPosition() }
+        }
         if (visible && t - sessionCheckAt >= 15_000) {
             sessionCheckAt = t
             SpotifyApp.refresh(Vibe.app, rebind = false); MediaApps.refresh(Vibe.app, rebind = false)

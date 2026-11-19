@@ -524,11 +524,16 @@ object Spotify {
     suspend fun idFor(m: SongMeta): String? {
         if (m.id.isNotEmpty()) return m.id
         if (!connected || m.title.isEmpty()) return null
-        val key = (m.artist + "|" + m.title).lowercase()
+        val key = listOf(m.artist, m.title, m.album, m.duration.toString(), m.isrc).joinToString("|").lowercase()
         val d = ids.getOrPut(key) { Vibe.scope.async { runCatching {
             val q = "track:" + m.title + if (m.artist.isNotEmpty()) " artist:" + m.artist.split(',')[0] else ""
-            val d = api("/search?type=track&limit=1&q=" + URLEncoder.encode(q, "UTF-8")) as? JSONObject
-            d?.optJSONObject("tracks")?.optJSONArray("items")?.optJSONObject(0)?.optString("id")?.ifEmpty { null }
+            val d = api("/search?type=track&limit=10&q=" + URLEncoder.encode(q, "UTF-8")) as? JSONObject
+            val items = d?.optJSONObject("tracks")?.optJSONArray("items")
+            items?.let { list -> (0 until list.length()).map { list.getJSONObject(it) }.firstOrNull { item ->
+                val artist = item.optJSONArray("artists")?.optJSONObject(0)?.optString("name").orEmpty()
+                spotifyRecordingMatch(m, item.optString("name"), artist, item.optJSONObject("album")?.optString("name").orEmpty(),
+                    item.optLong("duration_ms"), item.optJSONObject("external_ids")?.optString("isrc").orEmpty())
+            }?.optString("id")?.ifEmpty { null } }
         }.getOrNull() } }
         val id = d.await()
         if (id == null) ids.remove(key)   // not found or failed: asked again next time

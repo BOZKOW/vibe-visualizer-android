@@ -107,6 +107,25 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         }
     }
 
+    /** Reconcile Android position without network requests; a large backwards jump also checks the song metadata. */
+    fun pollPosition() {
+        val c = ctrl ?: return
+        val live = runCatching { c.playbackState }.getOrNull() ?: return
+        val changed = state?.state != live.state || state?.playbackSpeed != live.playbackSpeed
+        val now = SystemClock.elapsedRealtime()
+        val speed = if (live.state == PlaybackState.STATE_PLAYING && live.playbackSpeed <= 0f) 1f else live.playbackSpeed
+        val rawNow = live.position + if (live.state == PlaybackState.STATE_PLAYING && live.lastPositionUpdateTime > 0)
+            ((now - live.lastPositionUpdateTime).coerceAtLeast(0L) * speed).toLong() else 0L
+        val wentBack = live.position >= 0 && rawNow < clock.positionAt(now) - 3_000
+        state = live
+        // A new song may also have lost its metadata callback. Read artwork only on a large backwards jump,
+        // not on every position sample (which would repeatedly parcel/decode large bitmaps).
+        if (wentBack) runCatching { readMeta(c.metadata, true) }
+        report(live)
+        // Position changes alone must not trigger Web API catch-up or restart artwork/lyrics lookups.
+        if (changed) onState?.invoke()
+    }
+
     fun stop() {
         if (listening) runCatching { msm?.removeOnActiveSessionsChangedListener(sessions) }
         listening = false; attach(null)
@@ -167,7 +186,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
     private fun readMeta(m: MediaMetadata?, notify: Boolean) {
         val t = m?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
         val a = m?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
-        val changed = t != title || a != artist
+        val oldTitle = title; val oldArtist = artist; val oldAlbum = album; val oldDuration = durMs; val oldId = spotifyId
         title = t
         artist = a
         album = m?.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
@@ -178,6 +197,7 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         // Spicy Lyrics and Spotify's own lyrics are found by it, without asking Spotify's Web API
         spotifyId = sequenceOf(m?.description?.mediaId, m?.getString(MediaMetadata.METADATA_KEY_MEDIA_ID), m?.description?.mediaUri?.toString())
             .mapNotNull { spotifyTrackId(it) }.firstOrNull() ?: ""
+        val changed = t != oldTitle || a != oldArtist || sessionRecordingChanged(oldId, spotifyId, oldAlbum, album, oldDuration, durMs)
         if (notify) note("meta '" + t + "' by '" + artist + "' " + durMs + "ms art=" + (art?.let { it.width.toString() + "px#" + it.generationId } ?: "none") + (if (artUri.isNotEmpty()) " uri" else "") + (if (spotifyId.isNotEmpty()) " id" else "") + (if (changed) " NEW" else ""))
         if (notify && changed && t.isNotEmpty()) { report(state, force = true, trackChanged = true); onTrack?.invoke() }
         if (notify) onMeta?.invoke()
@@ -237,6 +257,8 @@ open class SessionFollower(private val accept: (String) -> Boolean) {
         val p = clock.positionAt(SystemClock.elapsedRealtime())
         return (if (durMs > 0) minOf(p, durMs) else p).toDouble()
     }
+
+    fun hasCover() = art != null
 
     /** The app's cover for what it plays now (readable: a hardware bitmap is copied). */
     /** The Spotify song ID of what plays, when the player gives one ("" otherwise). */
