@@ -69,14 +69,14 @@ fun VibeRoot() {
             androidx.compose.runtime.SideEffect { E.quiet = live && sK >= .99f && E.settingsPage != null && !E.inPip }
             // Glass: the player blurs behind the sheets (and behind the heat warning)
             // (every window since 0.58.0: questions and the App updated card too, the owner: "blur behind every window")
-            val win = E.sheet != null || io.github.bozkow.vibevisualizer.engine.Perf.warn > 0 || E.noticeOpen != null || E.ask != null || io.github.bozkow.vibevisualizer.engine.Updates.updated != null
+            val win = E.sheet != null || E.noticeOpen != null || E.ask != null || io.github.bozkow.vibevisualizer.engine.Updates.updated != null
             val qK by animateFloatAsState(if (win && !S.low) 1f else 0f, tween(260), label = "qblur")
             // Settings blur too while a window is open over them (it blurred only the player, under Settings' own blur)
             val wK by animateFloatAsState(if (win && !S.low && E.settingsPage != null) 1f else 0f, tween(260), label = "wblur")
             val settingsBackground = rememberBackdrop()
             val noticeBackdrop = rememberBackdrop()
             val noticeHost = androidx.compose.runtime.remember(noticeBackdrop) { PlayerNoticeHost(noticeBackdrop) }
-            if (E.inPip) { BackgroundLayer(); PipCanvas(); PipScreen(); PipHeat() }
+            if (E.inPip) { BackgroundLayer(); PipCanvas(); PipScreen() }
             else {
                 if (!covered) Box(Modifier.fillMaxSize().backdropSource(settingsBackground, E.settingsPage != null && SettingsUi.live).cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) {
                     androidx.compose.runtime.CompositionLocalProvider(LocalPlayerNotices provides noticeHost) {
@@ -96,7 +96,6 @@ fun VibeRoot() {
                 AnimatedVisibility(wizT, enter = popIn(wizFrom), exit = popOut(wizFrom)) { Box(popClip()) { SetupWizard() } }
                 Sheets()
                 AskDialog()
-                HeatWarning()
                 NoticeDetail()
                 UpdatedCard()
                 Snacks(Modifier.align(Alignment.BottomCenter).navBarsSpace().padding(bottom = 8.dp))

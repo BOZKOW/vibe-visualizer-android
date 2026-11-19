@@ -146,7 +146,7 @@ object E {
 
     /** Everything the top of the screen says, most important first (the space under the top line shows them in turn):
      *  one-off notices (the next one waits its turn; OK puts one away, it doesn't go by itself), what's wrong until
-     *  it's solved (OK can't put that away), a warm phone while it's warm, lyrics that couldn't load, and an update on
+     *  it's solved (OK can't put that away), lyrics that couldn't load, and an update on
      *  its way. Tapped, one opens its detail screen: what's wrong, what to do, OK. */
     fun notices(homeScreen: Boolean = false): List<Prob> {
         val out = ArrayList<Prob>()
@@ -155,13 +155,6 @@ object E {
             out.add(Prob(0, k, "note" + n.id, n.msg, n.sub, n.action?.let { a -> Act(a.label) { noteDone(n, true) } }, n.steps) { noteDone(n, false) })
         }
         out.addAll(problems(homeScreen))
-        val h = Perf.hot
-        if (h > 0 && S.b("perfAsk")) out.add(Prob(0, if (h >= 2) "err" else "wait", "heat", if (h >= 2) "Your phone is hot" else "Your phone is getting warm",
-            listOfNotNull(Perf.cause.ifEmpty { null }, if (S.low) "Low performance mode is on" else null).joinToString(" · "),
-            if (S.low) null else Act("Turn on Low performance mode") { S.set("low", true) },
-            listOf("Low performance mode keeps it cooler: the moving background and the live blurs rest, and fewer frames are drawn.",
-                "Out of the sun or a tight case, and off the charger for a while, it cools faster.",
-                "This goes by itself once the phone has cooled down.")))
         val m = Lyr.msg
         if (!homeScreen && m != null && m.err) out.add(Prob(0, "err", "lyrics", m.msg, m.sub, m.actions.firstOrNull { it.pri } ?: m.actions.firstOrNull(),
             listOf("Try again, or another source: Settings → Help & about → Last lookup.", "Check which sources are on, and their order: Settings → Lyrics → Sources.")))

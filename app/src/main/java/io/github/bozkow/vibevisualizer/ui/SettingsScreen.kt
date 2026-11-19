@@ -363,7 +363,7 @@ private fun pages(): List<Page> = listOf(
     Page("perf", "Performance & battery", VIcons.bolt, listOf(
         Item.Sw("low", "Low performance mode", "For a slower or hot phone: no animations, blurs or frost, no moving background, the cover's colours even with a Canvas, 30 frames a second."),
         Item.Sw("aSaverLow", "Low performance mode with Power saving", "Turns on by itself while the phone’s Power saving is on, and off again when it ends (if it came on that way)."),
-        Item.Sw("perfAsk", "Suggest Low performance mode when needed", "Watches how smoothly the app runs while a song plays, and how warm the phone is (the battery at 40 °C or more, or Android saying it’s warm: the warning says which). If the phone can’t keep up, gets warm, or the battery is low, a card offers to turn Low performance mode on."),
+        Item.Sw("perfAsk", "Suggest Low performance mode when needed", "Watches how smoothly the app runs while a song plays. If the phone can’t keep up or the battery is low, a card offers to turn Low performance mode on."),
         Item.Sub("Comfort"),
         Item.Sw("aCalm", "Motion sickness", "Less movement on screen. The lyrics stay where they are and change line with a soft fade instead of scrolling, the words fill in without bouncing or lifting, lines don't fly in or out, long names end in “…” instead of sliding, the background holds still and screens change without sliding. The lyrics keep exact time; the bars and the Canvas still move."),
         Item.Sub("Smoothness"),
@@ -450,7 +450,7 @@ fun SettingsScreen(background: Backdrop? = null) {
                         val close = @Composable { IconButton(onClick = { E.settingsPage = null }, Modifier.then(if (k > .5f) Modifier.padding(4.dp).glassChip(k) else Modifier)) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
                         val search = @Composable { sm: Modifier, x: Boolean ->
                             TextField(q, { q = it }, sm.glassIsland(under, k, baseGlass = true), singleLine = true,
-                                placeholder = { Text("Search settings", color = Color.White.copy(alpha = .55f)) },
+                                placeholder = { Text(if (wide && short) "Search" else "Search settings", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = .55f)) },
                                 // (an island: the close button comes into it, the title it was beside being gone)
                                 leadingIcon = { if (x) close() else Icon(Icons.Rounded.Search, null, tint = Color.White.copy(alpha = .7f)) },
                                 trailingIcon = { if (q.isNotEmpty()) IconButton(onClick = { q = "" }) { Icon(Icons.Rounded.Close, "Clear") } },
@@ -728,14 +728,20 @@ private fun SwitchRow(t: String, d: String, on: Boolean, set: (Boolean) -> Unit)
 private fun YourMusic() {
     val sp = E.src == "spotify"
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        VTonalButton(onClick = { E.haptic(); E.settingsPage = null; FilePicker.pickAudio() }) { Text("Play songs from your phone") }
-        if (!sp) VTonalButton(onClick = { E.haptic(); SpotifyApp.open(Vibe.app) }) { Text("Open Spotify") }
+        VTonalButton(onClick = { E.haptic(); E.settingsPage = null; FilePicker.pickAudio() }) { SettingsButtonLabel("Play songs from your phone") }
+        if (!sp) VTonalButton(onClick = { E.haptic(); SpotifyApp.open(Vibe.app) }) { SettingsButtonLabel("Open Spotify") }
     }
+}
+
+/** Keep action labels readable without turning a constrained button into a tall text column. */
+@Composable
+private fun SettingsButtonLabel(text: String) {
+    Text(text, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
 fun Buttons(vararg b: Pair<String, () -> Unit>) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { b.forEach { (l, f) -> VTonalButton(onClick = { E.haptic(); f() }) { Text(l) } } }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { b.forEach { (l, f) -> VTonalButton(onClick = { E.haptic(); f() }) { SettingsButtonLabel(l) } } }
 }
 
 /** The Color background's color: the cover's, a dark preset that keeps white lyrics readable (black first, for OLED
@@ -790,7 +796,7 @@ private fun AudioChoice() {
             Icon(Icons.Rounded.KeyboardArrowDown, null)
         }
         DropdownMenu(open, { open = false }, glassMenu(), shape = RoundedCornerShape(18.dp), containerColor = glassMenuColor(), shadowElevation = 16.dp, border = menuEdge) {
-            opts.forEach { (k, l) -> DropdownMenuItem(text = { Text(l) }, onClick = { open = false
+            opts.forEach { (k, l) -> DropdownMenuItem(text = { SettingsButtonLabel(l) }, onClick = { open = false
                 if (k != "off" && !Audio.permitted()) Perms.mic { ok -> if (ok) S.set("aCap", k) } else S.set("aCap", k) }) }
         }
     }
@@ -803,15 +809,31 @@ private fun Sources() {
         Text("Sources, in priority order", fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
         list.forEachIndexed { i, p ->
             val pr = Lyr.PROVS.getValue(p.k)
-            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = if (p.on) .06f else .02f)).padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("${i + 1}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(20.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(pr.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White.copy(alpha = if (p.on) 1f else .5f))
-                    Text(pr.desc, fontSize = 11.5.sp, color = Color.White.copy(alpha = .5f))
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = if (p.on) .06f else .02f)).padding(12.dp)) {
+                val compact = maxWidth < 400.dp
+                val label = @Composable { m: Modifier ->
+                    Row(m, verticalAlignment = Alignment.Top) {
+                        Text("${i + 1}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(24.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(pr.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White.copy(alpha = if (p.on) 1f else .5f))
+                            Text(pr.desc, fontSize = 11.5.sp, color = Color.White.copy(alpha = .5f))
+                        }
+                    }
                 }
-                IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i - 1].also { l[i - 1] = l[i] }; Lyr.setProv(l) }, enabled = i > 0) { Icon(Icons.Rounded.KeyboardArrowUp, "Move up") }
-                IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i + 1].also { l[i + 1] = l[i] }; Lyr.setProv(l) }, enabled = i < list.size - 1) { Icon(Icons.Rounded.KeyboardArrowDown, "Move down") }
-                VSwitch(p.on, { v -> Lyr.setProv(list.map { x -> if (x.k == p.k) x.copy(on = v) else x }) })
+                val controls = @Composable {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i - 1].also { l[i - 1] = l[i] }; Lyr.setProv(l) }, enabled = i > 0) { Icon(Icons.Rounded.KeyboardArrowUp, "Move up") }
+                        IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i + 1].also { l[i + 1] = l[i] }; Lyr.setProv(l) }, enabled = i < list.size - 1) { Icon(Icons.Rounded.KeyboardArrowDown, "Move down") }
+                        VSwitch(p.on, { v -> Lyr.setProv(list.map { x -> if (x.k == p.k) x.copy(on = v) else x }) })
+                    }
+                }
+                if (compact) Column(Modifier.fillMaxWidth()) {
+                    label(Modifier.fillMaxWidth())
+                    Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.CenterEnd) { controls() }
+                } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    label(Modifier.weight(1f)); Spacer(Modifier.width(8.dp)); controls()
+                }
             }
         }
         Hint("The first source that has the song is used. The arrows reorder, the switch turns a source off.")
@@ -877,7 +899,7 @@ private fun LookupLog() {
             }
         }
         Spacer(Modifier.height(8.dp))
-        Buttons("Try another source for this song" to { Lyr.other() }, "Copy debug info" to { Lyr.copy(Lyr.debugInfo()); E.copied("Debug info") })
+        Buttons("Try another source" to { Lyr.other() }, "Copy debug info" to { Lyr.copy(Lyr.debugInfo()); E.copied("Debug info") })
     }
 }
 
@@ -889,7 +911,7 @@ private fun CacheButtons() {
         @Composable fun row(t: String, d: String, b: String, f: () -> Unit) {
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) { Text(t, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color.White); Text(d, fontSize = 12.5.sp, color = Color.White.copy(alpha = .6f)) }
-                Spacer(Modifier.width(10.dp)); VTonalButton(onClick = { E.haptic(); f() }) { Text(b) }
+                Spacer(Modifier.width(10.dp)); VTonalButton(onClick = { E.haptic(); f() }) { SettingsButtonLabel(b) }
             }
         }
         row("Clear this song’s cache", "Remove everything saved for the song that’s playing (lyrics, romanization, translation) and fetch it again.", "Clear") { Lyr.clearSong() }
@@ -909,9 +931,9 @@ private fun SpotifySection() {
             Text(Spotify.redirectUri(), Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
             TextButton(onClick = { Lyr.copy(Spotify.redirectUri()); E.copied("Redirect URI") }) { Text("Copy URI") }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!Spotify.connected) VButton(onClick = { E.spLogin() }) { Text("Connect") }
-            else VTonalButton(onClick = { Spotify.disconnect(); if (E.src == "spotify") { E.setSource("none"); E.title = ""; E.artist = ""; Lyr.clear(""); E.goHome() } }) { Text("Disconnect") }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!Spotify.connected) VButton(onClick = { E.spLogin() }) { SettingsButtonLabel("Connect") }
+            else VTonalButton(onClick = { Spotify.disconnect(); if (E.src == "spotify") { E.setSource("none"); E.title = ""; E.artist = ""; Lyr.clear(""); E.goHome() } }) { SettingsButtonLabel("Disconnect") }
         }
         Text(if (!Spotify.connected) (if (id.isNotEmpty()) "Client ID saved. Press Connect." else "Not connected.") else if (E.src == "spotify") (if (Spotify.meta != null) "Connected · " + (if (Spotify.isPlaying) "playing" else "paused") else "Connected · nothing playing") else "Connected. Tap the Spotify chip to use it.",
             Modifier.padding(top = 8.dp), fontSize = 13.5.sp, color = Color.White)
@@ -963,9 +985,9 @@ private fun AppUpdates() {
         Text(Updates.appStat, fontSize = 13.5.sp, color = Color.White)
         if (Updates.downloading) LinearProgressIndicator({ Updates.progress }, Modifier.fillMaxWidth().padding(vertical = 8.dp))
         if (Updates.stage.isNotEmpty()) Text(Updates.stage + if (Updates.downloading) " " + (Updates.progress * 100).toInt() + "%" else "", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-            VTonalButton(onClick = { Updates.checkApp(true) }) { Text("Check for updates") }
-            Updates.latest?.let { r -> VButton(onClick = { Updates.install(r) }, enabled = !Updates.downloading) { Text("Update now") } }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            VTonalButton(onClick = { Updates.checkApp(true) }) { SettingsButtonLabel("Check for updates") }
+            Updates.latest?.let { r -> VButton(onClick = { Updates.install(r) }, enabled = !Updates.downloading) { SettingsButtonLabel("Update now") } }
         }
         Hint("Update now downloads the new version from GitHub and installs it over this one; your settings and saved lyrics stay. The first time, Android asks you to allow it; after that, updates install by themselves.")
         if (Updates.notes.isNotEmpty()) {
@@ -1025,9 +1047,9 @@ private fun NoteView(n: Updates.Note, open: Boolean) {
 private fun ServerUpdates() {
     Column {
         Text(Updates.serverStat, fontSize = 13.5.sp, color = Color.White)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-            VTonalButton(onClick = { Updates.checkServer(true) }, enabled = Server.set) { Text("Check") }
-            if (Updates.serverNew && Updates.serverCan) VButton(onClick = { Updates.updateServer() }) { Text("Update now") }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            VTonalButton(onClick = { Updates.checkServer(true) }, enabled = Server.set) { SettingsButtonLabel("Check") }
+            if (Updates.serverNew && Updates.serverCan) VButton(onClick = { Updates.updateServer() }) { SettingsButtonLabel("Update now") }
         }
         Hint("The web app (what a browser opens from your server) lives on your server; this downloads its newest version from GitHub onto the server (its settings, keys and saved lyrics stay).")
         Updates.serverNotes.take(5).forEachIndexed { i, n -> NoteView(n, i == 0) }
@@ -1162,7 +1184,7 @@ private fun LazyListScope.cardPages(all: List<Page>, page: String?, wide: Boolea
                         Spacer(Modifier.width(14.dp))
                         // what's on the page, so a setting isn't hidden in plain sight
                         Column(Modifier.weight(1f)) {
-                            Text(p.name, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                            Text(p.name, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (p.sub.isNotEmpty()) Text(p.sub, fontSize = 13.sp, lineHeight = 17.sp, color = Color.White.copy(alpha = .58f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, Modifier.size(20.dp), tint = Color.White.copy(alpha = .35f))

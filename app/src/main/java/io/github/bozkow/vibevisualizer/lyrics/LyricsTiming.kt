@@ -155,7 +155,7 @@ fun interludes(ls: List<Line>): List<Line> {
         if (!l.dots) { res.add(l); return@forEachIndexed }
         val nx = out.subList(i + 1, out.size).find { !it.dots }
         if (nx == null || (nx.t ?: 0.0) - (l.t ?: 0.0) < DOTS_FROM || (res.isNotEmpty() && res.last().dots)) return@forEachIndexed
-        res.add(Line(l.t, nx.t, "", dots = true))
+        res.add(Line(l.t, nx.t, "", opp = nx.opp, dots = true))
     }
     return res
 }

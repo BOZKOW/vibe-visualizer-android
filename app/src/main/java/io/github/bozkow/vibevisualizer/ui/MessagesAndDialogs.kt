@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.rounded.DeviceThermostat
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -159,42 +158,7 @@ fun AskDialog() {
         confirm = pri?.let { it.label to { E.ask = null; it.fn?.invoke(); Unit } }, dismiss = other?.let { it.label to { E.ask = null; it.fn?.invoke(); Unit } })
 }
 
-/** The phone is getting warm (or hot), as Android says: a warning over the whole screen, the player blurred behind
- *  it, offering Low performance mode. Back is "Not now". */
-@Composable
-fun HeatWarning() {
-    val w = io.github.bozkow.vibevisualizer.engine.Perf.warn.takeIf { !S.low } ?: 0
-    val vis = androidx.compose.runtime.remember { androidx.compose.animation.core.MutableTransitionState(false) }; vis.targetState = w > 0
-    val last = androidx.compose.runtime.remember { object { var w = 1; var c = "" } }
-    if (w > 0 && last.w != w) { last.w = w }
-    if (w > 0) last.c = io.github.bozkow.vibevisualizer.engine.Perf.cause   // what set it off (kept while it fades)
-    if (w > 0) androidx.activity.compose.BackHandler { io.github.bozkow.vibevisualizer.engine.Perf.warnDone(false) }
-    if (!vis.currentState && !vis.targetState) return
-    val hot = last.w >= 2
-    androidx.compose.animation.AnimatedVisibility(vis, enter = androidx.compose.animation.EnterTransition.None, exit = androidx.compose.animation.ExitTransition.None) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Box(Modifier.fillMaxSize().animateEnterExit(enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(260)), exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(220)))
-                .background(Color.Black.copy(alpha = if (E.wizard || E.settingsPage != null) .86f else .62f)).clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {})
-            // on its side there's little height: smaller, and it scrolls, so the buttons can always be reached
-            val short = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 520
-            Column(Modifier.animateEnterExit(enter = popIn(androidx.compose.ui.graphics.TransformOrigin.Center, .6f), exit = popOut(androidx.compose.ui.graphics.TransformOrigin.Center, .8f))
-                .statusBarsSpace().navBarsSpace().verticalScroll(rememberScrollState()).padding(if (short) 16.dp else 32.dp).widthIn(max = if (short) 560.dp else 420.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val tint = if (hot) Color(0xFFFF5449) else Color(0xFFFFD27A)
-                Box(Modifier.size(if (short) 56.dp else 96.dp).clip(CircleShape).background(tint.copy(alpha = .16f)), contentAlignment = Alignment.Center) {
-                    Icon(androidx.compose.material.icons.Icons.Rounded.DeviceThermostat, null, Modifier.size(if (short) 32.dp else 52.dp), tint = tint)
-                }
-                Text(if (hot) "Your phone is hot" else "Your phone is getting warm", Modifier.padding(top = if (short) 10.dp else 24.dp), fontSize = if (short) 22.sp else 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
-                last.c.takeIf { it.isNotEmpty() }?.let { Text(it.replaceFirstChar { ch -> ch.uppercase() }, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = tint, textAlign = TextAlign.Center) }
-                Text("Low performance mode keeps it cooler: the moving background and the live blurs rest, and the app draws fewer frames a second. You can turn it off again in Settings → Performance & battery.",
-                    Modifier.padding(top = if (short) 8.dp else 14.dp), fontSize = if (short) 13.sp else 15.sp, lineHeight = if (short) 18.sp else 21.sp, color = Color.White.copy(alpha = .75f), textAlign = TextAlign.Center)
-                VButton(onClick = { E.haptic(); io.github.bozkow.vibevisualizer.engine.Perf.warnDone(true) }, Modifier.padding(top = if (short) 14.dp else 28.dp).fillMaxWidth().height(if (short) 46.dp else 54.dp)) { Text("Turn on Low performance mode", fontSize = 16.sp) }
-                TextButton(onClick = { io.github.bozkow.vibevisualizer.engine.Perf.warnDone(false) }, Modifier.padding(top = 6.dp)) { Text("Not now", fontSize = 15.sp, color = Color.White.copy(alpha = .8f)) }
-            }
-        }
-    }
-}
-
-/** A notice tapped at the top: over the whole screen, as the heat warning, what it says, what to do about it (its
+/** A notice tapped at the top: over the whole screen: what it says, what to do about it (its
  *  steps), the button that fixes it (when there is one) and OK, which puts it away. Back closes it as it is. */
 @Composable
 fun NoticeDetail() {
@@ -239,7 +203,6 @@ fun NoticeDetail() {
                     "server" -> androidx.compose.material.icons.Icons.Rounded.Dns
                     "spotify" -> VIcons.spotify
                     "wait" -> androidx.compose.material.icons.Icons.Rounded.HourglassTop
-                    "heat" -> androidx.compose.material.icons.Icons.Rounded.DeviceThermostat
                     "lyrics" -> VIcons.lyrics
                     "update" -> androidx.compose.material.icons.Icons.Rounded.Download
                     else -> if (q.k == "err") androidx.compose.material.icons.Icons.Rounded.ErrorOutline else if (q.k == "ok") androidx.compose.material.icons.Icons.Rounded.CheckCircleOutline else androidx.compose.material.icons.Icons.Rounded.Info
@@ -273,25 +236,6 @@ fun NoticeDetail() {
 /** A card of frosted glass (the steps on a notice's detail screen). */
 @Composable
 private fun Modifier.glassCard(): Modifier = this.glass(RoundedCornerShape(20.dp))
-
-/** The heat warning in the picture-in-picture window: taps there reach only the window's own buttons, which offer
- *  Low performance mode, play / pause and "Not now" while it shows. */
-@Composable
-fun PipHeat() {
-    val w = io.github.bozkow.vibevisualizer.engine.Perf.warn.takeIf { !S.low } ?: 0
-    androidx.compose.animation.AnimatedVisibility(w > 0, enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
-        val tint = if (w >= 2) Color(0xFFFF5449) else Color(0xFFFFD27A)
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .72f)).padding(10.dp), contentAlignment = Alignment.Center) {
-            androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(androidx.compose.material.icons.Icons.Rounded.DeviceThermostat, null, Modifier.size(30.dp), tint = tint)
-                Column(Modifier.padding(start = 8.dp)) {
-                    Text(if (w >= 2) "Your phone is hot" else "Your phone is getting warm", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, maxLines = 2)
-                    Text("Low performance mode suggested · tap the window for its buttons", fontSize = 11.sp, color = Color.White.copy(alpha = .75f), maxLines = 2)
-                }
-            }
-        }
-    }
-}
 
 /** Just updated (0.58.0, the owner's pick: a card at once, not a notice): the version and what's new in it, from the notes that
  *  come with the app; OK closes it, and it doesn't come again until the next update. */

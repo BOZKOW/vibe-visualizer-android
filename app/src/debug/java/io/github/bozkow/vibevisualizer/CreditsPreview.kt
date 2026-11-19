@@ -68,11 +68,12 @@ object CreditsPreview {
         val static = mode == "static"
         val original = "君の名前を呼んでいた"
         val reading = "Kimi no namae wo yonde ita"
-        val lines = if (travel) listOf(Line(0.0, 2.0, "Before the break"), Line(16.0, 18.0, "After the break"))
+        val lines = if (mode.startsWith("duet")) listOf(Line(6.0, 8.0, "Upcoming singer", opp = mode == "duetright"))
+            else if (travel) listOf(Line(0.0, 2.0, "Before the break"), Line(16.0, 18.0, "After the break"))
             else if (roman) listOf(Line(0.0, 6.0, original, listOf(Word(0.0, 6.0, original, false, reading)), apiRom = reading))
             else if (static) (1..20).map { Line(null, null, "Fixture lyric line $it") }
             else (0..2).map { Line(it * 2.0, it * 2.0 + 1.5, "Fixture lyric line ${it + 1}") }
-        E.clockOverride = if (mode.endsWith("end")) 7.0 else 1.0
+        E.clockOverride = if (mode.startsWith("duet")) 2.0 else if (mode.endsWith("end")) 7.0 else 1.0
         apply(LyricsResult(lines, !static, "Spicy Lyrics", Credit("spicy_lyrics", writers = listOf("Fixture Writer"),
             maker = Person("fixture-maker", null, null, null), uploader = Person("fixture-uploader", null, null, null))))
         E.poke()
