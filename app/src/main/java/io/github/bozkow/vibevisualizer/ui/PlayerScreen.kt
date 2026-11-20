@@ -962,7 +962,7 @@ private fun SmallToggle(icon: ImageVector?, desc: String, on: Boolean, text: Str
     val pop = remember { Animatable(1f) }
     LaunchedEffect(on) { if (!S.low && !E.reduceMotion() && pop.value == 1f) { pop.snapTo(.82f); pop.animateTo(1f, spring(.45f, Spring.StiffnessMedium)) } }
     // like the seek bar: tapped while the controls are hidden, it only does its job (they stay away)
-    IconButton(onClick = { E.haptic(); onClick() }, Modifier.quietTouch().graphicsLayer { scaleX = pop.value; scaleY = pop.value }.frosted(inset = 4.dp)
+    IconButton(onClick = { E.haptic(); onClick() }, Modifier.quietTouch().graphicsLayer { scaleX = pop.value; scaleY = pop.value }.liquidFrost(inset = 4.dp)
         .semantics { contentDescription = desc; selected = on },
         colors = IconButtonDefaults.iconButtonColors(containerColor = bg, contentColor = fg)) {
         if (icon != null) Icon(icon, null, Modifier.size(20.dp)) else Text(text ?: "", fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -1437,7 +1437,7 @@ private fun SeekRow(inline: Boolean = false) {
     // frosted: it lies right on the cover, the video or the lyrics
     var at by remember { mutableStateOf(Offset.Zero) }
     val paintFrost = if (LocalFrost.current) frostPainter() else null
-    val under: (androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit)? = if (paintFrost != null) ({ paintFrost(this, at) }) else null
+    val under: (androidx.compose.ui.graphics.drawscope.DrawScope.(Offset) -> Unit)? = if (paintFrost != null) ({ offset -> paintFrost(this, at + offset) }) else null
     val bar = @Composable { m: Modifier ->
         Box(m) {
             ThickSeek(frac, thick = thick, onDrag = { f -> drag = f; E.seekDrag(true) }, onDone = { f -> if (drag == null) E.seekDrag(true); drag = null; E.seekFraction(f); E.seekDrag(false) }, enabled = E.src != "none" && dur > 0, under = under, modifier = Modifier.quietTouch().then(if (under != null) Modifier.onGloballyPositioned { at = it.positionInWindow() } else Modifier))

@@ -95,7 +95,7 @@ val GlassEdge = Color.White.copy(alpha = .22f)
 // (0.56.1, the owner: "too bright… get the glass from Spicy Lyrics Mobile", its 0.19's: SpicyGlass in SpicyTokens.kt: a 1 px ring
 // at .16 white, a bright line along the top at .36 and a fainter one at the foot at .18)
 private val FrostRim: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha = .36f), .14f to Color.White.copy(alpha = .16f), .86f to Color.White.copy(alpha = .16f), 1f to Color.White.copy(alpha = .18f))
-private val LiquidRim: Brush = Brush.linearGradient(0f to Color.White.copy(alpha = .85f), .3f to Color.White.copy(alpha = .2f), .62f to Color.White.copy(alpha = .06f), 1f to Color.White.copy(alpha = .4f))
+private val LiquidRim: Brush = Brush.linearGradient(0f to Color.White.copy(alpha = .55f), .3f to Color.White.copy(alpha = .14f), .62f to Color.White.copy(alpha = .04f), 1f to Color.White.copy(alpha = .25f))
 val GlassRim: Brush get() = if (liquidOn()) LiquidRim else FrostRim
 /** The rim of something switched off or quiet. */
 val GlassRimFaint: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha = .2f), .5f to Color.White.copy(alpha = .06f), 1f to Color.White.copy(alpha = .1f))
@@ -103,9 +103,9 @@ val GlassRimFaint: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha =
 /** The glass's body: [shade] so white words read, the cover's colour, the sheen; [k] how much of it (an island coming in).
  *  The colour is read as it's drawn, so a new song's tints the glass without anything being laid out again. */
 fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .16f, k: Float = 1f) {
-    // Liquid glass (the experiment, the owner's picks): clear, no shade, no colour, no sheen; only its thickness at the
-    // edges, a little light inside the top and a little shadow inside the foot
+    // Liquid glass: a slight neutral dark tint, no colour wash, and restrained light/shadow at its edges.
     if (liquidOn()) {
+        drawRect(Color.Black.copy(alpha = .1f * k))
         val e = minOf(size.height * .22f, 14.dp.toPx())
         drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = .1f * k), 1f to Color.Transparent, endY = e), size = androidx.compose.ui.geometry.Size(size.width, e))
         drawRect(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = .1f * k), startY = size.height - e, endY = size.height),
@@ -121,18 +121,18 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .1
 }
 
 /** The glass's body drawn behind something ([shade] as in [glassBody]). */
-fun Modifier.drawGlassBody(shade: Float = .16f): Modifier = this.drawBehind { glassBody(shade) }
+fun Modifier.drawGlassBody(shade: Float = .16f, shape: Shape = RoundedCornerShape(28.dp)): Modifier = this.liquidSurface(shape).drawBehind { glassBody(shade) }
 
 /** Shared capsule glass on cards and panels; [lift] adds a shadow to pieces that float. */
 fun Modifier.glass(shape: Shape, strong: Boolean = false, lift: Boolean = true): Modifier = this
     .then(if (lift) Modifier.shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF080A12).copy(alpha = .42f), spotColor = Color(0xFF080A12).copy(alpha = .42f)) else Modifier)
-    .clip(shape)
+    .clip(shape).liquidSurface(shape)
     .drawBehind { glassBody(if (strong) .55f else .16f) }
     .border(1.dp, GlassRim, shape)
 
 /** The glass's body and rim on something already shaped and clipped (a button): drawn behind its content. */
 fun Modifier.glassFace(shape: Shape, enabled: Boolean = true, shade: Float = .1f): Modifier = this
-    .clip(shape)
+    .clip(shape).liquidSurface(shape)
     .drawBehind { glassBody(shade, if (enabled) 1f else .35f) }
     .border(1.dp, if (enabled) GlassRim else GlassRimFaint, shape)
 
@@ -146,7 +146,7 @@ fun VTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Bo
 /** The main button: frosted glass tinted with the cover's colour (still the one to press). */
 @Composable
 fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-    androidx.compose.material3.Button(onClick, modifier.glassFace(ButtonDefaults.shape, enabled), enabled, border = BorderStroke(1.dp, if (enabled) GlassRim else GlassRimFaint),
+    androidx.compose.material3.Button(onClick, modifier.glassFace(ButtonDefaults.shape, enabled), enabled, border = if (liquidOn()) null else BorderStroke(1.dp, if (enabled) GlassRim else GlassRimFaint),
         colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
 
@@ -154,7 +154,7 @@ fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean
 @Composable
 fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
                     contentPadding: androidx.compose.foundation.layout.PaddingValues = ButtonDefaults.ContentPadding, content: @Composable RowScope.() -> Unit) {
-    androidx.compose.material3.OutlinedButton(onClick, modifier.clip(ButtonDefaults.outlinedShape).drawBehind { glassBody(0f, if (enabled) .45f else .2f) }, enabled, contentPadding = contentPadding,
+    androidx.compose.material3.OutlinedButton(onClick, modifier.clip(ButtonDefaults.outlinedShape).liquidSurface(ButtonDefaults.outlinedShape).drawBehind { glassBody(0f, if (enabled) .45f else .2f) }, enabled, contentPadding = contentPadding,
         border = BorderStroke(1.dp, if (enabled) GlassRim else GlassRimFaint),
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent, contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
@@ -165,7 +165,7 @@ fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled:
 @Suppress("UNUSED_PARAMETER")
 fun Modifier.choiceCard(on: Boolean, shape: Shape, off: Float = .06f): Modifier {
     val acc = MaterialTheme.colorScheme
-    return this.clip(shape).drawBehind { glassBody(0f, if (on) 1f else .5f) }.background(if (on) acc.primary.copy(alpha = .22f) else Color.Transparent)
+    return this.clip(shape).liquidSurface(shape).drawBehind { glassBody(0f, if (on) 1f else .5f) }.background(if (on) acc.primary.copy(alpha = .22f) else Color.Transparent)
         .border(1.dp, if (on) GlassRim else GlassRimFaint, shape)
 }
 
@@ -180,6 +180,7 @@ fun glassSlider(): SliderColors {
 /** A switch: off, frosted glass; on, the cover's colour (on and off told apart at a glance). */
 @Composable
 fun VSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    if (liquidOn()) { LiquidSwitch(checked, onCheckedChange, modifier, enabled); return }
     androidx.compose.material3.Switch(checked, onCheckedChange, modifier, enabled = enabled, colors = SwitchDefaults.colors(
         uncheckedTrackColor = GlassFill, uncheckedBorderColor = Color.White.copy(alpha = .34f), uncheckedThumbColor = Color.White.copy(alpha = .7f),
         disabledUncheckedTrackColor = Color.White.copy(alpha = .04f), disabledUncheckedBorderColor = Color.White.copy(alpha = .12f)))
@@ -244,7 +245,7 @@ fun Modifier.glassIsland(b: Backdrop?, k: Float = 1f, shape: Shape = RoundedCorn
             if (b != null && b.layer.size.width > 0) {
                 // (Liquid glass: what's under it sharp, at full size, bent at the edges; otherwise a quarter-size blur)
                 val f = if (liquid) 1f else 4f; val sw = (size.width / f).toInt() + 2; val sh = (size.height / f).toInt() + 2
-                blur.renderEffect = if (liquid) lens.effect(size.width, size.height, minOf(size.width, size.height) / 2) else fx; blur.alpha = k
+                blur.renderEffect = if (liquid) lensEffect(lens, shape) else fx; blur.alpha = k
                 blur.record(androidx.compose.ui.unit.IntSize(sw, sh)) {
                     scale(1f / f, 1f / f, pivot = Offset.Zero) {
                         translate(b.at.x - at[0], b.at.y - at[1]) { drawLayer(b.layer) }

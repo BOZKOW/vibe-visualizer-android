@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.derivedStateOf
@@ -100,7 +102,10 @@ fun WavySeek(frac: Float, wavy: Boolean, onDrag: (Float) -> Unit, onDone: (Float
 /** The seek bar as Spicy Lyrics Mobile draws it: a thick pill with a soft outline that fills from the left, no thumb.
  *  [frac] is read when it's drawn, so a playing song only repaints the bar (it rebuilt the whole row every frame). */
 @Composable
-fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Unit, enabled: Boolean, thick: androidx.compose.ui.unit.Dp = 12.dp, modifier: Modifier = Modifier, under: (DrawScope.() -> Unit)? = null) {
+fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Unit, enabled: Boolean, thick: androidx.compose.ui.unit.Dp = 12.dp, modifier: Modifier = Modifier, under: (DrawScope.(Offset) -> Unit)? = null) {
+    val liquid = liquidOn()
+    val lens = if (liquid) rememberLens() else null
+    val backdrop = if (liquid) androidx.compose.ui.graphics.rememberGraphicsLayer() else null
     val drag by rememberUpdatedState(onDrag); val done by rememberUpdatedState(onDone)
     val clip = remember { Path() }   // [under]: what the track shows instead of what's behind it (Frost)
     var last by remember { mutableFloatStateOf(0f) }
@@ -123,7 +128,13 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
         }) {
         val h = thick.toPx(); val y = (size.height - h) / 2; val r = CornerRadius(h / 2); val w = size.width
         clip.reset(); clip.addRoundRect(RoundRect(0f, y, w, y + h, r))
-        if (under != null) clipPath(clip) { under() }
+        if (under != null) clipPath(clip) {
+            if (lens != null && backdrop != null && w >= 1f && h >= 1f) {
+                backdrop.renderEffect = lens.effect(w, h, h / 2)
+                backdrop.record(androidx.compose.ui.unit.IntSize(w.roundToInt(), h.roundToInt())) { under(Offset(0f, y)) }
+                translate(0f, y) { drawLayer(backdrop) }
+            } else under(Offset.Zero)
+        }
         // your bar, in the glass the rest of the app has (0.58.2, the owner: "keep my design but the glass from the rest"):
         // its body (the dark base, the song's colour) and its rim catching the light at the top
         clipPath(clip) { glassBody(0f, if (enabled) 1f else .5f) }

@@ -74,30 +74,35 @@ fun VibeRoot() {
             // Settings blur too while a window is open over them (it blurred only the player, under Settings' own blur)
             val wK by animateFloatAsState(if (win && !S.low && E.settingsPage != null) 1f else 0f, tween(260), label = "wblur")
             val settingsBackground = rememberBackdrop()
+            val windowBackdrop = rememberBackdrop()
             val noticeBackdrop = rememberBackdrop()
             val noticeHost = androidx.compose.runtime.remember(noticeBackdrop) { PlayerNoticeHost(noticeBackdrop) }
             if (E.inPip) { BackgroundLayer(); PipCanvas(); PipScreen() }
             else {
-                if (!covered) Box(Modifier.fillMaxSize().backdropSource(settingsBackground, E.settingsPage != null && SettingsUi.live).cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) {
-                    androidx.compose.runtime.CompositionLocalProvider(LocalPlayerNotices provides noticeHost) {
-                        Box(Modifier.fillMaxSize().backdropSource(noticeBackdrop, !S.low && noticeHost.hasNotices())) { BackgroundLayer(); PlayerScreen() }
-                        PlayerNoticeOverlay(noticeHost)
+                Box(Modifier.fillMaxSize().backdropSource(windowBackdrop, liquidOn() && (win || qK > .001f))) {
+                    if (!covered) Box(Modifier.fillMaxSize().backdropSource(settingsBackground, E.settingsPage != null && SettingsUi.live).cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) {
+                        androidx.compose.runtime.CompositionLocalProvider(LocalPlayerNotices provides noticeHost) {
+                            Box(Modifier.fillMaxSize().backdropSource(noticeBackdrop, !S.low && noticeHost.hasNotices())) { BackgroundLayer(); PlayerScreen() }
+                            PlayerNoticeOverlay(noticeHost)
+                        }
                     }
+                    if (S.b("fps")) Text(E.fpsText, Modifier.align(Alignment.TopEnd).statusBarsSpace().padding(top = 60.dp, end = 12.dp), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = Color.White.copy(alpha = .7f))
+                    // Ambient mode: the waking touch only wakes (nothing under it is tapped or seeked)
+                    if (E.ambient) Box(Modifier.fillMaxSize().pointerInput(Unit) {
+                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume(); do { val e = awaitPointerEvent(); e.changes.forEach { it.consume() } } while (e.changes.any { it.pressed }) }
+                    })
+                    // Settings and the setup guide grow out of the button that opened them, and shrink back into it
+                    val setFrom = rememberPopOrigin(setT.targetState)
+                    AnimatedVisibility(setT, enter = popIn(setFrom), exit = popOut(setFrom)) { Box(popClip().cheapBlur(wK, 22.dp, .25f * wK)) { SettingsScreen(settingsBackground) } }
+                    val wizFrom = rememberPopOrigin(wizT.targetState)
+                    AnimatedVisibility(wizT, enter = popIn(wizFrom), exit = popOut(wizFrom)) { Box(popClip()) { SetupWizard() } }
                 }
-                if (S.b("fps")) Text(E.fpsText, Modifier.align(Alignment.TopEnd).statusBarsSpace().padding(top = 60.dp, end = 12.dp), fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = Color.White.copy(alpha = .7f))
-                // Ambient mode: the waking touch only wakes (nothing under it is tapped or seeked)
-                if (E.ambient) Box(Modifier.fillMaxSize().pointerInput(Unit) {
-                    awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume(); do { val e = awaitPointerEvent(); e.changes.forEach { it.consume() } } while (e.changes.any { it.pressed }) }
-                })
-                // Settings and the setup guide grow out of the button that opened them, and shrink back into it
-                val setFrom = rememberPopOrigin(setT.targetState)
-                AnimatedVisibility(setT, enter = popIn(setFrom), exit = popOut(setFrom)) { Box(popClip().cheapBlur(wK, 22.dp, .25f * wK)) { SettingsScreen(settingsBackground) } }
-                val wizFrom = rememberPopOrigin(wizT.targetState)
-                AnimatedVisibility(wizT, enter = popIn(wizFrom), exit = popOut(wizFrom)) { Box(popClip()) { SetupWizard() } }
-                Sheets()
-                AskDialog()
-                NoticeDetail()
-                UpdatedCard()
+                androidx.compose.runtime.CompositionLocalProvider(LocalGlassBackdrop provides windowBackdrop) {
+                    Sheets()
+                    AskDialog()
+                    NoticeDetail()
+                    UpdatedCard()
+                }
                 Snacks(Modifier.align(Alignment.BottomCenter).navBarsSpace().padding(bottom = 8.dp))
             }
             // errors and warnings: in picture-in-picture too, so their time runs out

@@ -375,7 +375,7 @@ private fun pages(): List<Page> = listOf(
         Item.Txt("Ideas being tried out. They may change, or go away, in a later version. The lyrics ones (the Focus style, Refined credits, Background vocal pop-out, Keep overlapping lines) are in Lyrics, beside what they go with."),
         Item.Sw("xScrub", "Scrub preview", "While you drag the seek bar, a bubble above your finger shows the time it would jump to (and the volume slider, the level). Off, the times show where the song is until you let go. From Spicy Lyrics 6.4.50."),
         Item.Sw("xSkeleton", "Lyrics loading skeleton", "While lyrics load, faint placeholder lines and a small “Loading lyrics” label instead of the big message. From Spicy Lyrics 6.4.0."),
-        Item.Sw("xLiquid", "Liquid glass", "The round buttons and the notices as liquid glass, as on iOS 26: the blurred picture behind them bends at their edges like a lens, with a faint rainbow at the rim and the light catching it. Android 13 or newer. It uses more of the graphics chip, so the phone may run a little warmer."),
+        Item.Sw("xLiquid", "Liquid glass", "A clear, slightly darkened material for controls, Settings cards, switches and sheets. Their edges gently bend the view behind them, with soft highlights. Experimental; needs Android 13 or newer."),
     ), sub = "Ideas being tried out", group = 3),
     Page("help", "Help & about", Icons.AutoMirrored.Rounded.Help, listOf(
         Item.Sub("App updates"),
@@ -402,6 +402,11 @@ private fun pages(): List<Page> = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(background: Backdrop? = null) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalGlassBackdrop provides background) { SettingsContent(background) }
+}
+
+@Composable
+private fun SettingsContent(background: Backdrop?) {
     val all = remember { pages() }
     var page by remember { mutableStateOf<String?>(E.settingsPage?.takeIf { p -> all.any { it.id == p } }) }
     var q by remember { mutableStateOf("") }

@@ -281,6 +281,7 @@ val LocalFrost = staticCompositionLocalOf { false }
 
 object Frost {
     var video by mutableStateOf<GraphicsLayer?>(null)   // the Canvas, blurred ([CanvasBlur])
+    var coverSharp by mutableStateOf<GraphicsLayer?>(null) // same recorded landscape cover for clear Liquid refraction
     var coverBlur by mutableStateOf<GraphicsLayer?>(null) // landscape cover, including its transition and motion video
     var videoSharp: GraphicsLayer? = null               // the Canvas as it plays (CanvasBackdrop's), for Liquid glass's clear glass
     var videoAlpha = 1f                                 // ...and how much of it shows there
@@ -308,9 +309,17 @@ fun DrawScope.screenGrade(w: Float, h: Float, top: Float, shade: Float, k: Float
 fun Modifier.liveCoverFrost(): Modifier = composed {
     if (S.low) return@composed Modifier
     val picture = rememberGraphicsLayer()
+    val liquid = liquidOn()
+    picture.compositingStrategy = if (liquid) androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen else androidx.compose.ui.graphics.layer.CompositingStrategy.Auto
     val small = rememberGraphicsLayer()
     val done = rememberGraphicsLayer()
-    DisposableEffect(done) { Frost.coverBlur = done; onDispose { if (Frost.coverBlur === done) Frost.coverBlur = null } }
+    DisposableEffect(done, picture) {
+        Frost.coverBlur = done; Frost.coverSharp = picture
+        onDispose {
+            if (Frost.coverBlur === done) Frost.coverBlur = null
+            if (Frost.coverSharp === picture) Frost.coverSharp = null
+        }
+    }
     this.drawWithContent {
         if (!E.quiet && E.playingState && io.github.bozkow.vibevisualizer.engine.AnimatedCover.ready) E.drawTick
         picture.record { this@drawWithContent.drawContent() }
@@ -381,10 +390,11 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
         return
     }
     val v = Frost.video; val scr = Frost.screen
+    val coverLayer = if (liquidOn()) Frost.coverSharp else Frost.coverBlur
     if (v != null && v.size.width > 0 && scr.width > 0) {
         translate(-at.x, -at.y) { scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) } }
-    } else if (Frost.coverBlur?.let { it.size.width > 0 } == true) {
-        val layer = Frost.coverBlur!!; val c = Frost.cover
+    } else if (coverLayer?.let { it.size.width > 0 } == true) {
+        val layer = coverLayer; val c = Frost.cover
         translate(c.left - at.x, c.top - at.y) {
             scale(c.width / layer.size.width, c.height / layer.size.height, pivot = Offset.Zero) { drawLayer(layer) }
         }
@@ -396,85 +406,6 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
         drawImage(img, IntOffset(sx, sy), IntSize(sw, sh), IntOffset.Zero, IntSize(size.width.roundToInt() + 1, size.height.roundToInt() + 1), filterQuality = FilterQuality.Low)
     }
     if (!liquidOn()) drawRect(Color.Black.copy(alpha = .15f))   // the white on it keeps reading on a bright cover (with the glass's own 10%; liquid glass: none, clear)
-}
-
-/* ---- Liquid glass (0.56.0, an experiment the owner asked for: "iOS-like"; Settings → Experiments → Liquid glass) ----
-   The frost behind a piece drawn through a lens: near its rim the blurred picture behind is read from further in, so it
-   bends and magnifies there like the edge of a thick glass, with red and blue read a hair apart for the faint rainbow
-   real glass has at its edge. Android 13 or newer (an AGSL RuntimeShader as the layer's RenderEffect); the shader runs
-   only on the piece's own small layer. Off in Low performance mode and with Motion sickness. */
-private const val LENS = """
-uniform shader content;
-uniform float2 size;
-uniform float radius;
-uniform float rim;
-half4 main(float2 p) {
-    float2 c = size * 0.5;
-    float2 q = abs(p - c) - (c - radius);
-    float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
-    float t = clamp(1.0 + d / rim, 0.0, 1.0);
-    float bend = t * t;
-    float2 dir = p - c;
-    float2 s = c + dir * (1.0 - 0.32 * bend);
-    float2 off = dir * 0.03 * bend;
-    half4 g = content.eval(s);
-    half r = content.eval(s + off).r;
-    half b = content.eval(s - off).b;
-    return half4(r, g.g, b, g.a);
-}
-"""
-
-/** The lens as a reusable effect: made again only when the size or the corners change (Android 13+; null before). */
-class Lens internal constructor(private val shader: Any?) {
-    private var w = -1f; private var h = -1f; private var r = -1f
-    private var fx: androidx.compose.ui.graphics.RenderEffect? = null
-    fun effect(width: Float, height: Float, radius: Float): androidx.compose.ui.graphics.RenderEffect? {
-        if (Build.VERSION.SDK_INT < 33) return null
-        val sh = shader as? RuntimeShader ?: return null
-        if (width != w || height != h || radius != r || fx == null) {
-            w = width; h = height; r = radius
-            sh.setFloatUniform("size", width, height); sh.setFloatUniform("radius", radius.coerceAtMost(minOf(width, height) / 2))
-            sh.setFloatUniform("rim", minOf(minOf(width, height) * .32f, 60f))
-            fx = android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content").asComposeRenderEffect()
-        }
-        return fx
-    }
-}
-@Composable fun rememberLens(): Lens = remember { Lens(if (Build.VERSION.SDK_INT >= 33) RuntimeShader(LENS) else null) }
-
-/** Liquid glass is on (and can be): the experiment, Android 13+, not in Low performance mode or with Motion sickness. */
-fun liquidOn(): Boolean = Build.VERSION.SDK_INT >= 33 && S.b("xLiquid") && !S.low && !S.calm
-
-/** The frost behind a round button ([radius] null: an oval) or a notice (its corners' [radius]), through the lens when
- *  Liquid glass is on; plain frost otherwise. */
-fun Modifier.liquidFrost(radius: Dp? = null, inset: Dp = 0.dp): Modifier = composed {
-    if (!liquidOn()) return@composed Modifier.frosted(inset, oval = radius == null)
-    if (!LocalFrost.current) return@composed Modifier
-    var at by remember { mutableStateOf(Offset.Zero) }
-    val paint = frostPainter()
-    val layer = androidx.compose.ui.graphics.rememberGraphicsLayer()
-    val shader = remember { if (Build.VERSION.SDK_INT >= 33) RuntimeShader(LENS) else null }
-    val made = remember { floatArrayOf(-1f, -1f) }
-    Modifier.onGloballyPositioned { at = it.positionInWindow() }.drawBehind {
-        val sh = shader ?: return@drawBehind
-        if (Build.VERSION.SDK_INT < 33) return@drawBehind
-        val w = size.width; val h = size.height
-        if (w < 1f || h < 1f) return@drawBehind
-        // the effect is made again only when the size changes (its numbers are the piece's shape)
-        if (made[0] != w || made[1] != h) {
-            made[0] = w; made[1] = h
-            val r = radius?.toPx()?.coerceAtMost(minOf(w, h) / 2) ?: (minOf(w, h) / 2)
-            sh.setFloatUniform("size", w, h); sh.setFloatUniform("radius", r)
-            sh.setFloatUniform("rim", minOf(minOf(w, h) * .32f, 22.dp.toPx()))
-            layer.renderEffect = android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content").asComposeRenderEffect()
-        }
-        layer.record(IntSize(w.roundToInt(), h.roundToInt())) { paint(at) }
-        if (radius == null) {
-            val i = inset.toPx()
-            val clip = Path().apply { addOval(Rect(i, i, w - i, h - i)) }
-            clipPath(clip) { drawLayer(layer) }
-        } else drawLayer(layer)
-    }
 }
 
 /** Frost behind a round button or a notice, on the player. [inset]: when the button is drawn smaller than it's laid out.

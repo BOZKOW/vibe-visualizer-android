@@ -1,5 +1,5 @@
-Vibe Visualizer for Android 0.60.8 (beta). Android 12 or newer; it installs over 0.60.7 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.60.9 (beta). Android 12 or newer; it installs over 0.60.8 (Settings → Help & about → Update now).
 
-- **Playback timing recovery:** the visible player regularly checks Android’s live playback position, recovering missed pause, seek and resume reports without waiting for the full session refresh.
-- **Correct song versions:** different Spotify IDs and releases with the same title and artist are recognised as different recordings. Search fallbacks check the album, duration and recording code when available.
-- **Reliable cover artwork:** the music app’s own artwork takes priority, including black-and-white covers. Late online searches cannot overwrite it, and ambiguous album matches are skipped.
+- **More complete Liquid Glass:** the experiment now refracts Settings cards and buttons, switches, sheets and the seek-bar track, using the content behind each surface.
+- **Gentler refraction:** long bars bend less, colour fringes are subtler, and the lens follows the actual corners and inset edges of controls.
+- **Consistent finish:** Liquid surfaces share a slight dark tint and softer highlights.
