@@ -45,9 +45,10 @@ half4 main(float2 p) {
     float t = smoothstep(-rim, 0.0, d);
     float2 normal = len > 0.001 ? sign(v) * outside / max(len, 0.001) :
         (q.x > q.y ? float2(sign(v.x), 0.0) : float2(0.0, sign(v.y)));
-    // Bend along the local edge normal, bounded by thickness, rather than by the length of a capsule.
-    float2 s = clamp(p - normal * (rim * 0.24 * t * t), float2(0.5), size - 0.5);
-    float2 fringe = normal * min(0.65, rim * 0.025) * t * t;
+    // Magnify the interior as well as bending the rim: an identity interior on a blurred
+    // backdrop looks indistinguishable from ordinary frost. Edge bending stays thickness-bound.
+    float2 s = clamp(c + v * 0.92 - normal * (rim * 0.5 * t * t), float2(0.5), size - 0.5);
+    float2 fringe = normal * min(1.25, rim * 0.035) * t * t;
     half4 g = content.eval(s);
     half4 red = content.eval(clamp(s + fringe, float2(0.5), size - 0.5));
     half4 blue = content.eval(clamp(s - fringe, float2(0.5), size - 0.5));
@@ -70,7 +71,7 @@ class Lens internal constructor(private val shader: Any?, private val density: F
             w = width; h = height; tl = a; tr = b; br = c; bl = d
             sh.setFloatUniform("size", width, height)
             sh.setFloatUniform("corners", a, b, c, d)
-            sh.setFloatUniform("rim", minOf(minOf(width, height) * .22f, 12f * density).coerceAtLeast(1f))
+            sh.setFloatUniform("rim", minOf(minOf(width, height) * .32f, 18f * density).coerceAtLeast(1f))
             fx = android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content").asComposeRenderEffect()
         }
         return fx

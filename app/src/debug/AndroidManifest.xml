@@ -2,6 +2,7 @@
 <!-- Debug builds only: the test switchboard (DebugReceiver), never in a release -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <activity android:name=".ui.GlassPreviewActivity" android:exported="true" />
         <receiver android:name=".DebugReceiver" android:exported="true" />
     </application>
 </manifest>
