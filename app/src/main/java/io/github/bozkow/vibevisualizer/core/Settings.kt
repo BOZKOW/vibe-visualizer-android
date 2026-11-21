@@ -70,6 +70,7 @@ object Defaults {
         "aLike" to true,        //   the heart beside a Spotify song
         "spRevive" to true,
         "aCalm" to false,
+        "lmerge" to false,     // optional safe word timing borrowed from other enabled lyrics sources
         "lbetter" to false,     // lyrics: word timing over your order of sources (Spicy Lyrics Mobile's way); off: your order decides       // Motion sickness: less movement (lyrics fade from line to line, names end in "…", a still background)     // the Spotify app closed by Android mid-song: started again
         "aLyrCover" to true,    //   upright, the Lyrics screen: a small cover beside the song's name
         "aTitle" to "m",        //   the song name's size: s, m, l

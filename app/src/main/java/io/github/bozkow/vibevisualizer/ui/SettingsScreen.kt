@@ -272,6 +272,7 @@ private fun pages(): List<Page> = listOf(
     Page("lyrics", "Lyrics", VIcons.lyrics, listOf(
         Item.Sub("Sources"),
         Item.Custom("Sources, in priority order Spicy Lyrics LRCLIB NetEase AMLL Spotify your lyrics files") { Sources() },
+        Item.Sw("lmerge", "Merge lyrics from sources", "Keep the preferred source’s words and credits, and borrow matching word timing from other enabled sources. Different versions and uncertain matches are kept separate. Off by default."),
         Item.Sw("lbetter", "Word timing over your order", "A source lower in your list is used over a higher one when it has word-by-word timing and the higher one only has line timing (as Spicy Lyrics Mobile does). Off: your order decides; a source lower down is only used when the ones above it have nothing synced."),
         Item.Sub("Your lyrics files"),
         Item.Custom("Add lyrics files use a file for this song remove all import lrc ttml") { MyFiles() },
@@ -439,19 +440,22 @@ private fun SettingsContent(background: Backdrop?) {
                 // screen's top), fading only at the very top and foot (the owner: "keep the same look ... transform to an island")
                 val statusH = topInset.asPaddingValues().calculateTopPadding()
                 val edges = Modifier.fillMaxSize().fadeEdges(statusH + 12.dp, navH + 24.dp)
+                // The list survives a section visit; its expanded header measurement must survive too.
+                // Re-measuring a newly composed, already collapsed island shrank the list's top padding on Back.
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                var listHeaderRest by remember(short, statusH, density.density, density.fontScale) { androidx.compose.runtime.mutableIntStateOf(0) }
                 @Composable fun ListPane(m: Modifier) {
                     val resState = rememberLazyListState()
                     val under = rememberBackdrop(if (SettingsUi.live) background else null)   // the list, for the island's glass
                     val k by collapse(if (q.isNotEmpty() && !wide) resState else listState, 64.dp)
-                    var headRest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                    val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
+                    val head = with(density) { listHeaderRest.toDp() }
                     val pad = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + (if (short) 12.dp else 22.dp), bottom = navH + 28.dp)
                     Box(m) {
                     if (q.isNotEmpty() && !wide) SearchResults(all, q, edges.backdropSource(under, k > 0f && !S.low), head, navH, resState)
                     else LazyColumn(edges.backdropSource(under, k > 0f && !S.low), state = listState, contentPadding = pad) {
                         cardPages(all, page, wide) { open(it) }
                     }
-                    Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {
+                    Column(Modifier.fillMaxWidth().onSizeChanged { if (listHeaderRest == 0 || k < .01f) listHeaderRest = it.height }.windowInsetsPadding(topInset)) {
                         val close = @Composable { IconButton(onClick = { E.settingsPage = null }, Modifier.then(if (k > .5f) Modifier.padding(4.dp).glassChip(k) else Modifier)) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
                         val search = @Composable { sm: Modifier, x: Boolean ->
                             TextField(q, { q = it }, sm.glassIsland(under, k, baseGlass = true), singleLine = true,
@@ -645,10 +649,10 @@ fun ItemView(it: Item, h: Dp = 0.dp, v: Dp = 0.dp, shape: Shape = RoundedCornerS
             val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
             Row(Modifier.fillMaxWidth().pressScale(src, .985f).clip(shape)
                 .toggleable(S.b(it.k), src, androidx.compose.material3.ripple(), enabled = on, role = Role.Switch) { x -> S.set(it.k, x); E.haptic() }
-                .padding(horizontal = h, vertical = v).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                .defaultMinSize(minHeight = 72.dp).padding(horizontal = h, vertical = v).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(it.t, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
-                    if (it.d.isNotEmpty()) Text(it.d, fontSize = 13.5.sp, lineHeight = 19.sp, color = Color.White.copy(alpha = .62f), modifier = Modifier.padding(top = 2.dp))
+                    if (it.d.isNotEmpty()) SettingDescription(it.d)
                 }
                 if (on) ResetBtn(it.k)
                 Spacer(Modifier.width(8.dp))
@@ -663,7 +667,7 @@ fun ItemView(it: Item, h: Dp = 0.dp, v: Dp = 0.dp, shape: Shape = RoundedCornerS
             }
             val range = (it.max - it.min).toFloat()
             Slider((S.i(it.k) - it.min) / range, { f -> S.set(it.k, it.min + (Math.round(f * range / it.step) * it.step)) }, enabled = on, steps = 0, colors = glassSlider())
-            if (it.d.isNotEmpty()) Hint(it.d)
+            if (it.d.isNotEmpty()) SettingDescription(it.d)
         } }
         // the whole tile (its note too) opens the choices
         is Item.Ch -> Needs(it.k, h) { on ->
@@ -686,9 +690,25 @@ fun ItemView(it: Item, h: Dp = 0.dp, v: Dp = 0.dp, shape: Shape = RoundedCornerS
                         it.opts.forEach { (v, l) -> DropdownMenuItem(text = { Text(l, fontWeight = if (v == S.str(it.k)) FontWeight.Bold else FontWeight.Normal) }, onClick = { open = false; E.haptic(); S.set(it.k, v) }) }
                     }
                 }
-                if (it.d.isNotEmpty()) Hint(it.d)
+                if (it.d.isNotEmpty()) SettingDescription(it.d)
             }
         }
+    }
+}
+
+/** Keep rows readable at a glance; the complete explanation is available without changing the setting. */
+@Composable
+private fun SettingDescription(text: String) {
+    var expanded by remember(text) { mutableStateOf(false) }
+    val detailed = text.length > 105 || text.contains("\n")
+    val summary = text.substringBefore(". ").trimEnd('.')
+    Row(Modifier.fillMaxWidth().then(if (detailed) Modifier.clickable(role = Role.Button,
+        onClickLabel = if (expanded) "Hide explanation" else "Read full explanation") { expanded = !expanded } else Modifier)
+        .padding(top = 3.dp, bottom = 2.dp), verticalAlignment = Alignment.Top) {
+        Text(if (expanded || !detailed) text else summary, Modifier.weight(1f), fontSize = 13.sp, lineHeight = 18.sp,
+            color = Color.White.copy(alpha = .6f), maxLines = if (expanded || !detailed) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
+        if (detailed) Text(if (expanded) "Less" else "More", Modifier.padding(start = 8.dp), fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -810,38 +830,47 @@ private fun AudioChoice() {
 @Composable
 private fun Sources() {
     val list = Lyr.provList()
+    var expanded by remember { mutableStateOf(false) }
+    var ordering by remember { mutableStateOf(false) }
     Column(Modifier.animateContentSize()) {
-        Text("Sources, in priority order", fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Lyrics sources", Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            VOutlinedButton({ expanded = !expanded; if (!expanded) ordering = false }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
+                SettingsButtonLabel(if (expanded) "Close" else "Manage")
+            }
+        }
+        if (!expanded) {
+            Text("${list.count { it.on }} enabled", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+            Text(list.filter { it.on }.take(3).joinToString(" → ") { Lyr.PROVS.getValue(it.k).name },
+                fontSize = 13.sp, color = Color.White.copy(alpha = .6f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        } else {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("In priority order", Modifier.weight(1f), fontSize = 13.sp, color = Color.White.copy(alpha = .6f))
+            VOutlinedButton({ ordering = !ordering }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
+                SettingsButtonLabel(if (ordering) "Done" else "Reorder")
+            }
+        }
         list.forEachIndexed { i, p ->
             val pr = Lyr.PROVS.getValue(p.k)
-            BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(16.dp))
-                .background(Color.White.copy(alpha = if (p.on) .06f else .02f)).padding(12.dp)) {
-                val compact = maxWidth < 400.dp
-                val label = @Composable { m: Modifier ->
-                    Row(m, verticalAlignment = Alignment.Top) {
-                        Text("${i + 1}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(24.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(pr.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White.copy(alpha = if (p.on) 1f else .5f))
-                            Text(pr.desc, fontSize = 11.5.sp, color = Color.White.copy(alpha = .5f))
-                        }
+            Column(Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = if (p.on) .06f else .02f)).padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${i + 1}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(24.dp))
+                    Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(pr.name, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Color.White.copy(alpha = if (p.on) 1f else .5f),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        SettingDescription(pr.desc)
                     }
+                    VSwitch(p.on, { v -> Lyr.setProv(list.map { x -> if (x.k == p.k) x.copy(on = v) else x }) })
                 }
-                val controls = @Composable {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i - 1].also { l[i - 1] = l[i] }; Lyr.setProv(l) }, enabled = i > 0) { Icon(Icons.Rounded.KeyboardArrowUp, "Move up") }
-                        IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i + 1].also { l[i + 1] = l[i] }; Lyr.setProv(l) }, enabled = i < list.size - 1) { Icon(Icons.Rounded.KeyboardArrowDown, "Move down") }
-                        VSwitch(p.on, { v -> Lyr.setProv(list.map { x -> if (x.k == p.k) x.copy(on = v) else x }) })
-                    }
-                }
-                if (compact) Column(Modifier.fillMaxWidth()) {
-                    label(Modifier.fillMaxWidth())
-                    Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.CenterEnd) { controls() }
-                } else Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    label(Modifier.weight(1f)); Spacer(Modifier.width(8.dp)); controls()
+                if (ordering) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i - 1].also { l[i - 1] = l[i] }; Lyr.setProv(l) }, enabled = i > 0) { Icon(Icons.Rounded.KeyboardArrowUp, "Move ${pr.name} up") }
+                    IconButton(onClick = { val l = list.toMutableList(); l[i] = l[i + 1].also { l[i + 1] = l[i] }; Lyr.setProv(l) }, enabled = i < list.size - 1) { Icon(Icons.Rounded.KeyboardArrowDown, "Move ${pr.name} down") }
                 }
             }
         }
-        Hint("The first source that has the song is used. The arrows reorder, the switch turns a source off.")
+        Hint(if (ordering) "Use the arrows to change priority." else "Higher sources are preferred. Reorder to change priority.")
+        }
     }
 }
 

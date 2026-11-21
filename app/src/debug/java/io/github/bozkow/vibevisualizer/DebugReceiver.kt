@@ -53,6 +53,14 @@ class DebugReceiver : BroadcastReceiver() {
             }
             i.getStringExtra("seek")?.toDoubleOrNull()?.let { io.github.bozkow.vibevisualizer.media.Local.seek((it * 1000).toLong()) }
             if (i.hasExtra("debugInfo")) android.util.Log.i("VV-dbg", Lyr.debugInfo())
+            i.getStringExtra("canvasLocal")?.let { u ->
+                if (u == "off") { CreditsPreview.stopCanvas(); io.github.bozkow.vibevisualizer.engine.CanvasVideo.clear(false) }
+                else io.github.bozkow.vibevisualizer.engine.CanvasVideo.setLocal(android.net.Uri.parse(u))
+            }
+            if (i.hasExtra("canvasMove")) Handler(Looper.getMainLooper()).postDelayed({ CreditsPreview.moveCanvas() }, 1200)
+            i.getStringExtra("pipAt")?.toDoubleOrNull()?.let { E.clockOverride = it; E.poke() }
+            if (i.hasExtra("pip")) E.activity?.enterPictureInPictureMode(android.app.PictureInPictureParams.Builder()
+                .setAspectRatio(android.util.Rational(16, 9)).build())
             i.getStringExtra("orientation")?.let { o -> E.activity?.requestedOrientation = when (o) {
                 "landscape" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                 "portrait" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT

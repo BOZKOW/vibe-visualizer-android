@@ -100,7 +100,8 @@ behind the lyrics, the small window's line at the top, the One UI widget size fi
 own background color, Keep syllable pace, the language of the lyrics' own translations, the Unison, LRCMux, lrc.red,
 KuGou, QQ Music and Kuwo sources, the translation services, session stickiness, Spicy Lyrics' Canvas service, Ambient
 mode, the widget, the Now Playing layout, its glass (0.19), its transport and timeline, reading the Spotify song ID and
-the player's own buttons from Android, Chinese read by word, and keeping lyrics longer. Its LRCMux source is itself
+the player's own buttons from Android, Chinese read by word, keeping lyrics longer, and the optional lyric-source
+merge matcher (preferred wording with safely matched donor timing). Its LRCMux source is itself
 adapted from Lyrica's lrcmux adapter (MIT).
 
 Japanese, Korean and Chinese romanization by line, Join split words, Up next and the name scrolling follow Spicy Lyrics

@@ -74,15 +74,19 @@ fun VibeRoot() {
             // Settings blur too while a window is open over them (it blurred only the player, under Settings' own blur)
             val wK by animateFloatAsState(if (win && !S.low && E.settingsPage != null) 1f else 0f, tween(260), label = "wblur")
             val settingsBackground = rememberBackdrop()
+            val homeBackground = rememberBackdrop()
             val windowBackdrop = rememberBackdrop()
             val noticeBackdrop = rememberBackdrop()
             val noticeHost = androidx.compose.runtime.remember(noticeBackdrop) { PlayerNoticeHost(noticeBackdrop) }
             if (E.inPip) { BackgroundLayer(); PipCanvas(); PipScreen() }
             else {
-                Box(Modifier.fillMaxSize().backdropSource(windowBackdrop, liquidOn() && (win || qK > .001f))) {
+                Box(Modifier.fillMaxSize().backdropSource(windowBackdrop, !S.low && (win || qK > .001f))) {
                     if (!covered) Box(Modifier.fillMaxSize().backdropSource(settingsBackground, E.settingsPage != null && SettingsUi.live).cheapBlur(maxOf(sK, qK), if (sK >= qK) 32.dp else 22.dp, .4f * sK)) {
                         androidx.compose.runtime.CompositionLocalProvider(LocalPlayerNotices provides noticeHost) {
-                            Box(Modifier.fillMaxSize().backdropSource(noticeBackdrop, !S.low && noticeHost.hasNotices())) { BackgroundLayer(); PlayerScreen() }
+                            Box(Modifier.fillMaxSize().backdropSource(noticeBackdrop, !S.low && noticeHost.hasNotices())) {
+                                Box(Modifier.fillMaxSize().backdropSource(homeBackground, (E.src == "none") && !S.low)) { BackgroundLayer() }
+                                androidx.compose.runtime.CompositionLocalProvider(LocalGlassBackdrop provides if (E.src == "none") homeBackground else null) { PlayerScreen() }
+                            }
                             PlayerNoticeOverlay(noticeHost)
                         }
                     }

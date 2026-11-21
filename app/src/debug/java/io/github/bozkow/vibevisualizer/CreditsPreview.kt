@@ -6,6 +6,7 @@ import android.util.Log
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.engine.E
 import io.github.bozkow.vibevisualizer.engine.Lyr
+import io.github.bozkow.vibevisualizer.lyrics.Bg
 import io.github.bozkow.vibevisualizer.lyrics.Credit
 import io.github.bozkow.vibevisualizer.lyrics.Line
 import io.github.bozkow.vibevisualizer.lyrics.LyricsResult
@@ -16,10 +17,30 @@ import io.github.bozkow.vibevisualizer.lyrics.Word
 object CreditsPreview {
     private val fixtureNote = E.Snack("Backdrop preview", "err", sub = "Live cover and title behind the glass")
     private var restore: (() -> Unit)? = null
+    private var canvasRestore: (() -> Unit)? = null
+    fun stopCanvas() { canvasRestore?.invoke(); canvasRestore = null }
+
+    /** Fake only Vibe's follower state while a muted local Canvas is previewed. No MediaSession,
+     * audio focus or command to another player. Never replace a real followed session. */
+    fun moveCanvas() {
+        val follower = io.github.bozkow.vibevisualizer.media.MediaApps
+        if (canvasRestore != null || E.src != "file" || follower.pkg.isNotEmpty()) return
+        val field = io.github.bozkow.vibevisualizer.spotify.SessionFollower::class.java.getDeclaredField("state").apply { isAccessible = true }
+        val duration = io.github.bozkow.vibevisualizer.spotify.SessionFollower::class.java.getDeclaredField("durMs").apply { isAccessible = true }
+        val oldState = field.get(follower); val oldDur = follower.durMs; val oldSrc = E.src; val hide = S.str("uiHide")
+        val fake = android.media.session.PlaybackState.Builder().setState(android.media.session.PlaybackState.STATE_PLAYING, 1000, 1f).build()
+        canvasRestore = {
+            if (field.get(follower) === fake) { field.set(follower, oldState); duration.setLong(follower, oldDur) }
+            if (E.src == "media") E.src = oldSrc
+            S.set("uiHide", hide)
+        }
+        field.set(follower, fake); duration.setLong(follower, 180000L); E.src = "media"; S.set("uiHide", "never")
+        io.github.bozkow.vibevisualizer.engine.CanvasVideo.syncPlay(); E.poke()
+    }
     private fun apply(r: LyricsResult) = Lyr::class.java.getDeclaredMethod("apply", LyricsResult::class.java)
         .apply { isAccessible = true }.invoke(Lyr, r)
     fun show(mode: String) {
-        if (mode == "off") { restore?.invoke(); restore = null; return }
+        if (mode == "off") { stopCanvas(); restore?.invoke(); restore = null; return }
         if (restore == null) {
             val src = E.src; val title = E.title; val artist = E.artist; val clock = E.clockOverride
             val cover = io.github.bozkow.vibevisualizer.engine.Visuals.cover
@@ -68,12 +89,17 @@ object CreditsPreview {
         val static = mode == "static"
         val original = "君の名前を呼んでいた"
         val reading = "Kimi no namae wo yonde ita"
-        val lines = if (mode.startsWith("duet")) listOf(Line(6.0, 8.0, "Upcoming singer", opp = mode == "duetright"))
+        val lines = if (mode.startsWith("pipbg")) {
+            val backing = "We keep on singing through the night together until the morning brings us home again".split(" ")
+            val words = backing.mapIndexed { n, word -> Word(3.0 + n, 4.0 + n, word, true) }
+            listOf(Line(0.0, 26.0, "Stay here with me", listOf(Word(0.0, 26.0, "Stay here with me", false)),
+                listOf(Bg(backing.joinToString(" "), null, words))))
+        } else if (mode.startsWith("duet")) listOf(Line(6.0, 8.0, "Upcoming singer", opp = mode == "duetright"))
             else if (travel) listOf(Line(0.0, 2.0, "Before the break"), Line(16.0, 18.0, "After the break"))
             else if (roman) listOf(Line(0.0, 6.0, original, listOf(Word(0.0, 6.0, original, false, reading)), apiRom = reading))
             else if (static) (1..20).map { Line(null, null, "Fixture lyric line $it") }
             else (0..2).map { Line(it * 2.0, it * 2.0 + 1.5, "Fixture lyric line ${it + 1}") }
-        E.clockOverride = if (mode.startsWith("duet")) 2.0 else if (mode.endsWith("end")) 7.0 else 1.0
+        E.clockOverride = if (mode.startsWith("pipbg")) 11.0 else if (mode.startsWith("duet")) 2.0 else if (mode.endsWith("end")) 7.0 else 1.0
         apply(LyricsResult(lines, !static, "Spicy Lyrics", Credit("spicy_lyrics", writers = listOf("Fixture Writer"),
             maker = Person("fixture-maker", null, null, null), uploader = Person("fixture-uploader", null, null, null))))
         E.poke()

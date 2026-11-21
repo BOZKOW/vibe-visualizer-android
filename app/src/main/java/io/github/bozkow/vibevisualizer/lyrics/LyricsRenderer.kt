@@ -746,6 +746,23 @@ class LyricsRenderer {
         return if (e <= t0) 0f else F * linePad() + r.y + r.h * ((pos - t0) / (e - t0)).coerceIn(0.0, 1.0).toFloat()
     }
 
+    /** Lead and backing share PiP only during their overlapping phrases. A future or finished backing
+     * must not move the scroll, and translations never count as a second singer. */
+    private fun pipVocalPair(d: LV, pos: Double): Pair<Float, Float>? {
+        var lead: Float? = null; var backing: Float? = null
+        for (r in d.rows) {
+            if (r.kind !in 0..1) continue
+            val ps = r.pieces ?: continue
+            val start = ps.minOfOrNull { it.ts.t } ?: continue
+            val end = ps.maxOfOrNull { it.ts.end } ?: continue
+            if (pos < start || pos >= end) continue
+            val pc = ps.asSequence().filter { it.ts.t <= pos }.maxByOrNull { it.ts.t } ?: continue
+            val row = F * linePad() + r.y + pc.y + F * r.fs * r.fit * r.lh / 2
+            if (r.kind == 0) lead = row else backing = row
+        }
+        return lead?.let { a -> backing?.let { b -> a to b } }
+    }
+
     /** Where the line's last words are (px down it): what comes after them (a translation) is what's left to show. */
     private fun lastSung(d: LV): Float {
         var best = 0f
@@ -766,7 +783,9 @@ class LyricsRenderer {
         if (h <= H - 2 * m) t = max(m, min(t, H - m - h))   // the whole line in view, as high as it needs to go
         else if (pip) {   // taller than everything, in the small window: it goes down with the singing
             lyTall = true; val e = lineEnd(el.l)
-            t = pipTallLineTop(H, m, h, sungRow(el, pos), lastSung(el), e != null && pos >= e)
+            val pair = pipVocalPair(el, pos)
+            t = if (pair != null) pipBalancedLineTop(H, m, h, pair.first, pair.second)
+                else pipTallLineTop(H, m, h, sungRow(el, pos), lastSung(el), e != null && pos >= e)
             band(m, H - m); return t - el.top
         }
         else {   // taller than everything: it moves on a row at a time, on the words' timing (on its side, and upright)

@@ -162,6 +162,20 @@ class ParseTest {
         pipTallLineTop(10f, 20f, 100f, 50f, 80f, false); pipTallLineTop(0f, 0f, 0f, 0f, 0f, false)   // no room: it mustn't throw
     }
 
+    @Test fun pipBalancesSimultaneousLeadAndBackingInsteadOfFollowingTheLastWord() {
+        val top = pipBalancedLineTop(240f, 18f, 500f, 60f, 200f)
+        assertEquals(120f, top + (60f + 200f) / 2, .001f)
+        assertTrue(top + 60f >= 18f)
+        assertTrue(top + 200f <= 222f)
+        assertEquals(top, pipBalancedLineTop(240f, 18f, 500f, 200f, 60f), .001f)
+    }
+
+    @Test fun pipBalancedVocalsDontScrollBeyondTheLyricBlock() {
+        assertEquals(18f, pipBalancedLineTop(240f, 18f, 600f, 10f, 30f), .001f)
+        assertEquals(-378f, pipBalancedLineTop(240f, 18f, 600f, 570f, 590f), .001f)
+        assertTrue(pipBalancedLineTop(0f, 18f, 0f, 0f, 0f).isFinite())
+    }
+
     @Test fun aTranslationTallerThanTheViewKeepsTheWordsInView() {
         val view = 200f; val m = 20f
         val at = tallLineTop(view, m, 900f, 400f, 50f, false) + 400f   // 500 of translation under the last words

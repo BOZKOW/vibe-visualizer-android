@@ -108,6 +108,11 @@ fun pipTallLineTop(view: Float, m: Float, h: Float, sung: Float, last: Float, en
     return minOf(maxOf(t, foot), m)
 }
 
+/** PiP follows the midpoint of simultaneously sung lead/backing rows, bounded by the lyric block.
+ * Solo vocals keep pipTallLineTop's existing timing and placement. */
+fun pipBalancedLineTop(view: Float, m: Float, h: Float, lead: Float, backing: Float): Float =
+    minOf(maxOf(view * .5f - (lead + backing) * .5f, view - m - h), m)
+
 /** A row of a line's words as it's wrapped on screen: when its first word is sung, when the last word on the row before
  *  it ends (for the first row, its own start), and where its middle is and how tall it is (px down the line). */
 class WordRow(val at: Double, val lastEnd: Double, val y: Float, val h: Float)

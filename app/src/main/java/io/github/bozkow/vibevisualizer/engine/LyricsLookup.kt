@@ -49,9 +49,14 @@ import io.github.bozkow.vibevisualizer.lyrics.songKeys
 import io.github.bozkow.vibevisualizer.media.Outputs
 import io.github.bozkow.vibevisualizer.media.PlayerDelays
 import io.github.bozkow.vibevisualizer.spotify.Spotify
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import io.github.bozkow.vibevisualizer.lyrics.toJson
+import io.github.bozkow.vibevisualizer.lyrics.LyricsMerge
+import io.github.bozkow.vibevisualizer.lyrics.lyricsCandidateBeats
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -420,20 +425,21 @@ object Lyr {
         if (order.isEmpty()) { if (skipS.isNotEmpty()) return otherDone(m, tok); clear("All lyrics sources are off", "", "none", listOf(E.Act("Settings", pri = true) { E.openSettings("lyrics") })); return }
         val key = keyOf(m)
         cur = Cur(m, key, skip)
+        var cached: LyricsResult? = null
         if (!fresh) {
             if (order[0] == "local") { val r = runCatching { fromLocal(m) }.getOrNull(); if (tok != E.coverTok) return; if (r != null) { r.prov = "local"; note("local", "found"); apply(r); return } }   // your own file wins, also over saved lyrics
-            lcache[key]?.takeIf { !SourceParse.placeholder(it.lines) }?.let { r -> note(r.prov ?: "?", "from memory"); apply(r); return }
-            val saved = LyricsCache.get(key); if (tok != E.coverTok) return
+            cached = lcache[key]?.takeIf { !SourceParse.placeholder(it.lines) }
+            cached?.let { r -> note(r.prov ?: "?", "from memory; checking sources above it"); apply(r) }
+            val saved = if (cached == null) LyricsCache.get(key) else null; if (tok != E.coverTok) return
             when {
                 // a "no lyrics" note saved before it was told apart: looked up again
-                saved is LyricsCache.Got.Hit && !SourceParse.placeholder(saved.r.lines) -> { lcache[key] = saved.r; note(saved.r.prov ?: "?", "saved on this device"); apply(saved.r); return }
+                saved is LyricsCache.Got.Hit && !SourceParse.placeholder(saved.r.lines) -> { cached = saved.r; lcache[key] = saved.r; note(saved.r.prov ?: "?", "saved on this device; checking sources above it"); apply(saved.r) }
                 saved is LyricsCache.Got.Miss -> { note("—", "saved: no lyrics"); clear("No lyrics for this song", "None of your sources had it lately.", "none", listOf(E.Act("Look again") { clearSong() })); return }
                 else -> {}
             }
         }
         val errs = ArrayList<String>()
         var answered = false   // a source answered (not found): a failing one doesn't make it "couldn't load"
-        val t0 = now()
         // Spicy Lyrics Mobile's lookup: the first source asks alone (one request usually settles the song); if it misses
         // or takes over a second, the rest are asked together. Better timing wins (word-synced over line-synced over
         // not synced), your order breaks ties. The first answer shows as soon as every source above it is done, and a
@@ -441,13 +447,16 @@ object Lyr {
         class Got(val r: LyricsResult?, val e: Exception?, val ms: Long)
         val asks = HashMap<String, Deferred<Got>>()
         val done = HashMap<String, Got>()        // answers in so far, in any order
-        var best: LyricsResult? = null
-        var shown: LyricsResult? = null          // on screen now (an early answer, or the best so far)
+        var best: LyricsResult? = cached
+        var shown: LyricsResult? = cached
+        var mergedSignature: String? = null          // on screen now (an early answer, or the best so far)
         // looked up ahead without the song's length: shown at once, and the usual lookup checks it
         if (!fresh && skipS.isEmpty()) soft.remove(softKey(m))?.let { r -> shown = r; note(r.prov ?: "?", "looked up ahead"); apply(r) }
         val place = order.withIndex().associate { it.value to it.index }
         fun usable(r: LyricsResult?) = r != null && r.lines.any { !it.dots } && !SourceParse.placeholder(r.lines)
-        fun canBeat(p: String) = best.let { b -> b == null || rank(b) == 0 || (rank(b) == 1 && top == 2 && p in WORDY) }
+        fun canBeat(p: String) = best.let { b -> b == null || (p != b.prov && (
+            (place[p] ?: 99) < (place[b.prov] ?: 99) || rank(b) == 0 ||
+            (rank(b) < top && p in WORDY) || (S.b("lmerge") && p in WORDY && LyricsMerge.needsTiming(b)))) }
         val resting = order.associateWith { ladder(it).openUntil(wall()) }
         coroutineScope {
             fun ask(p: String): Deferred<Got> = asks.getOrPut(p) { async {
@@ -458,7 +467,7 @@ object Lyr {
                 done[p] = g; g
             } }
             // a slow source above shouldn't hold back lyrics that are already here: after 1.5 s the best answer in so far
-            // shows (better timed first, then your order); a source above it that answers as well within 8 s takes over
+            // shows (better timed first, then your order); a higher-priority answer can replace it until this lookup finishes
             launch {
                 delay(1500)
                 while (shown == null && tok == E.coverTok) {
@@ -467,10 +476,9 @@ object Lyr {
                     delay(200)
                 }
             }
-            fun fanOut() { for (q in order) if (resting[q] == null && canBeat(q) && best.let { it == null || rank(it) < top }) ask(q) }
+            fun fanOut() { for (q in order) if (resting[q] == null && canBeat(q)) ask(q) }
             var fanned = false
             for (p in order) {
-                if (best.let { it != null && rank(it) == top }) break
                 if (!canBeat(p)) continue
                 resting[p]?.let { until -> note(p, "resting after errors, back at " + java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(until))) }
                 if (resting[p] != null) continue
@@ -494,18 +502,33 @@ object Lyr {
                         ladder(p).success()
                         r.prov = p
                         val b = best
-                        val better = b == null || rank(r) > rank(b)
+                        val better = lyricsCandidateBeats(rank(r), place[p] ?: 99, b?.let(::rank), place[b?.prov] ?: 99)
                         note(p, "found: " + (if (r.sync) (if (r.lines.any { it.words != null }) "word-synced" else "line-synced") else "not synced") + if (b != null && !better) " (not used)" else "", g.ms)
                         if (better) {
                             best = r
-                            if (skipS.isEmpty()) { lcache[key] = r; LyricsCache.put(key, r); refreshCounts() }
+
                             // on screen unless an early answer is there that this doesn't beat: better timed, or as well timed
-                            // from higher in your order, while the lookup lasts (20 s a source: within 8 s, a slow Spicy Lyrics
-                            // through your server lost to a quicker source below it, whatever your order)
+                            // from higher in your order. Each request has its own timeout; no extra wall-clock cut-off
+                            // may discard a higher-priority answer that is still in flight.
                             val s = shown
-                            val beats = s == null || (s !== r && now() - t0 < 21000 && (rank(r) > rank(s) || (rank(r) == rank(s) && (place[p] ?: 99) < (place[s.prov ?: ""] ?: 99))))
+                            val beats = s == null || (s !== r && lyricsCandidateBeats(rank(r), place[p] ?: 99, rank(s), place[s.prov] ?: 99))
                             if (beats) { shown = r; apply(r) }
                             if (tok != E.coverTok) break
+                        }
+                        val base = best
+                        if (base != null) {
+                            val answers = order.mapNotNull { q -> (done[q]?.r ?: cached?.takeIf { it.prov == q })?.also { it.prov = q } }
+                                .filter { usable(it) }
+                            val words = answers.firstOrNull() ?: base
+                            val merged = if (S.b("lmerge")) withContext(Dispatchers.Default) { LyricsMerge.merge(words, answers.filter { it !== words }, m.title, m.artist) } else null
+                            if (tok != E.coverTok) break
+                            val signature = merged?.toJson()?.toString()
+                            val presentation = if (merged != null && signature == mergedSignature && shown != null) shown!! else merged ?: base
+                            if (merged != null) mergedSignature = signature
+                            if (skipS.isEmpty()) { lcache[key] = presentation; LyricsCache.put(key, presentation); refreshCounts() }
+                            if (merged != null || shown === base || shown == null || lyricsCandidateBeats(rank(base), place[base.prov] ?: 99, shown?.let(::rank), place[shown?.prov] ?: 99)) {
+                                if (shown !== presentation) { shown = presentation; apply(presentation) }
+                            }
                         }
                     }
                     else -> { ladder(p).success(); answered = true; note(p, "not found", g.ms) }
@@ -535,7 +558,7 @@ object Lyr {
         return r
     }
 
-    private fun keyOf(m: SongMeta) = listOf(m.id, m.artist, m.title, Math.round(m.duration).toString(), provList().filter { it.on }.joinToString(",") { it.k } + (if (S.b("lbetter")) "+w" else "+o")).joinToString("|").lowercase()
+    private fun keyOf(m: SongMeta) = listOf(m.id, m.artist, m.title, Math.round(m.duration).toString(), provList().filter { it.on }.joinToString(",") { it.k } + (if (S.b("lbetter")) "+w" else "+o") + (if (S.b("lmerge")) "+merge1" else "")).joinToString("|").lowercase()
     private fun softKey(m: SongMeta) = (m.artist + "|" + m.title).lowercase()
     private val soft = HashMap<String, LyricsResult>()   // looked up ahead for a song whose length wasn't known yet
 
@@ -750,7 +773,7 @@ object Lyr {
     fun restyle() { if (L.isNotEmpty()) render(null, true) else view.restyle() }
     fun relayout() = view.relayout()
     fun noticeChanged() { if (!S.b("lnotice") && msg?.kind == "none") msg = null }
-    fun cacheClear() = lcache.clear()
+    fun cacheClear() { lcache.clear(); soft.clear() }
 
     /* ---- every frame ---- */
     fun tick(t: Double) {

@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -137,7 +138,7 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
         }
         // your bar, in the glass the rest of the app has (0.58.2, the owner: "keep my design but the glass from the rest"):
         // its body (the dark base, the song's colour) and its rim catching the light at the top
-        clipPath(clip) { glassBody(0f, if (enabled) 1f else .5f) }
+        clipPath(clip) { inset(0f, y, 0f, y) { glassBody(0f, if (enabled) 1f else .5f) } }
         drawRoundRect(GlassRim, Offset(.5f, y + .5f), Size(w - 1f, h - 1f), r, style = Stroke(1.dp.toPx()))
         val x = frac().coerceIn(0f, 1f) * w
         if (x > 0f) drawRoundRect(Color.White, Offset(0f, y), Size(maxOf(x, h), h), r)

@@ -948,7 +948,7 @@ object E {
             "volume" -> Local.applyVolume()
             "ljoinMode", "ljoinPace", "lbgBr", "lsimple", "romMode", "lfont" -> Lyr.restyle()
             "aCalm" -> { Lyr.restyle(); Lyr.relayout(); Background.resume() }   // (Motion sickness: the words' springs at rest, the lines placed anew)
-            "lprov", "lbetter" -> Lyr.cacheClear()
+            "lprov", "lbetter", "lmerge" -> { Lyr.cacheClear(); Lyr.reloadCurrent() }
             "tr", "trTo", "trSkip", "aTrSvc" -> Lyr.decorate()
             "lnotice" -> Lyr.noticeChanged()
             "lsize", "xFocus", "xBgPop", "lduet", "view", "credPos", "xRefCred", "lcredLast", "lminimal", "xKeep", "lspace" -> Lyr.relayout()

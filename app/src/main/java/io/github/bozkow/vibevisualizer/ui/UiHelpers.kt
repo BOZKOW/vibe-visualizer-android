@@ -105,7 +105,8 @@ val GlassRimFaint: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha =
 fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .16f, k: Float = 1f) {
     // Liquid glass: a slight neutral dark tint, no colour wash, and restrained light/shadow at its edges.
     if (liquidOn()) {
-        drawRect(Color.Black.copy(alpha = .1f * k))
+        drawRect(Color.Black.copy(alpha = .24f * k))
+        drawRect(Color.White.copy(alpha = .025f * k))
         val e = minOf(size.height * .22f, 14.dp.toPx())
         drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = .1f * k), 1f to Color.Transparent, endY = e), size = androidx.compose.ui.geometry.Size(size.width, e))
         drawRect(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = .1f * k), startY = size.height - e, endY = size.height),
@@ -121,18 +122,18 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .1
 }
 
 /** The glass's body drawn behind something ([shade] as in [glassBody]). */
-fun Modifier.drawGlassBody(shade: Float = .16f, shape: Shape = RoundedCornerShape(28.dp)): Modifier = this.liquidSurface(shape).drawBehind { glassBody(shade) }
+fun Modifier.drawGlassBody(shade: Float = .16f, shape: Shape = RoundedCornerShape(28.dp)): Modifier = this.glassSurface(shape).drawBehind { glassBody(shade) }
 
 /** Shared capsule glass on cards and panels; [lift] adds a shadow to pieces that float. */
 fun Modifier.glass(shape: Shape, strong: Boolean = false, lift: Boolean = true): Modifier = this
     .then(if (lift) Modifier.shadow(10.dp, shape, clip = false, ambientColor = Color(0xFF080A12).copy(alpha = .42f), spotColor = Color(0xFF080A12).copy(alpha = .42f)) else Modifier)
-    .clip(shape).liquidSurface(shape)
+    .clip(shape).glassSurface(shape)
     .drawBehind { glassBody(if (strong) .55f else .16f) }
     .border(1.dp, GlassRim, shape)
 
 /** The glass's body and rim on something already shaped and clipped (a button): drawn behind its content. */
 fun Modifier.glassFace(shape: Shape, enabled: Boolean = true, shade: Float = .1f): Modifier = this
-    .clip(shape).liquidSurface(shape)
+    .clip(shape).glassSurface(shape)
     .drawBehind { glassBody(shade, if (enabled) 1f else .35f) }
     .border(1.dp, if (enabled) GlassRim else GlassRimFaint, shape)
 
@@ -146,7 +147,7 @@ fun VTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Bo
 /** The main button: frosted glass tinted with the cover's colour (still the one to press). */
 @Composable
 fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-    androidx.compose.material3.Button(onClick, modifier.glassFace(ButtonDefaults.shape, enabled), enabled, border = if (liquidOn()) null else BorderStroke(1.dp, if (enabled) GlassRim else GlassRimFaint),
+    androidx.compose.material3.Button(onClick, modifier.glassFace(ButtonDefaults.shape, enabled), enabled, border = null,
         colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
 
@@ -154,7 +155,7 @@ fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean
 @Composable
 fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
                     contentPadding: androidx.compose.foundation.layout.PaddingValues = ButtonDefaults.ContentPadding, content: @Composable RowScope.() -> Unit) {
-    androidx.compose.material3.OutlinedButton(onClick, modifier.clip(ButtonDefaults.outlinedShape).liquidSurface(ButtonDefaults.outlinedShape).drawBehind { glassBody(0f, if (enabled) .45f else .2f) }, enabled, contentPadding = contentPadding,
+    androidx.compose.material3.OutlinedButton(onClick, modifier.clip(ButtonDefaults.outlinedShape).glassSurface(ButtonDefaults.outlinedShape).drawBehind { glassBody(0f, if (enabled) .45f else .2f) }, enabled, contentPadding = contentPadding,
         border = BorderStroke(1.dp, if (enabled) GlassRim else GlassRimFaint),
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent, contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
 }
@@ -165,7 +166,7 @@ fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled:
 @Suppress("UNUSED_PARAMETER")
 fun Modifier.choiceCard(on: Boolean, shape: Shape, off: Float = .06f): Modifier {
     val acc = MaterialTheme.colorScheme
-    return this.clip(shape).liquidSurface(shape).drawBehind { glassBody(0f, if (on) 1f else .5f) }.background(if (on) acc.primary.copy(alpha = .22f) else Color.Transparent)
+    return this.clip(shape).glassSurface(shape).drawBehind { glassBody(0f, if (on) 1f else .5f) }.background(if (on) acc.primary.copy(alpha = .22f) else Color.Transparent)
         .border(1.dp, if (on) GlassRim else GlassRimFaint, shape)
 }
 
@@ -180,10 +181,7 @@ fun glassSlider(): SliderColors {
 /** A switch: off, frosted glass; on, the cover's colour (on and off told apart at a glance). */
 @Composable
 fun VSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    if (liquidOn()) { LiquidSwitch(checked, onCheckedChange, modifier, enabled); return }
-    androidx.compose.material3.Switch(checked, onCheckedChange, modifier, enabled = enabled, colors = SwitchDefaults.colors(
-        uncheckedTrackColor = GlassFill, uncheckedBorderColor = Color.White.copy(alpha = .34f), uncheckedThumbColor = Color.White.copy(alpha = .7f),
-        disabledUncheckedTrackColor = Color.White.copy(alpha = .04f), disabledUncheckedBorderColor = Color.White.copy(alpha = .12f)))
+    GlassSwitch(checked, onCheckedChange, modifier, enabled)
 }
 
 /** Glass: a scrolling list fades out at its edges instead of being cut off in a hard line where it scrolls under
@@ -261,7 +259,7 @@ fun Modifier.glassIsland(b: Backdrop?, k: Float = 1f, shape: Shape = RoundedCorn
 /** A round button's symbol on an island: frosted as the island's ([k]: how much of an island it is). */
 fun Modifier.glassChip(k: Float): Modifier = if (k <= 0f) this else this
     .clip(androidx.compose.foundation.shape.CircleShape).drawBehind { glassBody(0f, k) }
-    .border(1.dp, Brush.verticalGradient(0f to Color.White.copy(alpha = .5f * k), .5f to Color.White.copy(alpha = .1f * k), 1f to Color.White.copy(alpha = .2f * k)), androidx.compose.foundation.shape.CircleShape)
+    .border(1.dp, if (k >= .99f) GlassRim else GlassRimFaint, androidx.compose.foundation.shape.CircleShape)
 
 /** A click only a quick tap makes. Held past the long-press time, it's let go without doing anything: an accidental touch
  *  (the phone gripped, a palm or a resting thumb lifted off a button) is a long one, and it skipped or paused the song.

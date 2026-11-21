@@ -1651,7 +1651,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     val stageW = stage?.let { stageStart + it.width.dp }; val featherPx = stage?.let { with(d) { it.feather.dp.toPx() } } ?: 0f
     // (.75: translucent, so the blurred backdrop carries through the video and the two read as one surface; Low performance mode has
     // no such backdrop, and it was the cover's colours that came through)
-    Box((if (stageW != null) Modifier.fillMaxHeight().width(stageW) else if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f) * (if (stage != null && !S.low) .75f else 1f))
+    Box((if (stageW != null) Modifier.fillMaxHeight().width(stageW) else if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).liveCanvasFrost(wide && !S.low).alpha(maxOf(a, .01f) * (if (stage != null && !S.low) .75f else 1f))
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.22f / .56f) * c }.drawWithContent {
             drawContent()
             // as dark at the top (behind the status bar and the top bar) as behind the controls at the bottom

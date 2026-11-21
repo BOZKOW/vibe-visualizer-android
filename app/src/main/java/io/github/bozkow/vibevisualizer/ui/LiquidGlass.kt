@@ -57,7 +57,7 @@ half4 main(float2 p) {
 """
 
 /** One cached shader/effect per surface; every corner and the actual visible size participates in its cache key. */
-class Lens internal constructor(private val shader: Any?, private val density: Float = 1f) {
+class Lens internal constructor(private val shader: Any?, private val density: Float = 1f, private val diffusion: Float = 0f) {
     private var w = -1f; private var h = -1f
     private var tl = -1f; private var tr = -1f; private var br = -1f; private var bl = -1f
     private var fx: RenderEffect? = null
@@ -72,7 +72,10 @@ class Lens internal constructor(private val shader: Any?, private val density: F
             sh.setFloatUniform("size", width, height)
             sh.setFloatUniform("corners", a, b, c, d)
             sh.setFloatUniform("rim", minOf(minOf(width, height) * .32f, 18f * density).coerceAtLeast(1f))
-            fx = android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content").asComposeRenderEffect()
+            val refract = android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content")
+            fx = (if (diffusion > 0f) android.graphics.RenderEffect.createChainEffect(refract,
+                android.graphics.RenderEffect.createBlurEffect(diffusion, diffusion, android.graphics.Shader.TileMode.CLAMP))
+                else refract).asComposeRenderEffect()
         }
         return fx
     }
@@ -81,7 +84,8 @@ class Lens internal constructor(private val shader: Any?, private val density: F
 @Composable fun rememberLens(): Lens {
     val enabled = liquidOn()
     val density = androidx.compose.ui.platform.LocalDensity.current.density
-    return remember(enabled, density) { Lens(if (enabled) RuntimeShader(LENS) else null, density) }
+    val clear = io.github.bozkow.vibevisualizer.engine.E.wide
+    return remember(enabled, density, clear) { Lens(if (enabled) RuntimeShader(LENS) else null, density, if (clear) 0f else 1.25f * density) }
 }
 
 fun liquidOn(): Boolean = Build.VERSION.SDK_INT >= 33 && S.b("xLiquid") && !S.low && !S.calm
@@ -96,12 +100,18 @@ internal fun DrawScope.lensEffect(lens: Lens, shape: Shape): RenderEffect? {
     }
 }
 
-/** Refraction only: callers keep their shared body/rim and clip. Regular glass pays no layer/shader cost. */
-internal fun Modifier.liquidSurface(shape: Shape): Modifier = composed {
-    if (!liquidOn()) return@composed Modifier
+/** One backdrop path for panels/buttons. Already frosted sources need no additional regular-glass pass. */
+internal fun Modifier.glassSurface(shape: Shape): Modifier = composed {
     val backdrop = LocalGlassBackdrop.current
     val frost = LocalFrost.current
-    if (backdrop == null && !frost) return@composed Modifier
+    if (S.low || (backdrop == null && !frost)) return@composed Modifier
+    if (!liquidOn()) {
+        if (backdrop == null) return@composed Modifier.frosted(oval = false)
+        var at by remember { mutableStateOf(Offset.Zero) }
+        return@composed Modifier.onGloballyPositioned { at = it.positionInRoot() }.drawBehind {
+            if (backdrop.layer.size.width > 0) translate(backdrop.at.x - at.x, backdrop.at.y - at.y) { drawLayer(backdrop.layer) }
+        }
+    }
     val lens = rememberLens()
     val layer = rememberGraphicsLayer()
     val painter = if (backdrop == null) frostPainter() else null
@@ -144,13 +154,13 @@ fun Modifier.liquidFrost(radius: Dp? = null, inset: Dp = 0.dp): Modifier = compo
 
 /** Same touch target and switch semantics as the standard control; only the experimental material changes. */
 @Composable
-internal fun LiquidSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier, enabled: Boolean) {
+internal fun GlassSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier, enabled: Boolean) {
     val x by androidx.compose.animation.core.animateDpAsState(if (checked) 24.dp else 4.dp,
-        androidx.compose.animation.core.tween(if (Pop.calm) 0 else 180), label = "liquidSwitch")
+        androidx.compose.animation.core.tween(if (Pop.calm) 0 else 180), label = "glassSwitch")
     val accent = androidx.compose.material3.MaterialTheme.colorScheme.primary
     val touch = if (onCheckedChange == null) Modifier else Modifier.toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
     Box(modifier.defaultMinSize(minWidth = 52.dp, minHeight = 48.dp).then(touch), contentAlignment = androidx.compose.ui.Alignment.Center) {
-        Box(Modifier.size(52.dp, 32.dp).clip(CircleShape).liquidSurface(CircleShape)
+        Box(Modifier.size(52.dp, 32.dp).clip(CircleShape).glassSurface(CircleShape)
             .drawBehind { glassBody(0f, if (enabled) 1f else .35f) }
             .background(if (checked) accent.copy(alpha = if (enabled) .22f else .08f) else Color.Transparent)
             .border(1.dp, if (enabled) GlassRim else GlassRimFaint, CircleShape)) {

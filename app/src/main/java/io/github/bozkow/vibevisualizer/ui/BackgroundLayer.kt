@@ -284,6 +284,9 @@ object Frost {
     var coverSharp by mutableStateOf<GraphicsLayer?>(null) // same recorded landscape cover for clear Liquid refraction
     var coverBlur by mutableStateOf<GraphicsLayer?>(null) // landscape cover, including its transition and motion video
     var videoSharp: GraphicsLayer? = null               // the Canvas as it plays (CanvasBackdrop's), for Liquid glass's clear glass
+    var videoScene: GraphicsLayer? = null              // finished landscape Canvas, with its actual crop/veil/feathers
+    var videoSceneBlur: GraphicsLayer? = null          // one finished blur of the same crop for regular frost
+    var videoAt = Offset.Zero
     var videoAlpha = 1f                                 // ...and how much of it shows there
     var screen = IntSize.Zero                           // the size that's drawn at
     var cover by mutableStateOf(Rect.Zero)              // where the cover is, in the window
@@ -332,6 +335,39 @@ fun Modifier.liveCoverFrost(): Modifier = composed {
             small.renderEffect = BlurEffect(r, r, TileMode.Clamp)
             small.record(IntSize(sw, sh)) { scale(1f / f, 1f / f, pivot = Offset.Zero) { drawLayer(picture) } }
             done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+            done.record(IntSize(sw, sh)) { drawLayer(small) }
+        }
+    }
+}
+
+/** Share the finished landscape stage: sharp for Liquid, one cached GPU blur for all frosted controls. */
+fun Modifier.liveCanvasFrost(enabled: Boolean): Modifier = composed {
+    if (!enabled) return@composed Modifier
+    val scene = rememberGraphicsLayer()
+    val small = rememberGraphicsLayer()
+    val done = rememberGraphicsLayer()
+    scene.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+    done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+    val liquid = liquidOn()
+    DisposableEffect(scene, done) {
+        Frost.videoScene = scene; Frost.videoSceneBlur = done
+        onDispose {
+            if (Frost.videoScene === scene) Frost.videoScene = null
+            if (Frost.videoSceneBlur === done) Frost.videoSceneBlur = null
+        }
+    }
+    Modifier.onGloballyPositioned { Frost.videoAt = it.positionInWindow() }.drawWithContent {
+        // Finished offscreen pictures must refresh with playback, at the engine's cap, not just on layout changes.
+        if (!E.quiet && E.playingState && io.github.bozkow.vibevisualizer.engine.CanvasVideo.hasVideo) E.drawTick
+        scene.record { this@drawWithContent.drawContent() }
+        drawLayer(scene)
+        if (!liquid && !E.quiet && size.width > 0f && size.height > 0f) {
+            val f = 8f
+            val sw = (size.width / f).roundToInt().coerceAtLeast(1)
+            val sh = (size.height / f).roundToInt().coerceAtLeast(1)
+            val r = 48.dp.toPx() / f
+            small.renderEffect = BlurEffect(r, r, TileMode.Clamp)
+            small.record(IntSize(sw, sh)) { scale(1f / f, 1f / f, pivot = Offset.Zero) { drawLayer(scene) } }
             done.record(IntSize(sw, sh)) { drawLayer(small) }
         }
     }
@@ -405,7 +441,14 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
         val sx = ((at.x - c.left) * k).roundToInt().coerceIn(0, iw - sw); val sy = ((at.y - c.top) * k).roundToInt().coerceIn(0, ih - sh)
         drawImage(img, IntOffset(sx, sy), IntSize(sw, sh), IntOffset.Zero, IntSize(size.width.roundToInt() + 1, size.height.roundToInt() + 1), filterQuality = FilterQuality.Low)
     }
-    if (!liquidOn()) drawRect(Color.Black.copy(alpha = .15f))   // the white on it keeps reading on a bright cover (with the glass's own 10%; liquid glass: none, clear)
+    val scene = Frost.videoScene
+    val stage = if (liquidOn()) scene else Frost.videoSceneBlur
+    if (stage != null && scene != null && stage.size.width > 0) {
+        translate(Frost.videoAt.x - at.x, Frost.videoAt.y - at.y) {
+            scale(scene.size.width / stage.size.width.toFloat(), scene.size.height / stage.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(stage) }
+        }
+    }
+    // The shared glass body supplies the tint in both orientations; don't darken landscape twice.
 }
 
 /** Frost behind a round button or a notice, on the player. [inset]: when the button is drawn smaller than it's laid out.

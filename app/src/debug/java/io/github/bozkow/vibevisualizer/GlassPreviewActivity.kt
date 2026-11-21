@@ -67,6 +67,6 @@ class GlassPreviewActivity : ComponentActivity() {
 
 @Composable
 private fun PreviewSurface(modifier: Modifier, shape: Shape, refract: Boolean) {
-    Box(modifier.clip(shape).then(if (refract) Modifier.liquidSurface(shape) else Modifier)
+    Box(modifier.clip(shape).then(if (refract) Modifier.glassSurface(shape) else Modifier)
         .drawBehind { glassBody(0f) }.border(1.dp, GlassRim, shape))
 }
