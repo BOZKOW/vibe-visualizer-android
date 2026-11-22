@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
@@ -138,17 +139,17 @@ fun Modifier.liquidFrost(radius: Dp? = null, inset: Dp = 0.dp): Modifier = compo
     val layer = rememberGraphicsLayer()
     var at by remember { mutableStateOf(Offset.Zero) }
     val path = remember { Path() }
-    Modifier.onGloballyPositioned { at = it.positionInWindow() }.drawBehind {
+    Modifier.onGloballyPositioned { at = it.positionInWindow() }.drawWithCache {
         val i = inset.toPx().coerceAtLeast(0f)
         val w = size.width - 2 * i; val h = size.height - 2 * i
-        if (w < 1f || h < 1f) return@drawBehind
+        if (w < 1f || h < 1f) return@drawWithCache onDrawBehind { }
         val r = radius?.toPx()?.coerceIn(0f, minOf(w, h) / 2) ?: (minOf(w, h) / 2)
         layer.renderEffect = lens.effect(w, h, r)
-        layer.record(IntSize(w.roundToInt(), h.roundToInt())) { painter(at + Offset(i, i)) }
+        layer.record(this, layoutDirection, IntSize(w.roundToInt(), h.roundToInt())) { painter(at + Offset(i, i)) }
         path.reset()
         if (radius == null) path.addOval(Rect(i, i, i + w, i + h))
         else path.addRoundRect(RoundRect(i, i, i + w, i + h, androidx.compose.ui.geometry.CornerRadius(r)))
-        clipPath(path) { translate(i, i) { drawLayer(layer) } }
+        onDrawBehind { clipPath(path) { translate(i, i) { drawLayer(layer) } } }
     }
 }
 

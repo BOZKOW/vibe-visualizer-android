@@ -1,6 +1,5 @@
-Vibe Visualizer for Android 0.61.0 (beta). Android 12 or newer; it installs over 0.60.10 (Settings → Help & about → Update now).
+Vibe Visualizer for Android 0.61.1 (beta). Android 12 or newer; it installs over 0.61.0 (Settings → Help & about → Update now).
 
-- **Consistent glass:** a denser Liquid finish, clear refraction over landscape Canvas, matching frosted controls and corrected seek-bar glass.
-- **Cleaner Settings:** compact explanations with More/Less, consistent switches, and a header that returns correctly after visiting a section.
-- **Balanced PiP lyrics:** overlapping lead and background vocals share the scroll position.
-- **Better source lookup:** cached lyrics can upgrade to a higher-priority source. Optional source merging keeps preferred words and credits while borrowing matching word timing.
+- **Glass follows the blur:** the timeline and bottom bar now sample the displayed Canvas, including its blur and shading, in either orientation.
+- **Lighter rendering:** shared smaller blur layers and a separate timeline fill reduce repeated graphics work.
+- **Report a problem:** Settings → Help & about prepares a GitHub report with optional technical details, a preview and a copy option. You review and submit it yourself.

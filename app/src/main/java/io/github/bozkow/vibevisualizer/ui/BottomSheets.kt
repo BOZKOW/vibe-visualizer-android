@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -90,12 +91,13 @@ fun Sheets() {
     // the sheet pops out of the button that opened it
     PopSheet(E.sheet, close, Color(0xFF0E0E14).copy(alpha = .62f), glass = true) { s ->
         // at rest nothing sits in the fades (the title's top was faded): the room they take, above and below
-        Column(Modifier.fillMaxWidth().fadeEdges(16.dp, 16.dp).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(top = 12.dp, bottom = 18.dp).navBarsSpace()) {
+        Column(Modifier.fillMaxWidth().then(if (s == "report") Modifier.imePadding() else Modifier).fadeEdges(16.dp, 16.dp).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(top = 12.dp, bottom = 18.dp).navBarsSpace()) {
             when (s) {
                 "audio" -> AudioSheet()
                 "net" -> NetSheet()
                 "devices" -> DevicesSheet(close)
                 "timing" -> TimingSheet()
+                "report" -> ReportProblemSheet()
             }
         }
     }

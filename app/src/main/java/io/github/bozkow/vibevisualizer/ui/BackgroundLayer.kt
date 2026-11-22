@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -89,9 +90,17 @@ fun BackgroundLayer(modifier: Modifier = Modifier) {
     val cvA by animateFloatAsState(if (cvlive) 1f else 0f, tween(800), label = "cv")
     // recorded as it's drawn, so what's frosted upright can show it too (FrostBack)
     val seen = rememberGraphicsLayer()
-    DisposableEffect(seen) { Frost.bg = seen; onDispose { if (Frost.bg === seen) Frost.bg = null } }
+    DisposableEffect(seen) { Frost.bg = seen; Frost.bgReady = false; onDispose { if (Frost.bg === seen) { Frost.bg = null; Frost.bgReady = false } } }
     val low = S.low   // (no frost there)
-    Box(modifier.fillMaxSize().drawWithContent { if (low) drawContent() else { seen.record { this@drawWithContent.drawContent() }; drawLayer(seen) } }.background(Bg)) {
+    val cacheStill = !low && !cvlive && (style == "artist" || style == "cover")
+    seen.compositingStrategy = if (cacheStill) androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen else androidx.compose.ui.graphics.layer.CompositingStrategy.Auto
+    Box(modifier.fillMaxSize().then(if (cacheStill) Modifier.graphicsLayer() else Modifier).drawWithContent {
+        if (low) drawContent() else {
+            seen.record { this@drawWithContent.drawContent() }
+            if (Frost.bg === seen) Frost.bgReady = seen.size.width > 0
+            drawLayer(seen)
+        }
+    }.background(Bg)) {
         if (cvA < 1f) Box(Modifier.fillMaxSize()) {
             when {
                 style == "dynamic" && !S.low -> if (Build.VERSION.SDK_INT >= 33) LiquidBackground() else LayersBackground()
@@ -246,6 +255,10 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
     val done = rememberGraphicsLayer()
     DisposableEffect(done) { Frost.video = done; onDispose { if (Frost.video === done) Frost.video = null } }
     val cf = remember(S.bri, S.sat, stage) { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = if (stage) .65f * S.bri / 70f else Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) }) }
+    val rf = S.bgblur * .025
+    val sigma = 2f * kotlin.math.sqrt(.36 + rf * (rf + 1)).toFloat()
+    val radius = (((if (wide) sigma * 2f else sigma) - .5f) / .57735f).coerceAtLeast(.5f)
+    val blur = remember(radius, quiet) { if (quiet) null else BlurEffect(radius, radius, TileMode.Clamp) }
     Canvas(Modifier.fillMaxSize().onSizeChanged { Frost.screen = it }) {
         val lw = vs.width; val lh = vs.height
         if (lw > 0 && lh > 0) {
@@ -253,10 +266,7 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
             val sw = maxOf(1, (size.width * k).roundToInt()); val sh = maxOf(1, (size.height * k).roundToInt())
             // as soft as before: the background's Blur as the old three box passes over a 48-px frame, with that frame's
             // own softness, here in 96-px pixels (a blur radius r is a sigma of .577 r + .5)
-            val rf = S.bgblur * .025
-            val sigma = 2f * kotlin.math.sqrt(.36 + rf * (rf + 1)).toFloat()
-            val r = (((if (wide) sigma * 2f else sigma) - .5f) / .57735f).coerceAtLeast(.5f)
-            small.renderEffect = if (quiet) null else BlurEffect(r, r, TileMode.Clamp)
+            small.renderEffect = blur
             small.colorFilter = cf
             small.alpha = cvA
             small.record(IntSize(sw, sh)) {
@@ -283,18 +293,20 @@ object Frost {
     var video by mutableStateOf<GraphicsLayer?>(null)   // the Canvas, blurred ([CanvasBlur])
     var coverSharp by mutableStateOf<GraphicsLayer?>(null) // same recorded landscape cover for clear Liquid refraction
     var coverBlur by mutableStateOf<GraphicsLayer?>(null) // landscape cover, including its transition and motion video
-    var videoSharp: GraphicsLayer? = null               // the Canvas as it plays (CanvasBackdrop's), for Liquid glass's clear glass
-    var videoScene: GraphicsLayer? = null              // finished landscape Canvas, with its actual crop/veil/feathers
-    var videoSceneBlur: GraphicsLayer? = null          // one finished blur of the same crop for regular frost
-    var videoAt = Offset.Zero
-    var videoAlpha = 1f                                 // ...and how much of it shows there
+    var videoScene by mutableStateOf<GraphicsLayer?>(null)              // finished displayed Canvas/background composite, after blur and shading
+    var videoSceneBlur by mutableStateOf<GraphicsLayer?>(null)          // one finished blur of the same crop for regular frost
+    var canvasAlreadyBlurred by mutableStateOf(false)
+    var sceneReady by mutableStateOf(false)
+    var sceneBlurReady by mutableStateOf(false)
+    var videoAt by mutableStateOf(Offset.Zero)
     var screen = IntSize.Zero                           // the size that's drawn at
     var cover by mutableStateOf(Rect.Zero)              // where the cover is, in the window
     var upright by mutableStateOf(false)                // the phone's held upright: frost shows what's behind it
-    var bg: GraphicsLayer? = null                       // the background as it's drawn
-    var lyrics: GraphicsLayer? = null                   // the lyrics' blurred ends (LyricsPane), when they're drawn: an eighth of the size...
-    var lyricsY = 0f                                    // ...and how far up they start
-    var gradeW = 0f; var gradeH = 0f; var gradeTop = 0f; var gradeShade = 0f   // the grade below, for what's frosted to show too
+    var bg by mutableStateOf<GraphicsLayer?>(null)
+    var bgReady by mutableStateOf(false)                       // the background as it's drawn
+    var lyrics by mutableStateOf<GraphicsLayer?>(null)                   // the lyrics' blurred ends (LyricsPane), when they're drawn: an eighth of the size...
+    var lyricsY by mutableStateOf(0f)                                    // ...and how far up they start
+    var gradeW by mutableStateOf(0f); var gradeH by mutableStateOf(0f); var gradeTop by mutableStateOf(0f); var gradeShade by mutableStateOf(0f)   // the grade below, for what's frosted to show too
 }
 
 /** The Canvas screen's grade, over any background, so every song's screen looks the same as one with a Canvas: darker to the
@@ -314,6 +326,8 @@ fun Modifier.liveCoverFrost(): Modifier = composed {
     val picture = rememberGraphicsLayer()
     val liquid = liquidOn()
     picture.compositingStrategy = if (liquid) androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen else androidx.compose.ui.graphics.layer.CompositingStrategy.Auto
+    val radius = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() / 8f }
+    val blur = remember(radius) { BlurEffect(radius, radius, TileMode.Clamp) }
     val small = rememberGraphicsLayer()
     val done = rememberGraphicsLayer()
     DisposableEffect(done, picture) {
@@ -327,12 +341,11 @@ fun Modifier.liveCoverFrost(): Modifier = composed {
         if (!E.quiet && E.playingState && io.github.bozkow.vibevisualizer.engine.AnimatedCover.ready) E.drawTick
         picture.record { this@drawWithContent.drawContent() }
         drawLayer(picture)
-        if (!E.quiet && size.width > 0f && size.height > 0f) {
+        if (!liquid && !E.quiet && size.width > 0f && size.height > 0f) {
             val f = 8f
             val sw = (size.width / f).roundToInt().coerceAtLeast(1)
             val sh = (size.height / f).roundToInt().coerceAtLeast(1)
-            val r = 48.dp.toPx() / f
-            small.renderEffect = BlurEffect(r, r, TileMode.Clamp)
+            small.renderEffect = blur
             small.record(IntSize(sw, sh)) { scale(1f / f, 1f / f, pivot = Offset.Zero) { drawLayer(picture) } }
             done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
             done.record(IntSize(sw, sh)) { drawLayer(small) }
@@ -340,35 +353,37 @@ fun Modifier.liveCoverFrost(): Modifier = composed {
     }
 }
 
-/** Share the finished landscape stage: sharp for Liquid, one cached GPU blur for all frosted controls. */
-fun Modifier.liveCanvasFrost(enabled: Boolean): Modifier = composed {
+/** Share the displayed Canvas: inherit its blur; add material frost only where it is still sharp. */
+fun Modifier.liveCanvasFrost(enabled: Boolean, alreadyBlurred: Boolean): Modifier = composed {
     if (!enabled) return@composed Modifier
     val scene = rememberGraphicsLayer()
     val small = rememberGraphicsLayer()
     val done = rememberGraphicsLayer()
     scene.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
     done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
-    val liquid = liquidOn()
+    val needsBlur = !liquidOn() && !alreadyBlurred
+    val radius = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() / 8f }
+    val blur = remember(radius) { BlurEffect(radius, radius, TileMode.Clamp) }
+    androidx.compose.runtime.SideEffect { Frost.canvasAlreadyBlurred = alreadyBlurred }
     DisposableEffect(scene, done) {
-        Frost.videoScene = scene; Frost.videoSceneBlur = done
+        Frost.videoScene = scene; Frost.videoSceneBlur = done; Frost.sceneReady = false; Frost.sceneBlurReady = false
         onDispose {
-            if (Frost.videoScene === scene) Frost.videoScene = null
-            if (Frost.videoSceneBlur === done) Frost.videoSceneBlur = null
+            if (Frost.videoScene === scene) { Frost.videoScene = null; Frost.sceneReady = false }
+            if (Frost.videoSceneBlur === done) { Frost.videoSceneBlur = null; Frost.sceneBlurReady = false }
         }
     }
     Modifier.onGloballyPositioned { Frost.videoAt = it.positionInWindow() }.drawWithContent {
-        // Finished offscreen pictures must refresh with playback, at the engine's cap, not just on layout changes.
-        if (!E.quiet && E.playingState && io.github.bozkow.vibevisualizer.engine.CanvasVideo.hasVideo) E.drawTick
         scene.record { this@drawWithContent.drawContent() }
+        if (Frost.videoScene === scene) Frost.sceneReady = scene.size.width > 0
         drawLayer(scene)
-        if (!liquid && !E.quiet && size.width > 0f && size.height > 0f) {
+        if (needsBlur && !E.quiet && size.width > 0f && size.height > 0f) {
             val f = 8f
             val sw = (size.width / f).roundToInt().coerceAtLeast(1)
             val sh = (size.height / f).roundToInt().coerceAtLeast(1)
-            val r = 48.dp.toPx() / f
-            small.renderEffect = BlurEffect(r, r, TileMode.Clamp)
+            small.renderEffect = blur
             small.record(IntSize(sw, sh)) { scale(1f / f, 1f / f, pivot = Offset.Zero) { drawLayer(scene) } }
             done.record(IntSize(sw, sh)) { drawLayer(small) }
+            if (Frost.videoSceneBlur === done) Frost.sceneBlurReady = true
         }
     }
 }
@@ -386,41 +401,31 @@ fun frostPainter(): DrawScope.(Offset) -> Unit {
 
 private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: Offset) {
     drawRect(Color(0xFF18181E))   // never see-through, whatever's there yet
+    val scene = Frost.videoScene
+    if (io.github.bozkow.vibevisualizer.engine.CanvasVideo.cvmode && Frost.sceneReady && scene != null && scene.size.width > 0) {
+        val finished = if (liquidOn() || Frost.canvasAlreadyBlurred) scene
+            else if (Frost.sceneBlurReady) Frost.videoSceneBlur ?: scene else scene
+        translate(-at.x, -at.y) { Frost.bg?.let { drawLayer(it) } }
+        translate(Frost.videoAt.x - at.x, Frost.videoAt.y - at.y) {
+            scale(scene.size.width / finished.size.width.toFloat(), scene.size.height / finished.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(finished) }
+        }
+        if (Frost.upright) Frost.lyrics?.let { l -> if (l.size.width > 0) translate(-at.x, Frost.lyricsY - at.y) { scale(8f, 8f, pivot = Offset.Zero) { drawLayer(l) } } }
+        return
+    }
     if (Frost.upright) {
         translate(-at.x, -at.y) {
             val c = Frost.cover
-            when (S.bgStyle) {
+            val background = Frost.bg
+            if (Frost.bgReady && background != null) drawLayer(background)
+            else when (S.bgStyle) {
                 // (a still background's picture itself: drawn through its own blur, that would be worked out again for each of these)
                 "artist", "cover" -> if (stillImg != null) drawImage(stillImg, IntOffset.Zero, IntSize(stillImg.width, stillImg.height), IntOffset.Zero, IntSize((c.right + c.left).roundToInt().coerceAtLeast(1), (c.bottom + c.top).roundToInt().coerceAtLeast(1)), filterQuality = FilterQuality.Low)
                 "color" -> drawRect(Visuals.plainColor())
                 else -> Frost.bg?.let { drawLayer(it) }
             }
             val v = Frost.video; val scr = Frost.screen
-            val vs = Frost.videoSharp
-            // Liquid glass: clear, so the Canvas as it plays, sharp (the frosted glass shows its blurred copy)
-            val liquidVideo = liquidOn() && vs != null && vs.size.width > 0 && Frost.videoAlpha > .01f && io.github.bozkow.vibevisualizer.engine.CanvasVideo.cvmode
-            // (the blurred Canvas first, as the screen has it under everything; Liquid glass then the sharp one over it)
             if (v != null && v.size.width > 0 && scr.width > 0) scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) }
-            // (and its darkening toward the edges, as CanvasBlur draws it there)
-            if (liquidVideo && scr.width > 0) drawRect(Brush.radialGradient(listOf(Color.Black.copy(alpha = .15f), Color.Black.copy(alpha = .55f)), Offset(scr.width * .7f, scr.height * .5f), maxOf(scr.width, scr.height) * .8f),
-                size = androidx.compose.ui.geometry.Size(scr.width.toFloat(), scr.height.toFloat()))
-            if (liquidVideo && vs != null) {
-                // as the screen has it upright: softening into the blurred Canvas (in the background) at the top and the foot
-                val r = androidx.compose.ui.geometry.Rect(0f, 0f, vs.size.width.toFloat(), vs.size.height.toFloat())
-                drawContext.canvas.saveLayer(r, androidx.compose.ui.graphics.Paint().apply { alpha = Frost.videoAlpha })
-                drawLayer(vs)
-                drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .35f), .08f to Color.Black.copy(alpha = .7f), .2f to Color.Black, .45f to Color.Black, .58f to Color.Black.copy(alpha = .85f),
-                    .74f to Color.Black.copy(alpha = .5f), .88f to Color.Black.copy(alpha = .18f), 1f to Color.Transparent, endY = r.height), size = r.size, blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
-                // the dark shade at the top and the foot the screen lays over its video (Canvas → What's behind the controls)
-                val behind = S.str("cvBehind")
-                if (behind == "dark" || behind == "both" || (behind == "blur" && S.low)) {
-                    val tf = (Frost.gradeTop / r.height).coerceIn(.02f, .45f)
-                    drawRect(Brush.verticalGradient(0f to Color.Black.copy(alpha = .45f), tf to Color.Transparent, .55f to Color.Transparent, 1f to Color.Black.copy(alpha = .45f), endY = r.height), size = r.size)
-                }
-                drawContext.canvas.restore()
-            }
-            // (what's behind it is graded; with a Canvas showing the screen has no grade: Liquid glass's clear glass none either)
-            if (Frost.gradeW > 0f && !(liquidOn() && io.github.bozkow.vibevisualizer.engine.CanvasVideo.cvlive)) screenGrade(Frost.gradeW, Frost.gradeH, Frost.gradeTop, Frost.gradeShade)
+            if (Frost.gradeW > 0f && !io.github.bozkow.vibevisualizer.engine.CanvasVideo.cvlive) screenGrade(Frost.gradeW, Frost.gradeH, Frost.gradeTop, Frost.gradeShade)
             Frost.lyrics?.let { l -> if (l.size.width > 0) translate(0f, Frost.lyricsY) { scale(8f, 8f, pivot = Offset.Zero) { drawLayer(l) } } }
         }
         return
@@ -440,13 +445,6 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
         val sw = (size.width * k).roundToInt().coerceIn(1, iw); val sh = (size.height * k).roundToInt().coerceIn(1, ih)
         val sx = ((at.x - c.left) * k).roundToInt().coerceIn(0, iw - sw); val sy = ((at.y - c.top) * k).roundToInt().coerceIn(0, ih - sh)
         drawImage(img, IntOffset(sx, sy), IntSize(sw, sh), IntOffset.Zero, IntSize(size.width.roundToInt() + 1, size.height.roundToInt() + 1), filterQuality = FilterQuality.Low)
-    }
-    val scene = Frost.videoScene
-    val stage = if (liquidOn()) scene else Frost.videoSceneBlur
-    if (stage != null && scene != null && stage.size.width > 0) {
-        translate(Frost.videoAt.x - at.x, Frost.videoAt.y - at.y) {
-            scale(scene.size.width / stage.size.width.toFloat(), scene.size.height / stage.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(stage) }
-        }
     }
     // The shared glass body supplies the tint in both orientations; don't darken landscape twice.
 }

@@ -81,6 +81,15 @@ Kotlin, Jetpack Compose (Material 3 Expressive), Media3, OkHttp and kuromoji; AG
 secrets `ANDROID_KEYSTORE_B64` and `ANDROID_KEYSTORE_PASS`; without them the build is signed with a debug key. The
 build number comes from the version (0.24.0 is 124000), so every release counts up.
 
+## Report a problem
+
+In **Settings → Help & about → Report a problem**, describe what happened and how to reproduce it.
+Preview the report, optionally include basic device/display details, then review and submit it on GitHub.
+A GitHub account is needed to submit; **Copy report** is available too. Reports stay in this repository's
+[issue tracker](https://github.com/BOZKOW/vibe-visualizer-android/issues) for later review, including in future
+Codex sessions. There is no automatic upload or AI monitoring. Keys, server addresses, listening history and
+logs are not collected for the report. Keep private information out of the description.
+
 ## Credits
 
 Made by [BOZKOW](https://github.com/BOZKOW), built together with [Claude Code](https://claude.com/claude-code)

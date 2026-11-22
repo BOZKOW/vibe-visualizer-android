@@ -41,6 +41,8 @@ android {
             signingConfig = if (ks != null) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
         debug {
+            // Release-like rendering measurements with debug-only fixtures, same signing key.
+            isDebuggable = providers.gradleProperty("vvProfile").orNull != "true"
             versionNameSuffix = "-debug"
         }
     }

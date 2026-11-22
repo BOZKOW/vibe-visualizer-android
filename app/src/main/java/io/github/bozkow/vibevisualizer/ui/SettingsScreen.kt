@@ -379,6 +379,8 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("xLiquid", "Liquid glass", "A clear, slightly darkened material for controls, Settings cards, switches and sheets. Their edges gently bend the view behind them, with soft highlights. Experimental; needs Android 13 or newer."),
     ), sub = "Ideas being tried out", group = 3),
     Page("help", "Help & about", Icons.AutoMirrored.Rounded.Help, listOf(
+        Item.Sub("Support"),
+        Item.Custom("Report a problem bugs feedback GitHub") { Buttons("Report a problem" to { E.openSheet("report") }) },
         Item.Sub("App updates"),
         Item.Custom("Updates check for updates update now release notes") { AppUpdates() },
         Item.Sub("Debug info and lyrics cache"),

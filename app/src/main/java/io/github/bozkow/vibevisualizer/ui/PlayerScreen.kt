@@ -1640,9 +1640,18 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     // the video, recorded as it's drawn, so the background can draw it again blurred (on the GPU, see CanvasBlur)
     val vid = rememberGraphicsLayer()
     var vidSize by remember { mutableStateOf(IntSize.Zero) }
-    // (the sharp video, and how much of it shows, for Liquid glass's clear glass: it shows what's really behind it)
-    androidx.compose.runtime.DisposableEffect(vid) { Frost.videoSharp = vid; onDispose { if (Frost.videoSharp === vid) Frost.videoSharp = null } }
-    androidx.compose.runtime.SideEffect { Frost.videoAlpha = maxOf(a, .01f) * (if (stage != null && !S.low) .75f else 1f) }
+    val bandSmall = rememberGraphicsLayer()
+    val bandDone = rememberGraphicsLayer()
+    bandDone.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+    val bandBlur = remember(r) { BlurEffect(r / 4f, r / 4f, TileMode.Clamp) }
+    val bandMask = remember(vidSize.height, topPx, softPx, from, topK) {
+        val height = vidSize.height.toFloat().coerceAtLeast(1f)
+        frostBandMask(topPx / height, softPx / height, from, topK)
+    }
+    // Capture the displayed composite after Canvas blur/shading, shared by every glass surface.
+    // A raw-video replay here would bypass both the global and behind-controls blur settings.
+    val alreadyBlurred = S.b("cvBlur") || (!wide && (behind == "blur" || behind == "both"))
+    Box(Modifier.fillMaxSize().liveCanvasFrost(!S.low, alreadyBlurred)) {
     CanvasBlur(vid, { vidSize }, wide, stage != null)
     // on its side the sharp video first blurs where it is, then fades into the blurred background (straight from sharp to the
     // blurred copy, which sits elsewhere, the two showed as an edge)
@@ -1651,7 +1660,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     val stageW = stage?.let { stageStart + it.width.dp }; val featherPx = stage?.let { with(d) { it.feather.dp.toPx() } } ?: 0f
     // (.75: translucent, so the blurred backdrop carries through the video and the two read as one surface; Low performance mode has
     // no such backdrop, and it was the cover's colours that came through)
-    Box((if (stageW != null) Modifier.fillMaxHeight().width(stageW) else if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).liveCanvasFrost(wide && !S.low).alpha(maxOf(a, .01f) * (if (stage != null && !S.low) .75f else 1f))
+    Box((if (stageW != null) Modifier.fillMaxHeight().width(stageW) else if (wide) Modifier.fillMaxHeight().fillMaxWidth(.56f) else Modifier.fillMaxSize()).alpha(maxOf(a, .01f) * (if (stage != null && !S.low) .75f else 1f))
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen; if (wide) translationX = size.width * (.22f / .56f) * c }.drawWithContent {
             drawContent()
             // as dark at the top (behind the status bar and the top bar) as behind the controls at the bottom
@@ -1685,37 +1694,46 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
                 if (dark) drawRect(shade)
             }
         }) {
-        Box(Modifier.fillMaxSize().graphicsLayer { renderEffect = if (size.height < 1f || size.width < 1f) null else if (frost) frostBands(size.height, r, topPx / size.height, softPx / size.height, from, topK) else if (soft) sideBlur(size.width, sideR) else null }
+        Box(Modifier.fillMaxSize().graphicsLayer { renderEffect = if (size.height < 1f || size.width < 1f) null else if (soft) sideBlur(size.width, sideR) else null }
             .drawWithContent {
                 vid.record { this@drawWithContent.drawContent() }; drawLayer(vid)
                 if (vid.size != vidSize) vidSize = vid.size
+                if (frost && size.width > 0f && size.height > 0f) {
+                    val sw = (size.width / 4f).roundToInt().coerceAtLeast(1)
+                    val sh = (size.height / 4f).roundToInt().coerceAtLeast(1)
+                    bandSmall.renderEffect = bandBlur
+                    bandSmall.record(IntSize(sw, sh)) {
+                        scale(sw / vid.size.width.toFloat(), sh / vid.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(vid) }
+                    }
+                    bandDone.record(IntSize(sw, sh)) {
+                        drawLayer(bandSmall)
+                        drawRect(bandMask, blendMode = BlendMode.DstIn)
+                    }
+                    scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(bandDone) }
+                }
             }) { CanvasVideoView() }
+    }
     }
 }
 
 /** The Canvas frosted where the controls are: a blurred copy of it over the sharp one, shown through a mask that's opaque at
  *  the top (down to [top0], where the top's text ends; [topK] of it, fading while nothing's there), clear in the middle, and
  *  opaque again from a little below [from] (under the song, the seek bar and the controls). Long, eased ends, so the blur
- *  melts into the video: a short straight ramp showed where it stopped. One blur pass on the GPU. */
-private fun frostBands(h: Float, r: Float, top0: Float, ramp0: Float, from: Float, topK: Float): androidx.compose.ui.graphics.RenderEffect {
-    // never a range upside down (a crash in 0.29.0: a layer 0 px tall made the ramp 84 times the height)
+ *  melts into the video: a short straight ramp showed where it stopped. Blur and mask share a small finished GPU layer. */
+private fun frostBandMask(top0: Float, ramp0: Float, from: Float, topK: Float): Brush {
     val ramp = ramp0.coerceIn(.001f, .25f)
     val low0 = from - .08f; val low1 = minOf(from + .14f, .99f)
     val top = top0.coerceIn(0f, maxOf(0f, low0 - ramp - .02f))
-    val blur = android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
-    fun black(a: Float) = android.graphics.Color.argb((a.coerceIn(0f, 1f) * 255).toInt(), 0, 0, 0)
     val up = topK.coerceIn(0f, 1f)
-    val cols = ArrayList<Int>(); val at = ArrayList<Float>()
-    cols.add(black(up)); at.add(0f)
-    for (k in 0..SOFT_STEPS) { val s = k / SOFT_STEPS.toFloat(); cols.add(black(up * (1 - softStep(s)))); at.add(top + ramp * s) }
-    for (k in 0..SOFT_STEPS) { val s = k / SOFT_STEPS.toFloat(); cols.add(black(softStep(s))); at.add(low0 + (low1 - low0) * s) }
-    cols.add(black(1f)); at.add(1f)
-    val mask = android.graphics.RenderEffect.createShaderEffect(android.graphics.LinearGradient(0f, 0f, 0f, maxOf(h, 1f), cols.toIntArray(), at.toFloatArray(), android.graphics.Shader.TileMode.CLAMP))
-    val frosted = android.graphics.RenderEffect.createBlendModeEffect(blur, mask, android.graphics.BlendMode.DST_IN)
-    return android.graphics.RenderEffect.createBlendModeEffect(android.graphics.RenderEffect.createOffsetEffect(0f, 0f), frosted, android.graphics.BlendMode.SRC_OVER).asComposeRenderEffect()
+    val stops = ArrayList<Pair<Float, Color>>()
+    stops.add(0f to Color.Black.copy(alpha = up))
+    for (k in 0..SOFT_STEPS) { val f = k / SOFT_STEPS.toFloat(); stops.add(top + ramp * f to Color.Black.copy(alpha = up * (1 - softStep(f)))) }
+    for (k in 0..SOFT_STEPS) { val f = k / SOFT_STEPS.toFloat(); stops.add(low0 + (low1 - low0) * f to Color.Black.copy(alpha = softStep(f))) }
+    stops.add(1f to Color.Black)
+    return Brush.verticalGradient(*stops.toTypedArray())
 }
 
-/** On its side: the video, blurred more and more to the right, one blur pass on the GPU as [frostBands]. */
+/** On its side: the video, blurred more and more to the right, one blur pass on the GPU with the Canvas band mask. */
 private fun sideBlur(w: Float, r: Float): androidx.compose.ui.graphics.RenderEffect {
     val blur = android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
     val on = android.graphics.Color.BLACK; val off = android.graphics.Color.TRANSPARENT

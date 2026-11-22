@@ -25,6 +25,7 @@ class DebugReceiver : BroadcastReceiver() {
         val page = i.getStringExtra("page"); val sheet = i.getStringExtra("sheet")
         Handler(Looper.getMainLooper()).post {
             i.getStringExtra("creditsPreview")?.let(CreditsPreview::show)
+            if (i.hasExtra("renderProbe")) RenderProbe.run()
             if (i.hasExtra("coverRecovery")) CoverRecoveryProbe.run()
             if (i.hasExtra("sessionRecovery")) SessionRecoveryProbe.run(c.applicationContext)
             if (set != null && to != null) Defaults.S[set]?.let { d ->

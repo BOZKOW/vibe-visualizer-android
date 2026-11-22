@@ -8,6 +8,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -115,7 +117,7 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
     // that took a third of the phone's time and made every animation stutter
     val now by rememberUpdatedState(frac)
     val pct by remember { derivedStateOf { (now().coerceIn(0f, 1f) * 100).roundToInt() } }
-    Canvas(modifier.fillMaxWidth().height(30.dp)
+    Box(modifier.fillMaxWidth().height(30.dp)
         .semantics {
             contentDescription = "Seek"; progressBarRangeInfo = ProgressBarRangeInfo(pct / 100f, 0f..1f)
             if (enabled) setProgress { v -> done(v.coerceIn(0f, 1f)); true }
@@ -127,6 +129,8 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
                 last = (ch.position.x / size.width).coerceIn(0f, 1f); drag(last)
             }
         }) {
+        // Progress ticks repaint only the white fill. The backdrop keeps its own layer/input invalidations.
+        Canvas(Modifier.matchParentSize().graphicsLayer()) {
         val h = thick.toPx(); val y = (size.height - h) / 2; val r = CornerRadius(h / 2); val w = size.width
         clip.reset(); clip.addRoundRect(RoundRect(0f, y, w, y + h, r))
         if (under != null) clipPath(clip) {
@@ -140,7 +144,11 @@ fun ThickSeek(frac: () -> Float, onDrag: (Float) -> Unit, onDone: (Float) -> Uni
         // its body (the dark base, the song's colour) and its rim catching the light at the top
         clipPath(clip) { inset(0f, y, 0f, y) { glassBody(0f, if (enabled) 1f else .5f) } }
         drawRoundRect(GlassRim, Offset(.5f, y + .5f), Size(w - 1f, h - 1f), r, style = Stroke(1.dp.toPx()))
-        val x = frac().coerceIn(0f, 1f) * w
-        if (x > 0f) drawRoundRect(Color.White, Offset(0f, y), Size(maxOf(x, h), h), r)
+        }
+        Canvas(Modifier.matchParentSize()) {
+            val h = thick.toPx(); val y = (size.height - h) / 2; val r = CornerRadius(h / 2)
+            val x = frac().coerceIn(0f, 1f) * size.width
+            if (x > 0f) drawRoundRect(Color.White, Offset(0f, y), Size(maxOf(x, h), h), r)
+        }
     }
 }
