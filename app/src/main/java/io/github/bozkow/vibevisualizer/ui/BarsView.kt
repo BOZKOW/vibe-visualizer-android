@@ -47,7 +47,7 @@ fun BarsView(modifier: Modifier = Modifier) {
         val W = size.width; val H = size.height
         val glow = S.b("glow") && !S.low
         val edge = ceil(W / n * (if (glow) .5f else .18f)) + 1; val step = (W - edge * 2) / n; val gp = step * S.i("gap") / 100f
-        val bw = max(1f, step - gp); val maxH = H * .9f; val by = H * .97f; val rd = S.b("round") && bw > 2; val r = bw / 2
+        val bw = max(1f, step - gp); val maxH = H * .84f; val by = H * .95f; val rd = S.b("round") && bw > 2; val r = bw / 2
         val brush = st.brush(pal, W)
         // one path, emptied and refilled for each pass (a drawn path is copied when it's recorded), and the bars added
         // without a new object each
@@ -62,9 +62,9 @@ fun BarsView(modifier: Modifier = Modifier) {
         if (glassy) {
             val p = pass(vals, 0f)
             if (paintFrost != null) clipPath(p) { paintFrost(this, at) }
-            drawPath(p, brush, alpha = .3f)   // tinted with the song's colours, or they'd all be one grey
+            drawPath(p, brush, alpha = .45f)   // tinted with the song's colours, or they'd all be one grey
             drawPath(p, GlassFill)
-            drawPath(p, GlassEdge, style = Stroke(1.dp.toPx()))
+            drawPath(p, brush, alpha = .8f, style = Stroke(1.dp.toPx()))
             return@Canvas
         }
         // motion blur: the last frames, fading (the web app fades the canvas a little every frame)
@@ -84,16 +84,19 @@ fun BarsView(modifier: Modifier = Modifier) {
 }
 
 private class BarsState {
-    private var key: IntArray? = null; private var w = 0f; private var b: Brush? = null
+    private var version = -1L; private var w = 0f; private var b: Brush? = null
     val hist = ArrayList<FloatArray>()
     val path = Path()
     fun brush(pal: IntArray, width: Float): Brush {
-        if (b != null && key === pal && w == width) return b!!
-        key = pal; w = width
-        val n = pal.size
-        b = Brush.horizontalGradient(*Array(n) { i -> ((i + .5f) / n) to Color(pal[i]) }, startX = 0f, endX = width)
+        if (b != null && version == Visuals.palVersion && w == width) return b!!
+        version = Visuals.palVersion; w = width
+        val n = minOf(pal.size, 16)
+        b = Brush.horizontalGradient(*Array(n) { i -> (i.toFloat() / (n - 1).coerceAtLeast(1)) to Color(pal[i * (pal.size - 1) / (n - 1).coerceAtLeast(1)]) }, startX = 0f, endX = width)
         return b!!
     }
-    fun push(v: FloatArray, n: Int) { hist.add(v.copyOf(n)); while (hist.size > 40) hist.removeAt(0) }
+    fun push(v: FloatArray, n: Int) {
+        val frame = if (hist.size >= 40) hist.removeAt(0).takeIf { it.size == n } ?: FloatArray(n) else FloatArray(n)
+        v.copyInto(frame, endIndex = n); hist.add(frame)
+    }
     @Suppress("unused") fun pow(x: Float) = x.pow(1)
 }

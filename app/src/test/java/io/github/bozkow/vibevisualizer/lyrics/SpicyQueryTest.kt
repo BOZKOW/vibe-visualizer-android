@@ -23,4 +23,15 @@ class SpicyQueryTest {
         assertNull(spicyQuery(SongMeta()))
         assertNull(spicyQuery(SongMeta(artist = "Someone")))
     }
+    @Test fun `connection diagnostic uses current local file instead of the sample track`() {
+        val current = SongMeta(title = "A different song", artist = "Another artist", file = "local.flac", duration = 171.0)
+        assertEquals(current, spicyDiagnosticTarget(current))
+        assertEquals("title=A+different+song&artist=Another+artist&duration=171", spicyQuery(spicyDiagnosticTarget(current)))
+        assertEquals("Blinding Lights", spicyDiagnosticTarget(null).title)
+    }
+
+    @Test fun `ampersand band names are preserved in local searches`() {
+        assertEquals("title=Example&artist=Years+%26+Years&duration=200", spicyQuery(SongMeta(title = "Example", artist = "Years & Years", duration = 200.0, file = "example.flac")))
+    }
+
 }

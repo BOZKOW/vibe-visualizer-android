@@ -195,7 +195,7 @@ fun PlayerScreen() {
         // side by side: a big screen held wide (a tablet, an open foldable on its side), or a phone on its side; held
         // upright they get the phone's layout, no wider than 600 dp
         val wide = (maxWidth >= 600.dp && maxWidth >= maxHeight) || (maxWidth > maxHeight && maxHeight < 520.dp)
-        if (E.wide != wide) E.wide = wide
+        if (E.wide != wide) { E.wide = wide; Visuals.palDirty = true }
         // clear of the bars and of the camera hole (where it really is: on its side some phones report less room)
         val ins = WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.navigationBarsIgnoringVisibility).union(cutoutInsets())
         val dn = androidx.compose.ui.platform.LocalDensity.current; val ldir = androidx.compose.ui.platform.LocalLayoutDirection.current
@@ -234,12 +234,13 @@ private fun NowPlaying(noLyricsNote: Boolean = false) {
         // while music plays untouched, the controls slide away (as in Spicy Lyrics Mobile): the cover, the song and the
         // seek bar stay; a tap brings the rest back
         TopBar(floatNotice = true)
+        TitleRow(big = true, center = true, like = true)
         Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
             // upright it grows to Apple's tall shape while a tall animated cover plays (Spicy Lyrics Mobile 0.19.0)
             if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(bigCoverShape(), matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp, tall = true)
         }
-        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(64.dp).padding(bottom = 6.dp))   // (48 dp tall until 0.46.1; edge to edge in 0.46.2 only, the owner preferred it inside the margins)
-        SongInfo(big = true, note = noLyricsNote)
+        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(visualizerHeight()).padding(bottom = 6.dp))   // (48 dp tall until 0.46.1; edge to edge in 0.46.2 only, the owner preferred it inside the margins)
+        SongInfo(big = true, note = noLyricsNote, name = false)
         AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top, clip = false) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top, clip = false) + fadeOut()) {
             Column { Transport(big = true); if (S.b("volshow")) VolumeRow(); BottomBar() }
         }
@@ -302,7 +303,7 @@ private fun LyricsWithLyrics() {
                 }
             }
             // (lined up with the seek bar and the lyrics, 24 dp in: they reached 12 dp further out on both sides, the owner's pick)
-            val barsHeight by androidx.compose.animation.core.animateDpAsState(if (hidden) 80.dp else 56.dp,
+            val barsHeight by androidx.compose.animation.core.animateDpAsState(if (hidden) visualizerHeight() + 20.dp else visualizerHeight(),
                 if (Pop.calm) tween(0) else tween(300), label = "controlsBars")
             if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(barsHeight).padding(horizontal = 24.dp))
             Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, lyrics = true, name = false, restCover = rest) }
@@ -378,11 +379,11 @@ private fun Tablet() {
     Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.Center) {
         Column(Modifier.fillMaxHeight().then(if (solo) Modifier.widthIn(max = 560.dp) else Modifier.weight(.42f).widthIn(max = 480.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
             TopBar(Modifier.ambientOut(), floatNotice = true)
+            TitleRow(big = true, center = true, like = true)
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
                 if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
-            if (solo && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(56.dp).padding(bottom = 6.dp))
-            TitleRow(big = true)
+            if (solo && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(visualizerHeight()).padding(bottom = 6.dp))
             if (solo) NoLyricsNote()
             SeekRow()
             Column(Modifier.ambientOut()) {
@@ -519,7 +520,7 @@ private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 4
             // the screen's edge (28 dp in, they sat towards the middle: "move the duet vocals more to the right")
             else LyricsPane(Modifier.fillMaxSize().padding(end = lyricsEnd), areaHeightPx = areaH, padStart = 4f, padEnd = 6f, problems = false, behind = true, startRoom = startRoom)
         }
-        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = endGap).height(34.dp))
+        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = endGap).height(60.dp))
         Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }
     }
 }
@@ -552,7 +553,7 @@ private fun RightPane(modifier: Modifier) {
             if (bars) { BarsView(Modifier.fillMaxSize().padding(vertical = 16.dp)); AwayNote(Modifier.align(Alignment.Center)) }
             else LyricsPane(Modifier.fillMaxSize(), areaHeightPx = areaH, padStart = 8f, padEnd = 16f, problems = false)
         }
-        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(64.dp))
+        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(visualizerHeight()))
         LyricsCredits()
     }
 }
@@ -909,6 +910,13 @@ private fun NoticeText(text: androidx.compose.ui.text.AnnotatedString, size: and
     Text(text, Modifier.layout { m, c -> if (c.hasBoundedWidth && c.maxWidth != maxW) maxW = c.maxWidth; val pl = m.measure(c); layout(pl.width, pl.height) { pl.place(0, 0) } }
         .then(if (over) Modifier.edgeMarquee(0.dp, 16.dp, 12.dp, 12.dp, iter, onRead = { ms -> E.readMs[key] = ms }) else Modifier.pingPong(iter)),   // (not into the icon at its start)
         fontSize = size, fontWeight = weight, color = color, maxLines = 1, softWrap = false, textAlign = TextAlign.Center, onTextLayout = { textW = it.size.width })
+}
+
+/** More vertical room, constrained on short screens; the lyrics/cover keep the remaining flexible area. */
+@Composable
+private fun visualizerHeight(): Dp {
+    val c = androidx.compose.ui.platform.LocalConfiguration.current
+    return when { c.screenHeightDp < 400 -> 60.dp; c.screenHeightDp < 640 -> 80.dp; else -> 104.dp }
 }
 
 @Composable
@@ -1626,7 +1634,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     val behind = S.str("cvBehind")
     val dark = behind == "dark" || behind == "both" || (behind == "blur" && S.low)   // Low performance: no blur, the gradient instead
     // only while the video shows (not while it loads, nor once it's gone): the whole Canvas blurred already, nothing to add
-    val frost = (behind == "blur" || behind == "both") && !S.low && !S.b("cvBlur") && CanvasVideo.cvmode && !wide && !E.quiet   // side by side nothing sits on the video (the desktop's)
+    val frost = (behind == "blur" || behind == "both") && !S.low && !S.b("cvBlur") && !lyricsCanvasBlur() && CanvasVideo.cvmode && !wide && !E.quiet   // side by side nothing sits on the video (the desktop's)
     // the blur reaches up to the song while the controls show, and sinks with them when they hide
     val sink by animateFloatAsState(if (E.uiHidden) 1f else 0f, tween(600, easing = FastOutSlowInEasing), label = "cvsink")
     val from = when { wide -> .52f; behindLyrics -> .6f; else -> .5f } + .12f * sink
@@ -1650,7 +1658,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     }
     // Capture the displayed composite after Canvas blur/shading, shared by every glass surface.
     // A raw-video replay here would bypass both the global and behind-controls blur settings.
-    val alreadyBlurred = S.b("cvBlur") || (!wide && (behind == "blur" || behind == "both"))
+    val alreadyBlurred = S.b("cvBlur") || lyricsCanvasBlur() || (!wide && (behind == "blur" || behind == "both"))
     Box(Modifier.fillMaxSize().liveCanvasFrost(!S.low, alreadyBlurred)) {
     CanvasBlur(vid, { vidSize }, wide, stage != null)
     // on its side the sharp video first blurs where it is, then fades into the blurred background (straight from sharp to the
@@ -1754,15 +1762,38 @@ private val EASE_A = floatArrayOf(1f, .9f, .66f, .38f, .14f, 0f)
  *  stretched back, which is cheap, unlike a full-screen blur every frame. */
 @Composable
 private fun CanvasVideoView() {
-    if (S.b("cvBlur") && !S.low) BoxWithConstraints(Modifier.fillMaxSize()) {
-        val fw = constraints.maxWidth; val fh = constraints.maxHeight
-        val sw = (fw / 4).coerceAtLeast(1); val sh = (fh / 4).coerceAtLeast(1)
-        val r = S.i("cvBlurAmt").coerceIn(5, 100) / 100f * 14f   // in quarter-size pixels: up to ~56 on the screen
-        Box(Modifier.layout { m, _ -> val p = m.measure(Constraints.fixed(sw, sh)); layout(fw, fh) { p.place(0, 0) } }
-            .graphicsLayer { transformOrigin = TransformOrigin(0f, 0f); scaleX = fw / sw.toFloat(); scaleY = fh / sh.toFloat(); renderEffect = BlurEffect(r, r, TileMode.Clamp); compositingStrategy = CompositingStrategy.Offscreen }) {
-            CanvasView()
+    val lyricsBlur = lyricsCanvasBlur()
+    val enabled = (S.b("cvBlur") || lyricsBlur) && !S.low
+    val blend by animateFloatAsState(if (enabled) 1f else 0f,
+        tween(if (Pop.calm) 0 else 260), label = "canvasBlur")
+    val raw = rememberGraphicsLayer()
+    val small = rememberGraphicsLayer()
+    val done = rememberGraphicsLayer()
+    done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+    // Keep the native TextureView and its crop stable. Resizing/recreating it when lyrics arrive
+    // causes a missing frame and a sudden quality jump; only the shared GPU copy changes here.
+    val recipe = remember { floatArrayOf(0f, 7f) }
+    if (enabled) {
+        recipe[0] = if (lyricsBlur) 96f else 0f
+        recipe[1] = if (lyricsBlur) backgroundBlurRadius(S.bgblur, E.wide) else S.i("cvBlurAmt").coerceIn(5, 100) / 100f * 14f
+    }
+    val factor = recipe[0]; val radius = recipe[1]
+    val effect = remember(radius) { BlurEffect(radius, radius, TileMode.Clamp) }
+    Box(Modifier.fillMaxSize().drawWithContent {
+        if (S.low || blend <= .001f) { drawContent(); return@drawWithContent }
+        raw.record { this@drawWithContent.drawContent() }
+        if (blend < .999f) drawLayer(raw)
+        val k = if (factor > 0f) factor / maxOf(size.width, size.height).coerceAtLeast(1f) else .25f
+        val sw = (size.width * k).roundToInt().coerceAtLeast(1)
+        val sh = (size.height * k).roundToInt().coerceAtLeast(1)
+        small.renderEffect = effect
+        small.record(IntSize(sw, sh)) {
+            scale(sw / raw.size.width.toFloat().coerceAtLeast(1f), sh / raw.size.height.toFloat().coerceAtLeast(1f), pivot = Offset.Zero) { drawLayer(raw) }
         }
-    } else CanvasView()
+        done.record(IntSize(sw, sh)) { drawLayer(small) }
+        done.alpha = blend
+        scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(done) }
+    }) { CanvasView() }
 }
 
 /** Picture-in-picture: the Canvas behind the lyrics there too, darkened so they stay readable. */
@@ -1834,3 +1865,6 @@ fun toggleRom() {
 }
 
 @Suppress("unused") private val keep = listOf(Server, ColumnScope::class)
+
+/** Same condition for the displayed video and the shared glass/ambient sources. */
+internal fun lyricsCanvasBlur() = !S.low && S.b("cvLyrBlur") && Lyr.lines > 0 && (E.screen == "lyrics" || E.inPip)

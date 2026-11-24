@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import io.github.bozkow.vibevisualizer.audio.Audio
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.core.Vibe
@@ -54,6 +55,10 @@ object Visuals {
 
     // the bars' colors, blending over 0.9 s from the old ones
     var pal: IntArray = IntArray(0); private set
+    var palVersion = 0L; private set
+    private var canvasLuma: Double? = null
+    private var motionLuma: Double? = null
+    private var coverLuma = .1
     private var palRGB: Array<FloatArray> = emptyArray()
     private var palFrom: Array<FloatArray>? = null; private var palTo: Array<FloatArray>? = null; private var palT0 = 0.0
     private var palMs = 900.0; private var palMsNext = 900.0   // the next blend's length: a Canvas's or animated cover's colours come in fast (300 ms)
@@ -126,12 +131,20 @@ object Visuals {
     private var canvasBars: List<IntArray>? = null
     val hasCanvasColors get() = canvasBars != null
     /** A video frame's bar colours (worked out off the main thread: FrameColors), or null. */
-    fun barsFrom(img: Bitmap): List<IntArray>? = runCatching { extract(img).second }.getOrNull()
+    internal fun barsFrom(img: Bitmap): VideoPalette? = runCatching { VideoPalette(extract(img).second, imageLuminance(img)) }.getOrNull()
+    private fun imageLuminance(img: Bitmap): Double {
+        val sample = Bitmap.createScaledBitmap(img, 24, 24, true)
+        val pixels = IntArray(24 * 24); sample.getPixels(pixels, 0, 24, 0, 0, 24, 24)
+        return pixels.sumOf(BarContrast::luminance) / pixels.size
+    }
     /** [c]: the video's bar colours (barsFrom), or null for none. A frame much like the last changes nothing: every sample
      *  set the palette blending and the app's accent changing, and with them all of the app redrawing (heat, 0.51.0). */
-    fun setCanvasColors(c: List<IntArray>?) {
+    internal fun setCanvasColors(frame: VideoPalette?) {
+        val c = frame?.colors
+        val lightChanged = kotlin.math.abs((canvasLuma ?: -1.0) - (frame?.luminance ?: -1.0)) > .035
+        canvasLuma = frame?.luminance
         if (c == null && canvasBars == null) return
-        if (c != null && canvasBars?.let { near(it, c) } == true) return
+        if (!lightChanged && c != null && canvasBars?.let { near(it, c) } == true) return
         canvasBars = c; palDirty = true; palMsNext = 300.0
         tintFrom()
     }
@@ -140,17 +153,26 @@ object Visuals {
 
     /** The same from an animated cover that plays (under the Canvas's: that's what's behind everything when it plays). */
     private var motionBars: List<IntArray>? = null
-    fun setMotionColors(c: List<IntArray>?) {
+    internal fun setMotionColors(frame: VideoPalette?) {
+        val c = frame?.colors
+        val lightChanged = kotlin.math.abs((motionLuma ?: -1.0) - (frame?.luminance ?: -1.0)) > .035
+        motionLuma = frame?.luminance
         if (c == null && motionBars == null) return
-        if (c != null && motionBars?.let { near(it, c) } == true) return
+        if (!lightChanged && c != null && motionBars?.let { near(it, c) } == true) return
         motionBars = c; palDirty = true; palMsNext = 300.0
         tintFrom()
     }
 
     var quietVer = -1; private set   // a cover that changes without its animation (the same picture, sharper)
 
+    /** Caller has checked that this is the SAME image at higher resolution. Palette/background are already correct. */
+    internal fun upgradeCover(image: Bitmap) {
+        cover = image; quietVer = coverVer + 1; coverVer++
+    }
+
     fun setCover(img: Bitmap?, quiet: Boolean = false) {
         cover = img
+        coverLuma = img?.let(::imageLuminance) ?: .1
         if (quiet) quietVer = coverVer + 1
         if (img != null) runCatching { extract(img) }.onSuccess { (r, b) -> rawCols = r; barCols = b }.onFailure { rawCols = DEF_COLS; barCols = DEF_COLS }
         else { rawCols = DEF_COLS; barCols = DEF_COLS }
@@ -164,20 +186,32 @@ object Visuals {
     fun buildPal() {
         val n = Audio.N
         val st: List<IntArray> = when (S.str("theme")) { "cover" -> canvasBars ?: motionBars ?: barCols; "custom" -> listOf(hex(S.str("c1")), hex(S.str("c2"))); else -> (STOPS[S.str("theme")] ?: STOPS.getValue("aurora")).map(::hex) }
+        val background = when {
+            CanvasVideo.cvlive -> (canvasLuma ?: coverLuma) * bgBri().coerceIn(0.0, 1.0).pow(2.2) * (if (E.wide) .85 else .55)
+            S.bgStyle == "color" -> BarContrast.luminance(plainColor().toArgb())
+            S.bgStyle == "none" -> 0.0
+            else -> (motionLuma ?: coverLuma) * bgBri().coerceIn(0.0, 1.0) * .7
+        }
         val to = Array(n) { i ->
             val t = if (n > 1) i.toDouble() / (n - 1) else 0.0; val f = t * (st.size - 1); val j = min(floor(f).toInt(), st.size - 2).coerceAtLeast(0); val u = f - j
             val a = st[j]; val b = st[min(j + 1, st.size - 1)]
-            FloatArray(3) { x -> (a[x] + (b[x] - a[x]) * u).toFloat() }
+            val source = FloatArray(3) { x -> (a[x] + (b[x] - a[x]) * u).toFloat() }
+            val adjusted = BarContrast.adjust(rgb(source), background)
+            floatArrayOf((adjusted shr 16 and 255).toFloat(), (adjusted shr 8 and 255).toFloat(), (adjusted and 255).toFloat())
         }
         val video = palMsNext < 900.0
-        if (palRGB.size == n && !S.low) { palFrom = palRGB; palTo = to; palT0 = now(); palMs = palMsNext } else { palRGB = to; palFrom = null; palTo = null }
+        if (palRGB.size == n && !S.low) { palFrom = Array(n) { palRGB[it].copyOf() }; palTo = to; palT0 = now(); palMs = palMsNext } else { palRGB = to; palFrom = null; palTo = null }
         palMsNext = 900.0
         palShow(); palDirty = false
         to.getOrNull(min(1, to.size - 1))?.let { c -> accentTo(rgb(c), video) }
     }
 
     private fun rgb(c: FloatArray) = (0xFF shl 24) or (c[0].roundToInt().coerceIn(0, 255) shl 16) or (c[1].roundToInt().coerceIn(0, 255) shl 8) or c[2].roundToInt().coerceIn(0, 255)
-    private fun palShow() { pal = IntArray(palRGB.size) { i -> rgb(palRGB[i]) } }
+    private fun palShow() {
+        if (pal.size != palRGB.size) pal = IntArray(palRGB.size)
+        for (i in pal.indices) pal[i] = rgb(palRGB[i])
+        palVersion++
+    }
 
     /** The app's accent (the theme's main colour), set once for each new palette, not on every frame of its blend: each
      *  change has the theme blend over 0.9 s, and every frame of that redraws the whole app. A video's ([video]) only on
@@ -196,7 +230,7 @@ object Visuals {
     fun palTick(t: Double): Boolean {
         val from = palFrom ?: return false; val to = palTo ?: return false
         val k = min(1.0, (t - palT0) / palMs); val e = if (k < .5) 2 * k * k else 1 - (-2 * k + 2).pow(2) / 2
-        palRGB = Array(to.size) { i -> val o = from.getOrNull(i) ?: to[i]; val c = to[i]; FloatArray(3) { x -> (o[x] + (c[x] - o[x]) * e).toFloat() } }
+        for (i in to.indices) { val o = from.getOrNull(i) ?: to[i]; for (x in 0..2) palRGB[i][x] = (o[x] + (to[i][x] - o[x]) * e).toFloat() }
         palShow()
         if (k >= 1) { palFrom = null; palTo = null }
         return true
@@ -224,7 +258,7 @@ object Visuals {
     /** A box blur (three passes ≈ a gaussian) with a fractional radius, then saturation and brightness. */
     /** The background's colours, boosted to be vivid: the Saturation and Brightness sliders (Settings → Look) times a
      *  little more of each, for every background (the moving one, a still image, the blurred Canvas). */
-    const val VIVID_SAT = 1.45; const val VIVID_BRI = 1.15
+    const val VIVID_SAT = 2.5 / 1.7; const val VIVID_BRI = .65 / .7
     fun bgSat() = S.sat / 100.0 * VIVID_SAT
     fun bgBri() = S.bri / 100.0 * VIVID_BRI
 
@@ -234,8 +268,8 @@ object Visuals {
         var out = boxBlur(px, w, h, r0)
         if (fr > .01) { val b = boxBlur(px, w, h, r0 + 1); out = FloatArray(out.size) { i -> out[i] + (b[i] - out[i]) * fr.toFloat() } }
         for (p in 0 until w * h) {
-            val r = out[p * 3]; val g = out[p * 3 + 1]; val b = out[p * 3 + 2]; val l = .299f * r + .587f * g + .114f * b
-            fun ch(v: Float) = ((l + (v - l) * sat.toFloat()) * bri.toFloat()).roundToInt().coerceIn(0, 255)
+            val r = out[p * 3]; val g = out[p * 3 + 1]; val b = out[p * 3 + 2]; val l = .213f * r + .715f * g + .072f * b
+            fun ch(v: Float) = (BackgroundGrade.channel(v / 255f, l / 255f, sat.toFloat(), bri.toFloat()) * 255).roundToInt()
             px[p] = (0xFF shl 24) or (ch(r) shl 16) or (ch(g) shl 8) or ch(b)
         }
         bm.setPixels(px, 0, w, 0, 0, w, h)

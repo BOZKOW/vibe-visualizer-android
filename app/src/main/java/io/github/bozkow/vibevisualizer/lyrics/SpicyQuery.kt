@@ -13,12 +13,19 @@ fun spicyQuery(m: SongMeta): String? {
     return when {
         m.id.isNotEmpty() -> "id=" + enc(m.id)
         m.isrc.isNotBlank() -> "id=" + enc(m.isrc.trim())
-        m.title.isNotBlank() -> buildString {
+        m.title.isNotBlank() && (m.file.isBlank() || m.artist.isNotBlank()) -> buildString {
             append("title=").append(enc(m.title.trim()))
-            firstArtist(m.artist).takeIf { it.isNotEmpty() }?.let { append("&artist=").append(enc(it)) }
+            spicySearchArtist(m.artist).takeIf { it.isNotEmpty() }?.let { append("&artist=").append(enc(it)) }
             m.album.trim().takeIf { it.isNotEmpty() }?.let { append("&album=").append(enc(it)) }
             if (m.duration > 0) append("&duration=").append(Math.round(m.duration))
         }
         else -> null
     }
 }
+
+/** The connection diagnostic tests the actual lookup metadata; only an idle app uses an explicitly labelled sample. */
+internal fun spicyDiagnosticTarget(current: SongMeta?): SongMeta = current ?: SongMeta(
+    id = "0VjIjW4GlUZAMYd2vXMi3b", title = "Blinding Lights", artist = "The Weeknd", duration = 200.0)
+
+/** An ampersand may be part of a band's name; never turn Years & Years into a different artist. */
+internal fun spicySearchArtist(artist: String): String = artist.split(Regex(",|\\s+(?:feat\\.?|ft\\.?)\\s+", RegexOption.IGNORE_CASE)).first().trim()

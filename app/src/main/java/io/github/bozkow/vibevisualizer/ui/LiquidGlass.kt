@@ -82,11 +82,10 @@ class Lens internal constructor(private val shader: Any?, private val density: F
     }
 }
 
-@Composable fun rememberLens(): Lens {
+@Composable fun rememberLens(diffusion: Dp = 1.25.dp): Lens {
     val enabled = liquidOn()
     val density = androidx.compose.ui.platform.LocalDensity.current.density
-    val clear = io.github.bozkow.vibevisualizer.engine.E.wide
-    return remember(enabled, density, clear) { Lens(if (enabled) RuntimeShader(LENS) else null, density, if (clear) 0f else 1.25f * density) }
+    return remember(enabled, density, diffusion) { Lens(if (enabled) RuntimeShader(LENS) else null, density, diffusion.value * density) }
 }
 
 fun liquidOn(): Boolean = Build.VERSION.SDK_INT >= 33 && S.b("xLiquid") && !S.low && !S.calm
@@ -110,7 +109,7 @@ internal fun Modifier.glassSurface(shape: Shape): Modifier = composed {
         if (backdrop == null) return@composed Modifier.frosted(oval = false)
         var at by remember { mutableStateOf(Offset.Zero) }
         return@composed Modifier.onGloballyPositioned { at = it.positionInRoot() }.drawBehind {
-            if (backdrop.layer.size.width > 0) translate(backdrop.at.x - at.x, backdrop.at.y - at.y) { drawLayer(backdrop.layer) }
+            if (backdrop.ready && backdrop.layer.size.width > 0) translate(backdrop.at.x - at.x, backdrop.at.y - at.y) { drawLayer(backdrop.layer) }
         }
     }
     val lens = rememberLens()
@@ -118,15 +117,21 @@ internal fun Modifier.glassSurface(shape: Shape): Modifier = composed {
     val painter = if (backdrop == null) frostPainter() else null
     var at by remember { mutableStateOf(Offset.Zero) }
     Modifier.onGloballyPositioned { at = if (backdrop != null) it.positionInRoot() else it.positionInWindow() }
-        .drawBehind {
-            if (size.width < 1f || size.height < 1f) return@drawBehind
-            layer.renderEffect = lensEffect(lens, shape)
-            layer.record(IntSize(size.width.roundToInt(), size.height.roundToInt())) {
+        .drawWithCache {
+            if (size.width < 1f || size.height < 1f) return@drawWithCache onDrawBehind { }
+            val outline = shape.createOutline(size, layoutDirection, this)
+            layer.renderEffect = when (outline) {
+                is Outline.Rounded -> outline.roundRect.let { r -> lens.effect(size.width, size.height,
+                    r.topLeftCornerRadius.x, r.topRightCornerRadius.x, r.bottomRightCornerRadius.x, r.bottomLeftCornerRadius.x) }
+                is Outline.Rectangle -> lens.effect(size.width, size.height, 0f)
+                else -> lens.effect(size.width, size.height, minOf(size.width, size.height) / 2)
+            }
+            layer.record(this, layoutDirection, IntSize(size.width.roundToInt(), size.height.roundToInt())) {
                 if (backdrop != null) {
-                    if (backdrop.layer.size.width > 0) translate(backdrop.at.x - at.x, backdrop.at.y - at.y) { drawLayer(backdrop.layer) }
+                    if (backdrop.ready && backdrop.layer.size.width > 0) translate(backdrop.at.x - at.x, backdrop.at.y - at.y) { drawLayer(backdrop.layer) }
                 } else painter?.invoke(this, at)
             }
-            drawLayer(layer)
+            onDrawBehind { drawLayer(layer) }
         }
 }
 

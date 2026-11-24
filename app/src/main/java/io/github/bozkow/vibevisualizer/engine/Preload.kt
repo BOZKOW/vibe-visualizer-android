@@ -55,7 +55,7 @@ object Preload {
     private suspend fun read(): List<SongMeta> = when (E.src) {
         "spotify" -> Spotify.queueAhead(AHEAD)
         "media" -> listOfNotNull(MediaApps.nextSong())
-        "file" -> listOfNotNull(Local.nextItem()?.let { (u, name) -> E.fileSong(name, Files.tags(u)) })
+        "file" -> listOfNotNull(Local.nextItem()?.let { (u, name) -> E.fileSong(name, Files.tags(u)).copy(uri = u.toString()) })
         else -> emptyList()
     }.filter { it.title.isNotEmpty() }.map { m ->
         if (m.cover.isNotEmpty() || !S.b("online") || m.artist.isBlank()) m

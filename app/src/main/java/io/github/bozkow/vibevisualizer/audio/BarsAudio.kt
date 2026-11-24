@@ -39,7 +39,9 @@ object Audio {
     private var bandRate = 0
     var bass = 0f; private set
     var mxv = 0f; private set
-    private val autoGain = AutoGain()
+    private val autoGains = Array(3) { AutoGain() }
+    private var bands = FrequencyBands(48, 48000)
+    private var bandRaw = Array(3) { FloatArray(0) }
     var idleK = 0f; private set
     private var silentFor = 0.0
     /** How long (ms) the sound being heard has been silent (0 while nothing's heard: then nothing's known). */
@@ -67,8 +69,9 @@ object Audio {
         N = if (S.low) min(S.bars, 48) else S.bars
         vals = FloatArray(N); raw = FloatArray(N)
         bandRate = curRate()
-        val lo = 2.0; val hi = min(1023.0, Math.round(11000.0 / (bandRate / 2048.0)).toDouble())   // up to ~11 kHz: above that most music is nearly silent
-        edges = IntArray(N + 1) { i -> floor(lo * (hi / lo).pow(i.toDouble() / N)).toInt() }
+        bands = FrequencyBands(N, bandRate)
+        edges = bands.edges
+        bandRaw = Array(3) { FloatArray(bands.ranges[it + 1] - bands.ranges[it]) }
     }
 
     private fun curRate() = if (E.src == "file" && Local.playing()) FileTap.sampleRate else 48000
@@ -149,10 +152,17 @@ object Audio {
                 raw[i] = r; if (r > mx) mx = r
             }
             silentFor = if (mx < .004f) silentFor + dt else 0.0   // a source that's connected but silent
-            var gain = 1.3f
-            if (S.b("auto")) gain = autoGain.gain(raw, N, dt)
-            gain *= boost
-            for (i in 0 until N) { val v = min(raw[i] * gain, 1.1f); vals[i] += (v - vals[i]) * (if (v > vals[i]) aA else aR).toFloat() }
+            // A loud bass drum must not turn down the vocal and treble ranges.
+            for (band in 0..2) {
+                val from = bands.ranges[band]; val until = bands.ranges[band + 1]
+                val slice = bandRaw[band]
+                raw.copyInto(slice, 0, from, until)
+                val gain = (if (S.b("auto")) autoGains[band].gain(slice, slice.size, dt) else 1.3f) * boost
+                for (i in from until until) {
+                    val v = min(raw[i] * gain, 1.1f)
+                    vals[i] += (v - vals[i]) * (if (v > vals[i]) aA else aR).toFloat()
+                }
+            }
         } else if (E.playing() && E.src != "file") {
             val s = t / 1000   // ambient motion: the music app's sound isn't heard
             for (i in 0 until N) {
@@ -165,7 +175,7 @@ object Audio {
         if (!live) silentFor = 0.0
         idleK += ((if (idle) 1f else 0f) - idleK) * (1 - exp(-dt / (if (idle) 700 else 200))).toFloat()
         idleWave(dt, t)
-        var b = 0f; val bn = max(3, N / 12); var m = 0f
+        var b = 0f; val bn = max(1, bands.ranges[1]); var m = 0f
         for (i in 0 until N) { if (vals[i] > m) m = vals[i]; if (i < bn) b += vals[i] }
         mxv = m
         bass += ((if (idleK > .5f) 0f else b / bn) - bass) * (1 - exp(-dt / 60)).toFloat()   // the wave isn't music: it doesn't move the background or count as beats

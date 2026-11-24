@@ -324,6 +324,7 @@ object E {
         val bm0 = MediaApps.cover()
         keepPic(bm0)
         mediaArt = bm0 != null && setCoverBitmap(bm0, "From " + MediaApps.appName(), tok)
+        if (mediaArt) upgradeMediaArtwork(tok)
         // (what's on screen stays until there's something else: only with no cover in the end the default colours)
         if (!mediaArt) Vibe.scope.launch {
             delay(700)   // (the real picture often follows the name within a moment)
@@ -333,8 +334,8 @@ object E {
             MediaApps.artUrl()?.let { u -> if (setCover(u, "From " + MediaApps.appName(), tok, canApply = { !mediaArt })) { mediaArt = true; return@launch } }
             if (tok != coverTok || mediaArt) return@launch
             // Nothing found: take any artwork that arrived meanwhile, else the defaults.
-            val last = { if (!mediaArt) { val b = MediaApps.cover(); if (b != null) setCoverBitmap(b, "From " + MediaApps.appName(), tok) else resetCover() } }
-            if (S.b("online")) { status = "Searching for cover…"; if (!findCover(meta, tok, canApply = { !mediaArt }) && tok == coverTok) { status = "No cover found · using default"; last() } }
+            val last = { if (!mediaArt) { val b = MediaApps.cover(); if (b != null) setCoverBitmap(b, "From " + MediaApps.appName(), tok) else resetCover(holdLast = true) } }
+            if (S.b("online")) { status = "Searching for cover…"; if (!findCover(meta, tok, canApply = { !mediaArt }) && tok == coverTok) { status = "No new cover found"; last() } }
             else { delay(1500); if (tok == coverTok) last() }
         }
         updPlay()
@@ -364,15 +365,52 @@ object E {
         val news = if (bm != null) picNews(bm) else 0
         if (bm != null && news > 0) {
             keepPic(bm)
-            mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = news == 1) || mediaArt; return
+            mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = news == 1) || mediaArt
+            upgradeMediaArtwork(coverTok); return
         }
-        if (mediaArt && bm != null) return   // Native bitmaps take priority over all URL/search results.
+        if (mediaArt && bm != null) { upgradeMediaArtwork(coverTok); return }   // Native bitmaps take priority over all URL/search results.
         if (bm != null) { mediaArt = setCoverBitmap(bm, "From " + MediaApps.appName(), coverTok, quiet = false); return }
         val u = MediaApps.artUrl() ?: return
         if (u == mediaArtUrl) return
         mediaArtUrl = u; val tok = coverTok
         Vibe.scope.launch { if (tok == coverTok && setCover(u, "From " + MediaApps.appName(), tok, canApply = { MediaApps.artUrl() == u && !MediaApps.hasCover() })) mediaArt = true }
     }
+    private fun upgradeMediaArtwork(tok: Int) {
+        if (dj || !S.b("online") || (Visuals.cover?.width ?: 0) >= 1200) return
+        val original = MediaApps.artUrl()
+        val want = mediaMeta ?: return
+        val key = original ?: "search:${want.artist}|${want.title}|${want.album}"
+        if (mediaArtUrl == key) return
+        mediaArtUrl = key
+        Vibe.scope.launch {
+            if (quickChange) { delay(700); if (tok != coverTok) return@launch }
+            fun stillCurrent() = tok == coverTok && src == "media" && mediaArt && MediaApps.artUrl() == original
+            fun improve(image: android.graphics.Bitmap?): Boolean {
+                if (image == null || !stillCurrent() || !samePic(picSig(image), mediaArtSig) || image.width <= (Visuals.cover?.width ?: 0)) return false
+                keepPic(image)
+                Visuals.upgradeCover(image)   // identical artwork, sharper: no colour extraction or transition restart
+                return true
+            }
+            if (original != null) improve(Images.load(io.github.bozkow.vibevisualizer.spotify.fullArtworkAddress(original), 1600))
+            if (!stillCurrent() || (Visuals.cover?.width ?: 0) >= 1200 || want.artist.isBlank()) return@launch
+            // A native bitmap may be the only address the player supplies. Search the exact release,
+            // then require the same picture as well as matching metadata before accepting a sharper copy.
+            try {
+                val q = firstArtist(want.artist) + " " + want.title
+                val results = Net.getJson("https://itunes.apple.com/search?media=music&entity=song&limit=5&term=" + URLEncoder.encode(q, "UTF-8")).optJSONArray("results") ?: return@launch
+                val hits = (0 until results.length()).map { results.getJSONObject(it) }.filter {
+                    coverSearchMatch(want, it.optString("trackName"), it.optString("artistName"), it.optString("collectionName"))
+                }
+                for (hit in hits.take(2)) {
+                    if (!stillCurrent()) return@launch
+                    val url = hit.optString("artworkUrl100").replace("100x100bb", "1600x1600bb")
+                    if (url.isNotBlank() && improve(Images.load(url, 1600))) break
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { }   // retain the player's valid artwork on any lookup failure
+        }
+    }
+
     private var djSettle: kotlinx.coroutines.Job? = null
     private var mediaId = ""
     private var mediaArtUrl = ""
@@ -559,8 +597,8 @@ object E {
             // no cover from Spotify (or it didn't load): the Spotify app on this phone shows one for the same song
             if (!ok && tok == coverTok) SpotifyApp.artFor(m.title, m.duration * 1000)?.let { ok = setCoverBitmap(it, "From the Spotify app", tok); if (ok) coverNote += " · from the Spotify app" }
             if (!ok && tok == coverTok && loadedCoverTok != tok) {
-                if (S.b("online")) { status = "Searching for cover…"; ok = findCover(m, tok); if (!ok && tok == coverTok && loadedCoverTok != tok) { status = "No cover found · using default"; resetCover() } }
-                else resetCover()
+                if (S.b("online")) { status = "Searching for cover…"; ok = findCover(m, tok); if (!ok && tok == coverTok && loadedCoverTok != tok) { status = "No new cover found"; resetCover(holdLast = true) } }
+                else resetCover(holdLast = true)
                 if (tok == coverTok) coverNote += if (ok) " · found online" else " · none online"
             }
         }
@@ -593,7 +631,7 @@ object E {
         Vibe.scope.launch {
             val tags = Files.tags(uri)
             if (tok != coverTok) return@launch
-            val meta = fileSong(name, tags)
+            val meta = fileSong(name, tags).copy(uri = uri.toString())
             title = meta.title; artist = meta.artist; year = meta.year; album = meta.album
             Lyr.load(meta, tok)
             Preload.songStarted()
@@ -602,9 +640,9 @@ object E {
             // Android's own album art for the file: its picture, or a cover.jpg / folder.jpg next to it
             Files.androidArt(uri)?.let { if (tok == coverTok && setCoverBitmap(it, "From this phone", tok)) return@launch }
             if (tok != coverTok) return@launch
-            if (!S.b("online")) { status = "No cover · using default"; resetCover(); return@launch }
+            if (!S.b("online")) { status = "No new cover"; resetCover(holdLast = true); return@launch }
             status = "Searching for cover…"
-            if (!findCover(meta.copy(title = meta.title.ifEmpty { Files.clean(name) }), tok) && tok == coverTok) { status = "No cover found · using default"; resetCover() }
+            if (!findCover(meta.copy(title = meta.title.ifEmpty { Files.clean(name) }), tok) && tok == coverTok) { status = "No new cover found"; resetCover(holdLast = true) }
         }
         updPlay()
     }
@@ -612,13 +650,8 @@ object E {
     /** A file's song as the lookups name it: its tags' title and artist (cleaned), else what its name says
      *  ("03 - Artist - Song (Official Video).mp3" → Song by Artist, Spicy Lyrics Mobile's name cleaner). */
     fun fileSong(name: String, tags: Files.Tags?): SongMeta {
-        val fn = TrackNameCleaner.clean(name, "")
-        var t = fn.title.ifEmpty { Files.clean(name) }; var a = fn.artist
-        if (tags != null && (tags.title != null || tags.artist != null)) {   // tags can be a file name too, or name no artist
-            val tn = TrackNameCleaner.clean(tags.title ?: name, tags.artist ?: "")
-            t = tn.title.ifEmpty { t }; a = tn.artist.ifEmpty { a }
-        }
-        return SongMeta(title = t, artist = a, album = tags?.album ?: "", duration = (tags?.durationMs ?: 0L) / 1000.0, file = name, year = tags?.year ?: "")
+        return io.github.bozkow.vibevisualizer.lyrics.localTrackIdentity(name, tags?.title, tags?.artist, tags?.album,
+            (tags?.durationMs ?: 0L) / 1000.0, tags?.year.orEmpty())
     }
 
     fun onFileState() { updPlay(); CanvasVideo.syncPlay() }
@@ -640,13 +673,17 @@ object E {
     fun setCoverBitmap(bm: android.graphics.Bitmap?, label: String, tok: Int, quiet: Boolean = false): Boolean {
         if (bm == null || tok != coverTok) return false
         loadedCoverTok = tok
+        if (coverNote == "Keeping the last artwork until a replacement is available") coverNote = ""
         Visuals.setCover(bm, quiet)
         if (label.isNotEmpty() || src != "spotify") status = label
         if (S.bgStyle != "dynamic") Background.applyStill()
         return true
     }
 
-    fun resetCover() { loadedCoverTok = -1; Visuals.setCover(null); if (S.bgStyle != "dynamic") Background.applyStill() }
+    fun resetCover(holdLast: Boolean = false) {
+        if (holdLast && Visuals.cover != null) { coverNote = "Keeping the last artwork until a replacement is available"; return }
+        loadedCoverTok = -1; Visuals.setCover(null); if (S.bgStyle != "dynamic") Background.applyStill()
+    }
 
     /** A missing queue cover is looked up separately; it never replaces the currently playing song's artwork. */
     suspend fun upcomingCover(want: SongMeta): String? {
@@ -851,8 +888,10 @@ object E {
         val under = settingsPage != null
         slowDt += dt
         val step = !under || t - slowAt >= (if (quiet) 66 else 33)
-        Audio.sample(dt, t); Audio.beatTick(t, dt)
-        if (step) { slowAt = t; Background.tick(t, slowDt); slowDt = 0.0; Lyr.tick(t) }
+        if (step) {
+            Audio.sample(slowDt, t); Audio.beatTick(t, slowDt)
+            slowAt = t; Background.tick(t, slowDt); slowDt = 0.0; Lyr.tick(t)
+        }
         Desync.tick(t)
         uiTick(t)
         if (Visuals.palDirty) Visuals.buildPal()
@@ -929,8 +968,8 @@ object E {
         when (k) {
             "theme", "c1", "c2" -> Visuals.palDirty = true
             "bars" -> { Audio.setupBands(); Visuals.palDirty = true }
-            "bgblur", "bri", "sat" -> { bakeJob?.cancel(); bakeJob = Vibe.scope.launch { delay(150); Visuals.bake(false); Background.applyStill() } }   // once the slider rests
-            "bgStyle" -> Background.applyStill()
+            "bgblur", "bri", "sat" -> { Visuals.palDirty = true; bakeJob?.cancel(); bakeJob = Vibe.scope.launch { delay(150); Visuals.bake(false); Background.applyStill() } }   // once the slider rests
+            "bgStyle", "aBgHex" -> { Background.applyStill(); Visuals.palDirty = true }
             "low" -> { Audio.setupBands(); Visuals.palDirty = true; CanvasVideo.applyMode(); Perf.lowByHand() }   // (Perf sets it back to "auto" when Power saving did it)
             "aSaverLow" -> if (S.b("aSaverLow")) Perf.saverCheck(force = true)
             // Refined credits are the credits under the lyrics: turning one on turns on the other (they did nothing

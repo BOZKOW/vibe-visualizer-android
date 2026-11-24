@@ -48,6 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -137,27 +138,43 @@ fun Modifier.glassFace(shape: Shape, enabled: Boolean = true, shade: Float = .1f
     .drawBehind { glassBody(shade, if (enabled) 1f else .35f) }
     .border(1.dp, if (enabled) GlassRim else GlassRimFaint, shape)
 
+/** Keep a 48dp touch row while the material follows the visible button's measured bounds. */
+private fun Modifier.glassButtonTarget(): Modifier = this.layout { measurable, constraints ->
+    val p = measurable.measure(constraints.copy(minHeight = 0))
+    val height = maxOf(p.height, 48.dp.roundToPx()).coerceIn(constraints.minHeight, constraints.maxHeight)
+    layout(p.width, height) { p.placeRelative(0, (height - p.height) / 2) }
+}
+
 /** A frosted button (Glass, the app's one design since 0.50.0). */
 @Composable
 fun VTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape = ButtonDefaults.filledTonalShape, content: @Composable RowScope.() -> Unit) {
-    androidx.compose.material3.FilledTonalButton(onClick, modifier.glassFace(shape, enabled), enabled, shape = shape,
+    val target = modifier.glassButtonTarget()
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
+    androidx.compose.material3.FilledTonalButton(onClick, target.glassFace(shape, enabled), enabled, shape = shape,
         colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color.Transparent, contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+    }
 }
 
 /** The main button: frosted glass tinted with the cover's colour (still the one to press). */
 @Composable
 fun VButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
-    androidx.compose.material3.Button(onClick, modifier.glassFace(ButtonDefaults.shape, enabled), enabled, border = null,
+    val target = modifier.glassButtonTarget()
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
+    androidx.compose.material3.Button(onClick, target.glassFace(ButtonDefaults.shape, enabled), enabled, border = null,
         colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White, disabledContainerColor = Color.Transparent, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+    }
 }
 
 /** A fainter frosted button. */
 @Composable
 fun VOutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
                     contentPadding: androidx.compose.foundation.layout.PaddingValues = ButtonDefaults.ContentPadding, content: @Composable RowScope.() -> Unit) {
-    androidx.compose.material3.OutlinedButton(onClick, modifier.clip(ButtonDefaults.outlinedShape).glassSurface(ButtonDefaults.outlinedShape).drawBehind { glassBody(0f, if (enabled) .45f else .2f) }, enabled, contentPadding = contentPadding,
-        border = BorderStroke(1.dp, if (enabled) GlassRim else GlassRimFaint),
+    val target = modifier.glassButtonTarget()
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
+    androidx.compose.material3.OutlinedButton(onClick, target.glassFace(ButtonDefaults.outlinedShape, enabled, 0f), enabled, contentPadding = contentPadding,
+        border = null,
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent, contentColor = Color.White, disabledContentColor = Color.White.copy(alpha = .38f)), content = content)
+    }
 }
 
 /** A choice's card (one of several to pick from): frosted glass, the chosen one tinted with the cover's colour and with
@@ -205,7 +222,7 @@ fun Modifier.fadeEdges(top: Dp = 28.dp, bottom: Dp = 0.dp, clear: Dp = 0.dp): Mo
 
 /** What lies under a floating island (the Settings list, all of Settings under a notice), recorded as it's drawn so the
  *  island can show it blurred behind its glass ([glassIsland]). */
-class Backdrop(internal val layer: androidx.compose.ui.graphics.layer.GraphicsLayer, internal val behind: Backdrop? = null) { internal var at = Offset.Zero }
+class Backdrop(internal val layer: androidx.compose.ui.graphics.layer.GraphicsLayer, internal val behind: Backdrop? = null) { internal var at by mutableStateOf(Offset.Zero); internal var ready by mutableStateOf(false) }
 
 @Composable
 fun rememberBackdrop(behind: Backdrop? = null): Backdrop { val l = androidx.compose.ui.graphics.rememberGraphicsLayer(); return remember(l, behind) { l.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen; Backdrop(l, behind) } }
@@ -217,10 +234,11 @@ fun Modifier.backdropSource(b: Backdrop?, on: Boolean = true): Modifier = if (b 
         b.layer.record {
             // Record the complete view behind the header, including transparent rows over the actual screen below.
             b.behind?.let { bg ->
-                if (bg.layer.size.width > 0) translate(bg.at.x - b.at.x, bg.at.y - b.at.y) { drawLayer(bg.layer) }
+                if (bg.ready && bg.layer.size.width > 0) translate(bg.at.x - b.at.x, bg.at.y - b.at.y) { drawLayer(bg.layer) }
             }
             this@drawWithContent.drawContent()
         }
+        b.ready = b.layer.size.width > 0 && b.layer.size.height > 0
         drawLayer(b.layer)
     }
 
@@ -234,13 +252,13 @@ fun Modifier.glassIsland(b: Backdrop?, k: Float = 1f, shape: Shape = RoundedCorn
     val at = remember { floatArrayOf(0f, 0f) }
     val fx = remember { androidx.compose.ui.graphics.BlurEffect(6f, 6f, androidx.compose.ui.graphics.TileMode.Clamp) }
     val liquid = liquidOn()
-    val lens = rememberLens()
+    val lens = rememberLens(6.dp)   // readable over scrolling text, with the same refraction/tint/rim
     if (k <= 0f || S.low) return if (baseGlass || k > 0f) this.glass(shape, lift = false) else this
     return this.shadow(10.dp * k, shape, clip = false, ambientColor = Color.Black, spotColor = Color.Black)
         .onGloballyPositioned { val p = it.positionInRoot(); at[0] = p.x; at[1] = p.y }
         .clip(shape)
         .drawBehind {
-            if (b != null && b.layer.size.width > 0) {
+            if (b != null && b.ready && b.layer.size.width > 0) {
                 // (Liquid glass: what's under it sharp, at full size, bent at the edges; otherwise a quarter-size blur)
                 val f = if (liquid) 1f else 4f; val sw = (size.width / f).toInt() + 2; val sh = (size.height / f).toInt() + 2
                 blur.renderEffect = if (liquid) lensEffect(lens, shape) else fx; blur.alpha = k
@@ -517,6 +535,9 @@ fun Modifier.cheapBlur(k: Float, radius: Dp, dim: Float = 0f): Modifier {
     val layer = androidx.compose.ui.graphics.rememberGraphicsLayer()
     val r = with(androidx.compose.ui.platform.LocalDensity.current) { radius.toPx() } / 8f
     if (k <= 0f) return this
+    val rr = (r * k).coerceAtLeast(.5f)
+    val effect = remember(rr) { androidx.compose.ui.graphics.BlurEffect(rr, rr, androidx.compose.ui.graphics.TileMode.Clamp) }
+    layer.renderEffect = effect
     return this.drawWithContent {
         if (k < 1f) drawContent()   // the sharp picture under it while it fades in
         val f = 8f
@@ -524,8 +545,6 @@ fun Modifier.cheapBlur(k: Float, radius: Dp, dim: Float = 0f): Modifier {
         layer.record(androidx.compose.ui.unit.IntSize(sw, sh)) {
             scale(1f / f, 1f / f, pivot = Offset.Zero) { this@drawWithContent.drawContent() }
         }
-        val rr = (r * k).coerceAtLeast(.5f)
-        layer.renderEffect = androidx.compose.ui.graphics.BlurEffect(rr, rr, androidx.compose.ui.graphics.TileMode.Clamp)
         layer.alpha = k
         scale(f, f, pivot = Offset.Zero) { drawLayer(layer) }
         if (dim > 0f) drawRect(Color.Black.copy(alpha = dim * k))

@@ -33,10 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -152,8 +149,8 @@ half4 main(float2 fc) {
     q += 0.025 * float2(sin(length(p) * 9.0 - t * 1.3), cos(length(p) * 7.0 + t));
     float2 st = clamp(q + 0.5, 0.0, 1.0) * 128.0;
     half4 c = mix(prev.eval(st), img.eval(st), mixv);
-    half l = dot(c.rgb, half3(0.299, 0.587, 0.114));
-    c.rgb = mix(half3(l), c.rgb, sat);
+    half l = dot(c.rgb, half3(0.213, 0.715, 0.072));
+    c.rgb = clamp((mix(half3(l), c.rgb, sat) - 0.5) * 1.06 + 0.5, 0.0, 1.0);
     c.rgb *= (1.0 - dim);
     c.rgb += pulse * 0.035;
     c.rgb += (fract(sin(dot(fc, float2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
@@ -227,12 +224,16 @@ private fun LayersBackground() {
 private fun StillBackground() {
     val bm = Background.still ?: return
     val img = remember(bm) { bm.asImageBitmap() }
-    val m = remember(S.bri, S.sat) { ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) } }
+    val grade = remember(S.bri, S.sat) { backgroundGradeEffect(Visuals.bgSat().toFloat(), Visuals.bgBri().toFloat()) }
     // (Low performance mode, no blur: a tiny copy stretched over the screen is as soft)
     val low = S.low
-    val tiny = remember(bm, low) { if (low) Bitmap.createScaledBitmap(bm, 32, 32, true).asImageBitmap() else null }
-    if (tiny != null) Image(tiny, null, Modifier.fillMaxSize().scale(1.12f), contentScale = ContentScale.Crop, colorFilter = ColorFilter.colorMatrix(m), filterQuality = FilterQuality.Low)
-    else Image(img, null, Modifier.fillMaxSize().scale(1.12f).blur((S.bgblur * .6f).dp), contentScale = ContentScale.Crop, colorFilter = ColorFilter.colorMatrix(m))
+    val tiny = remember(bm, low, S.bri, S.sat) {
+        if (low) Bitmap.createScaledBitmap(bm, 32, 32, true).copy(Bitmap.Config.ARGB_8888, true).also {
+            Visuals.blurBitmap(it, 0.0, Visuals.bgSat(), Visuals.bgBri())
+        }.asImageBitmap() else null
+    }
+    if (tiny != null) Image(tiny, null, Modifier.fillMaxSize().scale(1.12f), contentScale = ContentScale.Crop, filterQuality = FilterQuality.Low)
+    else Image(img, null, Modifier.fillMaxSize().scale(1.12f).graphicsLayer { renderEffect = grade }.blur((S.bgblur * .6f).dp), contentScale = ContentScale.Crop)
 }
 
 /** The Canvas video, blurred, as the background behind everything: [vid] (the video as the player draws it, recorded)
@@ -254,11 +255,13 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
     // with their own clips, its blur was worked out again for each of them, for every frame of the video
     val done = rememberGraphicsLayer()
     DisposableEffect(done) { Frost.video = done; onDispose { if (Frost.video === done) Frost.video = null } }
-    val cf = remember(S.bri, S.sat, stage) { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(Visuals.bgSat().toFloat()) }.also { cm -> val b = if (stage) .65f * S.bri / 70f else Visuals.bgBri().toFloat(); cm.timesAssign(ColorMatrix(floatArrayOf(b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, b, 0f, 0f, 0f, 0f, 0f, 1f, 0f))) }) }
-    val rf = S.bgblur * .025
-    val sigma = 2f * kotlin.math.sqrt(.36 + rf * (rf + 1)).toFloat()
-    val radius = (((if (wide) sigma * 2f else sigma) - .5f) / .57735f).coerceAtLeast(.5f)
-    val blur = remember(radius, quiet) { if (quiet) null else BlurEffect(radius, radius, TileMode.Clamp) }
+    val grade = remember(S.bri, S.sat) { backgroundGradeNative(Visuals.bgSat().toFloat(), Visuals.bgBri().toFloat()) }
+    val radius = backgroundBlurRadius(S.bgblur, wide)
+    val sourceBlurred = lyricsCanvasBlur()
+    val blur = remember(radius, quiet, grade, sourceBlurred) {
+        if (quiet || sourceBlurred) grade.asComposeRenderEffect() else android.graphics.RenderEffect.createChainEffect(grade,
+            android.graphics.RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)).asComposeRenderEffect()
+    }
     Canvas(Modifier.fillMaxSize().onSizeChanged { Frost.screen = it }) {
         val lw = vs.width; val lh = vs.height
         if (lw > 0 && lh > 0) {
@@ -267,7 +270,7 @@ fun CanvasBlur(vid: GraphicsLayer, vidSize: () -> IntSize, wide: Boolean = false
             // as soft as before: the background's Blur as the old three box passes over a 48-px frame, with that frame's
             // own softness, here in 96-px pixels (a blur radius r is a sigma of .577 r + .5)
             small.renderEffect = blur
-            small.colorFilter = cf
+            small.colorFilter = null
             small.alpha = cvA
             small.record(IntSize(sw, sh)) {
                 // the video covering the screen (upright it's the whole screen already; side by side, the left side's)
@@ -292,6 +295,8 @@ val LocalFrost = staticCompositionLocalOf { false }
 object Frost {
     var video by mutableStateOf<GraphicsLayer?>(null)   // the Canvas, blurred ([CanvasBlur])
     var coverSharp by mutableStateOf<GraphicsLayer?>(null) // same recorded landscape cover for clear Liquid refraction
+    var coverReady by mutableStateOf(false)
+    var coverBlurReady by mutableStateOf(false)
     var coverBlur by mutableStateOf<GraphicsLayer?>(null) // landscape cover, including its transition and motion video
     var videoScene by mutableStateOf<GraphicsLayer?>(null)              // finished displayed Canvas/background composite, after blur and shading
     var videoSceneBlur by mutableStateOf<GraphicsLayer?>(null)          // one finished blur of the same crop for regular frost
@@ -331,10 +336,10 @@ fun Modifier.liveCoverFrost(): Modifier = composed {
     val small = rememberGraphicsLayer()
     val done = rememberGraphicsLayer()
     DisposableEffect(done, picture) {
-        Frost.coverBlur = done; Frost.coverSharp = picture
+        Frost.coverBlur = done; Frost.coverSharp = picture; Frost.coverReady = false; Frost.coverBlurReady = false
         onDispose {
-            if (Frost.coverBlur === done) Frost.coverBlur = null
-            if (Frost.coverSharp === picture) Frost.coverSharp = null
+            if (Frost.coverBlur === done) { Frost.coverBlur = null; Frost.coverBlurReady = false }
+            if (Frost.coverSharp === picture) { Frost.coverSharp = null; Frost.coverReady = false }
         }
     }
     this.drawWithContent {
@@ -349,7 +354,9 @@ fun Modifier.liveCoverFrost(): Modifier = composed {
             small.record(IntSize(sw, sh)) { scale(1f / f, 1f / f, pivot = Offset.Zero) { drawLayer(picture) } }
             done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
             done.record(IntSize(sw, sh)) { drawLayer(small) }
+            if (Frost.coverBlur === done) Frost.coverBlurReady = true
         }
+        if (Frost.coverSharp === picture) Frost.coverReady = picture.size.width > 0
     }
 }
 
@@ -434,7 +441,7 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
     val coverLayer = if (liquidOn()) Frost.coverSharp else Frost.coverBlur
     if (v != null && v.size.width > 0 && scr.width > 0) {
         translate(-at.x, -at.y) { scale(scr.width / v.size.width.toFloat(), scr.height / v.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(v) } }
-    } else if (coverLayer?.let { it.size.width > 0 } == true) {
+    } else if ((if (liquidOn()) Frost.coverReady else Frost.coverBlurReady) && coverLayer?.let { it.size.width > 0 } == true) {
         val layer = coverLayer; val c = Frost.cover
         translate(c.left - at.x, c.top - at.y) {
             scale(c.width / layer.size.width, c.height / layer.size.height, pivot = Offset.Zero) { drawLayer(layer) }

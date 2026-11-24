@@ -54,12 +54,14 @@ Updates install from inside the app: *Settings → Help & about → Update now*.
 - **The player**: the song at the top, the lyrics, the bars and the controls on one screen; held sideways, the lyrics
   get the right side. Picture-in-picture, a home screen widget, Ambient mode (an always-on display while music plays),
   Spotify Canvas, Apple Music's animated covers (free, no account or key), Up next in a song's last 30 seconds, and
-  frosted glass throughout (Liquid glass as an experiment).
+  frosted glass throughout (Liquid glass as an experiment). **Settings → Canvas → Blur the whole Canvas with lyrics**
+  applies the background’s Blur intensity while lyrics are shown.
 - **Buttons you pick**: choose what goes under the controls, including one tap to add a lyrics file or play songs from
   your phone.
 - **The bars** hear everything the phone plays (Android's Visualizer; it needs the microphone permission, and nothing
   is recorded or sent), the microphone, or [Vibe Bridge](https://github.com/BOZKOW/vibe-visualizer#vibe-bridge-bars-from-the-spotify-app)
-  through your server.
+  through your server. Bass (40–250 Hz), mids (250 Hz–4 kHz) and treble (4–16 kHz, limited by the recording’s sample rate)
+  have separate automatic sensitivity. Colours follow the video quickly and adjust for light or dark backgrounds.
 - **Ready before they play**: the next songs in the music app's queue (or your files') get their lyrics, Canvas and
   cover while the song before plays.
 - **Only errors interrupt**: something that's broken shows at the top of the player; tap it to see what it means and

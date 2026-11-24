@@ -2,18 +2,21 @@ package io.github.bozkow.vibevisualizer.engine
 
 import android.graphics.Bitmap
 import android.view.TextureView
+import android.view.PixelCopy
+import android.view.Surface
+import android.os.Handler
+import android.os.Looper
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.core.Vibe
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Colours from a video that's playing (the Canvas, an animated cover) for the bars and the app's accent. A small frame is
- *  copied back now and then, never all the time: copying from the GPU holds up the frame being drawn (0.35.0 did it 12 times
- *  a second, and the lyrics stuttered). The first looks come quickly (many videos fade in from black, and black frames don't
- *  count), then one every 5 s while it moves, so the bars follow a video whose colours change; the last three lit frames
- *  count together. [set] gets them all side by side, or null for none (the cover's colours again). */
-class FrameColors(private val view: () -> TextureView?, private val moving: () -> Boolean, private val set: (List<IntArray>?) -> Unit) {
+/** Tiny asynchronous video snapshots for palette/contrast, never per-frame. Each sample reflects the current scene,
+ *  including a genuinely dark cut. Palette analysis runs off main; extraction pauses when the video is hidden or still. */
+internal class FrameColors(private val view: () -> TextureView?, private val moving: () -> Boolean, private val set: (VideoPalette?) -> Unit) {
     private var job: Job? = null
     val running get() = job?.isActive == true
 
@@ -23,16 +26,17 @@ class FrameColors(private val view: () -> TextureView?, private val moving: () -
         if (S.low) return
         job = Vibe.scope.launch {
             val w = 48; val h = 85
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             var n = 0
             while (true) {
                 // quick to take the video's colours (a quarter second in, then twice more as it fades in from black), then
-                // every 1.5 s while it moves: the bars follow its cuts (every 5 s, three frames mixed, they lagged and blended)
-                delay(when (n++) { 0 -> 250L; 1 -> 500L; 2 -> 750L; else -> 1500L })
-                if (n > 3 && !moving()) continue   // held still (paused, or not on screen): nothing new to see
-                val f = view()?.takeIf { it.isAvailable }?.getBitmap(w, h) ?: continue
-                if (!litEnough(f)) continue
-                // its colours worked out off the main thread (what's on screen now, not mixed with before)
-                set(kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Visuals.barsFrom(f) } ?: continue)
+                // every 0.8 s while it moves: the bars follow its cuts (every 5 s, three frames mixed, they lagged and blended)
+                delay(when (n++) { 0 -> 250L; 1 -> 500L; 2 -> 750L; else -> 800L })
+                if (n > 3 && (!moving() || E.quiet || !E.visible)) continue   // held still (paused, or not on screen): nothing new to see
+                val f = copyFrame(bitmap) ?: continue
+                // Only the tiny GPU readback runs on main; colour extraction and luminance run together off it.
+                val palette = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Visuals.barsFrom(f) } ?: continue
+                set(palette)
             }
         }
     }
@@ -40,8 +44,23 @@ class FrameColors(private val view: () -> TextureView?, private val moving: () -
     /** Stops looking; [clear]: and lets its colours go. */
     fun stop(clear: Boolean = true) { job?.cancel(); job = null; if (clear) set(null) }
 
-    private fun litEnough(b: Bitmap): Boolean {
-        val px = IntArray(b.width * b.height); b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
-        return px.sumOf { p -> ((p shr 16 and 255) + (p shr 8 and 255) + (p and 255)).toLong() } / (3.0 * 255 * px.size) > .04
+    /** PixelCopy waits for the decoder/GPU asynchronously. TextureView.getBitmap synchronously stalls the UI thread. */
+    private suspend fun copyFrame(bitmap: Bitmap): Bitmap? {
+        val texture = view()?.takeIf { it.isAvailable }?.surfaceTexture ?: return null
+        return suspendCancellableCoroutine { continuation ->
+            val surface = Surface(texture)
+            try {
+                PixelCopy.request(surface, bitmap, { result ->
+                    surface.release()
+                    if (io.github.bozkow.vibevisualizer.BuildConfig.BUILD_TYPE == "debug")
+                        android.util.Log.d("VV-palette", "Async frame copy: $result")
+                    if (continuation.isActive) continuation.resume(if (result == PixelCopy.SUCCESS) bitmap else null)
+                }, Handler(Looper.getMainLooper()))
+            } catch (_: IllegalArgumentException) {
+                surface.release()
+                if (continuation.isActive) continuation.resume(null)
+            }
+        }
     }
+
 }

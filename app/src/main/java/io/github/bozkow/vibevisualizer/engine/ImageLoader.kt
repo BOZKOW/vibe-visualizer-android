@@ -21,6 +21,7 @@ object Images {
     /** Retain a small media-session/file thumbnail without encoding it or writing it to storage. */
     fun retainCover(key: String, bitmap: Bitmap): String {
         val uri = "vv-artwork://" + key.hashCode().toUInt().toString(16) + "/" + bitmap.generationId
+        mem.put("$uri@full", bitmap)
         if (mem.get("$uri@128") == null) {
             val size = maxOf(bitmap.width, bitmap.height)
             val small = if (size > 128) Bitmap.createScaledBitmap(bitmap,
@@ -35,7 +36,7 @@ object Images {
 
     suspend fun load(url: String, max: Int = 1000, fresh: Boolean = false): Bitmap? {
         if (url.isEmpty()) { lastError = "no address"; return null }
-        if (url.startsWith("vv-artwork:")) return mem.get("$url@128")
+        if (url.startsWith("vv-artwork:")) return if (max > 128) mem.get("$url@full") ?: mem.get("$url@128") else mem.get("$url@128")
         if (!fresh) mem.get("$url@$max")?.let { return it }
         val bytes: ByteArray = if (url.startsWith("content:") || url.startsWith("file:") || url.startsWith("android.resource:"))
             withContext(Dispatchers.IO) { runCatching { Vibe.app.contentResolver.openInputStream(Uri.parse(url))?.use { it.readBytes() } }.getOrNull() } ?: run { lastError = "couldn’t open it"; return null }

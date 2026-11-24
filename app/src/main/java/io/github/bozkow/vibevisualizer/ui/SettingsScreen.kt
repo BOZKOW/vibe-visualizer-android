@@ -240,6 +240,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("cvNoArt", "Hide the cover while a Canvas plays", "Only the Canvas, no cover in front of it."),
         Item.Sw("cvShrink", "Smaller cover while a Canvas plays", "The cover glides to a smaller size in the middle, so more of the Canvas shows around it."),
         Item.Sub("Blur"),
+        Item.Sw("cvLyrBlur", "Blur the whole Canvas with lyrics", "While lyrics are shown, use the background’s Blur setting over the entire video."),
         Item.Sw("cvBlur", "Blur the Canvas", "The Canvas behind the player, softly blurred."),
         Item.Ch("cvBehind", "Behind the controls", listOf("dark" to "Dark gradient", "blur" to "Blur", "both" to "Blur and dark gradient", "none" to "Nothing"),
             "With a Canvas: what’s under the top bar, the song, the seek bar, the bars and the controls, so they stay readable. Blur frosts the Canvas there."),
@@ -586,13 +587,14 @@ private fun needs(k: String): String? = when (k) {
     "aHideSec" -> if (S.str("uiHide") == "never") "Only when the controls hide (above)" else null
     "aAmbientSec", "aAmbClock", "aAmbBattery", "aAmbCover", "aAmbSong", "aAmbLyrics", "aAmbBars", "aAmbBg", "aAmbBright", "aAmbShift" ->
         if (!S.b("aAmbient")) "Turn on Ambient mode first" else null
-    "cvNoArt", "cvBlur", "cvBehind", "cvSpicy" -> if (!S.canvasOn) "Turn on Canvas first" else null
+    "cvNoArt", "cvBehind", "cvSpicy" -> if (!S.canvasOn) "Turn on Canvas first" else null
+    "cvBlur", "cvLyrBlur" -> if (!S.canvasOn) "Turn on Canvas first" else if (S.low) "Off in Low performance mode" else null
     "cvShrink" -> if (!S.canvasOn) "Turn on Canvas first" else if (S.b("cvNoArt")) "Not while the cover is hidden" else null
     "cvBlurAmt" -> if (!S.canvasOn) "Turn on Canvas first" else if (!S.b("cvBlur") && S.str("cvBehind") !in setOf("blur", "both")) "Needs Blur the Canvas, or a blur behind the controls" else null
     "bridge" -> if (!Server.set) "Needs your server" else null
     "glow", "blur" -> if (S.low) "Off in Low performance mode" else null
     "bgspeed" -> if (S.str("bgStyle") != "dynamic") "Only with the Dynamic background" else if (S.low) "Still in Low performance mode" else null
-    "bgblur" -> if (S.str("bgStyle") in setOf("color", "none")) "Not with this background" else null
+    "bgblur" -> if (S.str("bgStyle") in setOf("color", "none") && !(S.canvasOn && S.b("cvLyrBlur"))) "Not with this background" else null
     "fpscap" -> if (S.low) "Low performance mode keeps it at 30 fps" else null
     // the Focus style (Lyrics → Lyrics style) places, fades and blurs the lines its own way: what it does instead is greyed while
     // it's on, and the cover in long breaks goes with it
@@ -888,8 +890,8 @@ private fun MyFiles() {
 
 @Composable
 private fun SpicyStatus() {
-    var stat by remember { mutableStateOf("Checking…") }
-    LaunchedEffect(Ping.health) { stat = if (!Server.set) "Needs your server (Help & about → Your server)." else Ping.health?.let { if (it.optBoolean("spicy_key")) "API key saved on your server. Press Test to check it." else "No API key on your server yet. LRCLIB is used meanwhile." } ?: "Your server could not be reached." }
+    var stat by remember(E.trackVer, E.title, E.artist) { mutableStateOf("Checking…") }
+    LaunchedEffect(Ping.health, E.trackVer, E.title, E.artist) { stat = if (!Server.set) "Needs your server (Help & about → Your server)." else Ping.health?.let { if (it.optBoolean("spicy_key")) "API key saved on your server. Press Test to check it." else "No API key on your server yet. LRCLIB is used meanwhile." } ?: "Your server could not be reached." }
     Column {
         Text(stat, fontSize = 13.5.sp, color = Color.White)
         // Spicy Lyrics' own status page: online, down, under maintenance, and what's planned
@@ -901,7 +903,7 @@ private fun SpicyStatus() {
                 else -> "Spicy Lyrics’ status: all services are online" },
             Modifier.padding(top = 6.dp), fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = if (st != null) Color(0xFFFFD27A) else Color.White.copy(alpha = .85f))
         if (pl != null) Text("Planned: " + pl.name + if (pl.at > 0) ", " + fmt.format(java.util.Date(pl.at)) else "", fontSize = 13.sp, color = Color.White.copy(alpha = .7f))
-        Buttons("Test connection" to { Lyr.testSpicy { stat = it } }, "Status page" to { openUrl(SpicyStatus.PAGE) })
+        Buttons((if (E.src == "none") "Test connection (sample)" else "Check this song") to { Lyr.testSpicy { stat = it } }, "Status page" to { openUrl(SpicyStatus.PAGE) })
         Hint("Spicy Lyrics needs your own API key. Create an application in the Spicy Lyrics developer dashboard, copy its secret key (sl_sk_…, shown only once) and save it on your server as config/spicy_key (see the README). It stays there and never reaches the phone.")
         Hint("Every lyric shown credits its source, and community syncs credit their uploader and maker, as the Spicy Lyrics attribution rules require.")
         Row { TextButton(onClick = { openUrl("https://developers.spicylyrics.org/dashboard") }) { Text("Dashboard") }; TextButton(onClick = { openUrl("https://developers.spicylyrics.org/docs/attribution") }) { Text("Attribution rules") } }

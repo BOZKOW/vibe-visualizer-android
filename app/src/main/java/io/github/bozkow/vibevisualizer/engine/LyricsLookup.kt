@@ -1,5 +1,7 @@
 package io.github.bozkow.vibevisualizer.engine
 
+import org.json.JSONObject
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Build
@@ -157,6 +159,8 @@ object Lyr {
         return null
     }
 
+    private val verifiedSpicyTracks = LinkedHashMap<String, JSONObject>()
+
     private suspend fun fromSpicy(m: SongMeta): LyricsResult? {
         val base = server("/api/lyrics")
         val ask = spicyQuery(m) ?: return null
@@ -174,7 +178,24 @@ object Lyr {
         if (r.code == 401 || r.code == 403) throw Exception("the API key was rejected (HTTP ${r.code})")
         if (r.code == 429) throw Exception("rate limited, try again in a bit")
         if (!r.ok) throw Exception(j?.optString("error")?.ifEmpty { null } ?: "HTTP ${r.code}")
-        return parseSpicy(j ?: throw Exception("not JSON"), m.duration)
+        val json = j ?: throw Exception("not JSON")
+        if (m.file.isNotBlank() && m.id.isBlank() && m.isrc.isBlank()) {
+            val id = io.github.bozkow.vibevisualizer.lyrics.SpicyRecording.responseId(json)
+                ?: throw SkipError("search returned no verifiable track ID")
+            val track = verifiedSpicyTracks[id] ?: run {
+                val html = Net.fetch("https://open.spotify.com/embed/track/$id")
+                if (!html.ok) throw SkipError("could not verify the search result")
+                io.github.bozkow.vibevisualizer.lyrics.SpicyRecording.entity(html.text)
+                    ?.also { verifiedSpicyTracks[id] = it; if (verifiedSpicyTracks.size > 32) verifiedSpicyTracks.remove(verifiedSpicyTracks.keys.first()) }
+                    ?: throw SkipError("could not verify the search result")
+            }
+            if (!io.github.bozkow.vibevisualizer.lyrics.SpicyRecording.matches(m, id, track))
+                throw SkipError("search result is a different recording")
+        }
+        val result = parseSpicy(json, m.duration)
+        if (m.file.isNotBlank() && !io.github.bozkow.vibevisualizer.lyrics.SpicyRecording.fitsDuration(result, m.duration))
+            throw SkipError("lyrics timing does not fit this file")
+        return result
     }
 
     // AMLL TTML DB (github.com/amll-dev/amll-ttml-db, CC0): word-synced TTML files named by Spotify track id
@@ -439,6 +460,7 @@ object Lyr {
             }
         }
         val errs = ArrayList<String>()
+        var cacheMiss = true
         var answered = false   // a source answered (not found): a failing one doesn't make it "couldn't load"
         // Spicy Lyrics Mobile's lookup: the first source asks alone (one request usually settles the song); if it misses
         // or takes over a second, the rest are asked together. Better timing wins (word-synced over line-synced over
@@ -490,7 +512,7 @@ object Lyr {
                 if (tok != E.coverTok) break
                 val r = g.r
                 when {
-                    g.e is SkipError -> note(p, "skipped: " + g.e.message)
+                    g.e is SkipError -> { cacheMiss = false; note(p, "skipped: " + g.e.message) }
                     g.e != null -> {
                         note(p, "failed: " + (g.e.message ?: g.e.javaClass.simpleName), g.ms)
                         errs.add(PROVS.getValue(p).name + ": " + (g.e.message ?: "error"))
@@ -539,7 +561,7 @@ object Lyr {
         }
         if (tok != E.coverTok || best != null) return
         if (skipS.isNotEmpty()) return otherDone(m, tok)
-        if (errs.isEmpty()) LyricsCache.put(key, null)   // remember "none" for a day; failures aren't remembered
+        if (errs.isEmpty() && cacheMiss) LyricsCache.put(key, null)   // remember "none" for a day; failures aren't remembered
         // only when no source could answer is it an error; else there are none, and the ones that failed are asked again
         // next time (nothing is remembered then)
         if (errs.isNotEmpty() && answered) clear("No lyrics for this song", errs.joinToString(" · ") { it.substringBefore(":") } + " didn’t answer; the rest had none.", "none", listOf(
@@ -558,8 +580,8 @@ object Lyr {
         return r
     }
 
-    private fun keyOf(m: SongMeta) = listOf(m.id, m.artist, m.title, Math.round(m.duration).toString(), provList().filter { it.on }.joinToString(",") { it.k } + (if (S.b("lbetter")) "+w" else "+o") + (if (S.b("lmerge")) "+merge1" else "")).joinToString("|").lowercase()
-    private fun softKey(m: SongMeta) = (m.artist + "|" + m.title).lowercase()
+    private fun keyOf(m: SongMeta) = listOf(io.github.bozkow.vibevisualizer.lyrics.onlineLyricsIdentity(m), provList().filter { it.on }.joinToString(",") { it.k } + (if (S.b("lbetter")) "+w" else "+o") + (if (S.b("lmerge")) "+merge1" else "")).joinToString("|").let { if (m.file.isNotBlank()) it else it.lowercase() }
+    private fun softKey(m: SongMeta) = if (m.file.isNotBlank()) io.github.bozkow.vibevisualizer.lyrics.onlineLyricsIdentity(m) else (m.artist + "|" + m.title).lowercase()
     private val soft = HashMap<String, LyricsResult>()   // looked up ahead for a song whose length wasn't known yet
 
     /** The next song's lyrics, looked up ahead while this one plays and kept (in memory and on this phone), so they show
@@ -840,13 +862,27 @@ object Lyr {
     fun reloadCurrent() { cur?.let { load(it.m, E.coverTok) } }
 
     fun testSpicy(out: (String) -> Unit) {
-        out("Testing…")
-        val m = if (E.src == "spotify" && Spotify.spId != null) SongMeta(id = Spotify.spId!!, title = E.title, artist = E.artist, duration = E.curDur())
-            else SongMeta(id = "0VjIjW4GlUZAMYd2vXMi3b", title = "Blinding Lights", artist = "The Weeknd", duration = 200.0)
+        val current = curSong()?.takeIf { E.src != "none" && it.title == E.title && it.artist == E.artist }
+        if (E.src != "none" && current == null) { out("Wait for the current song’s metadata, then try again."); return }
+        val target = io.github.bozkow.vibevisualizer.lyrics.spicyDiagnosticTarget(current)
+        val context = if (current == null) "Sample connection check" else "Current song"
+        val m = target
+        if (m.file.isNotBlank() && m.artist.isBlank() && m.id.isBlank() && m.isrc.isBlank()) {
+            out("Current song: “${m.title}”. Add artist metadata before searching Spicy Lyrics safely."); return
+        }
+        out("$context: checking “${m.title}”…")
         Vibe.scope.launch {
-            try { val r = fromSpicy(m); out(if (r != null && r.lines.isNotEmpty()) "Working · ${r.lines.size} lines for “${m.title}” (" + (if (r.sync) "synced" else "not synced") + ")." else "Connected, but Spicy Lyrics has nothing for “${m.title}”.") }
-            catch (e: SkipError) { out(if (e.message?.contains("key") == true) "No API key on your server yet (see below)." else "Needs your server: set it in Settings → Server & connection.") }
-            catch (e: Exception) { out("Failed: " + e.message) }
+            try {
+                val r = fromSpicy(m)
+                out(if (r != null && r.lines.isNotEmpty()) "$context: ${r.lines.size} lines for “${m.title}” (" + (if (r.sync) "synced" else "not synced") + ")."
+                    else "$context: connected, but Spicy Lyrics has no verified lyrics for “${m.title}”.")
+            } catch (e: SkipError) {
+                out(when {
+                    e.message?.contains("key") == true -> "No API key on your server yet (see below)."
+                    e.message?.contains("needs your server") == true -> "Needs your server: set it in Settings → Server & connection."
+                    else -> "$context: result not accepted — ${e.message}."
+                })
+            } catch (e: Exception) { out("$context: failed — " + e.message) }
         }
     }
 
