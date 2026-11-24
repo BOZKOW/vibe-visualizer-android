@@ -224,11 +224,36 @@ fun PlayerScreen() {
     }
 }
 
-/* ================= Portrait player ================= */
+/* ================= Now Playing ================= */
+@Composable
+private fun NowPlaying(noLyricsNote: Boolean = false) {
+    val hidden = E.uiHidden
+    val hiddenGap by androidx.compose.animation.core.animateDpAsState(if (hidden) 16.dp else 0.dp,
+        if (Pop.calm) tween(0) else tween(300), label = "controlsGap")
+    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        // while music plays untouched, the controls slide away (as in Spicy Lyrics Mobile): the cover, the song and the
+        // seek bar stay; a tap brings the rest back
+        TopBar(floatNotice = true)
+        TitleRow(big = true, center = true, like = true)
+        Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
+            // upright it grows to Apple's tall shape while a tall animated cover plays (Spicy Lyrics Mobile 0.19.0)
+            if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(bigCoverShape(), matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp, tall = true)
+        }
+        if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(visualizerHeight()).padding(bottom = 6.dp))   // (48 dp tall until 0.46.1; edge to edge in 0.46.2 only, the owner preferred it inside the margins)
+        SongInfo(big = true, note = noLyricsNote, name = false)
+        AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top, clip = false) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top, clip = false) + fadeOut()) {
+            Column { Transport(big = true); if (S.b("volshow")) VolumeRow(); BottomBar() }
+        }
+        Spacer(Modifier.height(hiddenGap))
+    }
+}
+
+/* ================= Lyrics ================= */
 @Composable
 private fun LyricsScreen() {
-    // Keep one header, footer and cover surface when lookup completes or a song has no lyrics.
-    LyricsWithLyrics(bigCover = noLyrics())
+    // a song without lyrics (or still looking for them after one without): the big cover, the song, the seek bar,
+    // controls that slide away, with a short note under the song
+    Crossfade(noLyrics(), label = "nolyrics") { big -> if (big) NowPlaying(noLyricsNote = true) else LyricsWithLyrics() }
 }
 
 /** The Lyrics screen upright (0.53.0, after Spicy Lyrics Mobile, the owner's pick): the song at the top, right under the
@@ -239,7 +264,10 @@ private fun LyricsScreen() {
  *  line comes ([MovingCover]); the name stays. Without the cover (Settings → Player screen → Cover at the top): the name
  *  alone up there, and a break's cover fades in over the lyrics as before. */
 @Composable
-private fun LyricsWithLyrics(bigCover: Boolean = false) {
+private fun LyricsWithLyrics() {
+    val hidden = E.uiHidden
+    val hiddenGap by androidx.compose.animation.core.animateDpAsState(if (hidden) 16.dp else 0.dp,
+        if (Pop.calm) tween(0) else tween(300), label = "controlsGap")
     val withCover = S.b("aLyrCover")
     val liftHeader = withCover && !S.low
     val headerPicture = rememberGraphicsLayer()
@@ -249,10 +277,8 @@ private fun LyricsWithLyrics(bigCover: Boolean = false) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     var nameAt by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }   // the moving name/artist block (in the root)
     // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
-    val rest = bigCover || restCover()
+    val rest = restCover()
     val rk by animateFloatAsState(if (rest) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, if (rest) Spring.StiffnessVeryLow else Spring.StiffnessLow), label = "rest")
-    val coverAspect by animateFloatAsState(if (bigCover) bigCoverShape() else 1f,
-        if (S.low || E.reduceMotion()) tween(0) else spring(.85f, Spring.StiffnessLow), label = "playerCoverAspect")
     val over = rk >= .99f
     androidx.compose.runtime.SideEffect { Lyr.view.covered = over }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { Lyr.view.covered = false } }
@@ -265,29 +291,29 @@ private fun LyricsWithLyrics(bigCover: Boolean = false) {
             // controls are: the owner's ask)
             Box(Modifier.reportTop().onGloballyPositioned { headerAt = it.positionInRoot() }
                 .then(if (liftHeader) Modifier.drawWithContent { headerPicture.record { this@drawWithContent.drawContent() } } else Modifier)
-                .heightIn(min = headerCoverSize() + 16.dp)
                 .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
-                TitleRow(big = false, bleed = true, cover = withCover, header = true, high = CanvasVideo.cvmode, coverSlot = { slot = it }, textSlot = { nameAt = it }, coverTravel = if (withCover || bigCover) rk else 0f)
+                TitleRow(big = false, bleed = true, cover = withCover, header = true, coverSlot = { slot = it }, textSlot = { nameAt = it }, coverTravel = if (withCover) rk else 0f)
             }
             var areaH by remember { mutableFloatStateOf(0f) }
             Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }.onGloballyPositioned { area = it.boundsInRoot() }) {   // (under all the rest: the lyrics run behind it)
-                LyricsPane(Modifier.fillMaxSize().graphicsLayer { alpha = if (rest) (1f - rk).coerceIn(0f, 1f) else (1f - rk / .7f).coerceIn(0f, 1f) }, areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false, behind = true)
-                if (!withCover && rk > .01f && !(bigCover && CanvasVideo.cvmode && S.b("cvNoArt"))) Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp).ambientOut()
+                LyricsPane(Modifier.fillMaxSize().graphicsLayer { alpha = (1f - rk).coerceIn(0f, 1f) }, areaHeightPx = areaH, padStart = 24f, padEnd = 24f, problems = false, behind = true)
+                if (!withCover && rk > .01f) Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp).ambientOut()
                     .graphicsLayer { alpha = rk.coerceIn(0f, 1f); val s = .9f + .1f * rk; scaleX = s; scaleY = s }, contentAlignment = Alignment.Center) {
-                    CoverArt(Modifier.aspectRatio(coverAspect, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp, tall = bigCover)
+                    CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
                 }
             }
             // (lined up with the seek bar and the lyrics, 24 dp in: they reached 12 dp further out on both sides, the owner's pick)
-            val barsHeight = visualizerHeight()
+            val barsHeight by androidx.compose.animation.core.animateDpAsState(if (hidden) visualizerHeight() + 20.dp else visualizerHeight(),
+                if (Pop.calm) tween(0) else tween(300), label = "controlsBars")
             if (S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(barsHeight).padding(horizontal = 24.dp))
-            Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, note = bigCover, lyrics = true, name = false, restCover = rest, stable = true) }
-            PlayerControls {
+            Column(Modifier.padding(horizontal = 24.dp)) { SongInfo(big = false, lyrics = true, name = false, restCover = rest) }
+            AnimatedVisibility(!hidden, enter = expandVertically(expandFrom = Alignment.Top, clip = false) + fadeIn(), exit = shrinkVertically(shrinkTowards = Alignment.Top, clip = false) + fadeOut()) {
                 // (higher above the gesture bar: the owner found them too low)
-                Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 18.dp)) { Transport(big = false, mid = true); if (S.b("volshow")) VolumeRow(); BottomBar(big = false, mid = true, lyricsToggles = true) }
+                Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 18.dp)) { Transport(big = false, mid = true); BottomBar(big = false, mid = true, lyricsToggles = true) }
             }
+            Spacer(Modifier.height(hiddenGap))
         }
-        if (withCover && slot.width > 0f && !(CanvasVideo.cvmode && S.b("cvNoArt") && bigCover))
-            MovingCover(slot, area, rk, origin, nameAt.bottom, aspect = coverAspect)
+        if (withCover && slot.width > 0f) MovingCover(slot, area, rk, origin, nameAt.bottom)
         // The cover travels behind the readable header, never across the first letters of a moving title.
         // Record once in its real layout and draw once here; its controls keep their original hit areas.
         if (liftHeader) Canvas(Modifier.fillMaxSize()) {
@@ -302,7 +328,7 @@ private fun LyricsWithLyrics(bigCover: Boolean = false) {
  *  grows into the middle of the lyrics' [area], as big as the break's cover was, and flows back as the next line comes
  *  (the owner: "make the cover get bigger, the text would stay"). Positions are in the root; [origin] is this layer's. */
 @Composable
-private fun MovingCover(slot: androidx.compose.ui.geometry.Rect, area: androidx.compose.ui.geometry.Rect, k0: Float, origin: Offset, nameBottom: Float = 0f, aspect: Float = 1f) {
+private fun MovingCover(slot: androidx.compose.ui.geometry.Rect, area: androidx.compose.ui.geometry.Rect, k0: Float, origin: Offset, nameBottom: Float = 0f) {
     val dens = androidx.compose.ui.platform.LocalDensity.current
     val cvk by animateFloatAsState(if (CanvasVideo.cvmode && S.b("cvShrink")) .56f else 1f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, Spring.StiffnessVeryLow), label = "cvcover")
     val k = k0.coerceIn(0f, 1f)
@@ -311,22 +337,22 @@ private fun MovingCover(slot: androidx.compose.ui.geometry.Rect, area: androidx.
     val padH = with(dens) { 24.dp.toPx() }; val padV = with(dens) { 12.dp.toPx() }
     // (clear of the bars under it too: their tallest reach above their own room)
     val top = (if (nameBottom > 0f) nameBottom else area.top) + padV; val bottom = area.bottom - with(dens) { 28.dp.toPx() }
-    val bigSide = (minOf(area.width - 2 * padH, (bottom - top) * aspect) * cvk).coerceAtLeast(slot.width)
+    val bigSide = (minOf(area.width - 2 * padH, bottom - top) * cvk).coerceAtLeast(slot.width)
     // A stable surface avoids resizing the TextureView on every spring frame, and keeps fractional travel positions.
     val surface = (area.width - 2 * padH).coerceAtLeast(slot.width).coerceAtLeast(1f)
     val pose = coverTravelPose(slot.left, slot.top, slot.width,
-        area.center.x - bigSide / 2, (top + bottom) / 2 - bigSide / aspect / 2, bigSide, surface, k)
+        area.center.x - bigSide / 2, (top + bottom) / 2 - bigSide / 2, bigSide, surface, k)
     val scale = pose.scale.coerceAtLeast(.001f)
     val corner = (pose.corner / scale).dp
     val shape = RoundedCornerShape(corner)
-    Box(Modifier.size(with(dens) { surface.toDp() }, with(dens) { (surface / aspect).toDp() }).graphicsLayer {
+    Box(Modifier.size(with(dens) { surface.toDp() }).graphicsLayer {
         transformOrigin = TransformOrigin(0f, 0f)
         translationX = pose.x - origin.x; translationY = pose.y - origin.y
         scaleX = scale; scaleY = scale
     }.ambientOut()) {
         // Shadow and corners scale back to the same on-screen sizes, without swapping layers at the travel endpoints.
         CoverArt(Modifier.fillMaxSize().shadow((pose.shadow / scale).dp, shape, ambientColor = Color.Black, spotColor = Color.Black),
-            corner = corner, small = true, motion = true, tall = aspect < .99f)
+            corner = corner, small = true, motion = true)
     }
 }
 
@@ -349,13 +375,16 @@ private fun WideLayout() {
 /** A tablet or an open foldable: Now Playing on the left, the lyrics (or the bars) on the right. */
 @Composable
 private fun Tablet() {
+    val solo = soloWide()   // no lyrics: Now Playing alone, the cover big
     Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.Center) {
-        Column(Modifier.fillMaxHeight().weight(.42f).widthIn(max = 480.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            TopBar(Modifier.ambientOut(), floatNotice = true, noticeGap = false)
+        Column(Modifier.fillMaxHeight().then(if (solo) Modifier.widthIn(max = 560.dp) else Modifier.weight(.42f).widthIn(max = 480.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
+            TopBar(Modifier.ambientOut(), floatNotice = true)
             TitleRow(big = true, center = true, like = true)
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 12.dp).ambientOut(), contentAlignment = Alignment.Center) {
                 if (!(CanvasVideo.cvmode && S.b("cvNoArt"))) CoverArt(Modifier.aspectRatio(1f, matchHeightConstraintsFirst = true).canvasShrink(), corner = 22.dp)
             }
+            if (solo && S.view == "both") ExtraBars(Modifier.fillMaxWidth().height(visualizerHeight()).padding(bottom = 6.dp))
+            if (solo) NoLyricsNote()
             SeekRow()
             Column(Modifier.ambientOut()) {
                 Transport(big = true)
@@ -363,8 +392,10 @@ private fun Tablet() {
                 BottomBar()
             }
         }
-        Spacer(Modifier.width(32.dp))
-        RightPane(Modifier.fillMaxHeight().weight(.58f))
+        if (!solo) {
+            Spacer(Modifier.width(32.dp))
+            RightPane(Modifier.fillMaxHeight().weight(.58f))
+        }
     }
 }
 
@@ -374,22 +405,8 @@ private fun Tablet() {
 @Composable
 private fun LandscapePhone() = LandscapeSplit()
 
-/** Hide the controls on their own layer, retaining the measured dock for the title and timeline.
- * Unplaced hidden content neither draws nor intercepts touches/accessibility navigation. */
-@Composable
-private fun PlayerControls(content: @Composable () -> Unit) {
-    val visible by animateFloatAsState(if (E.uiHidden) 0f else 1f,
-        if (Pop.calm) tween(0) else tween(260, easing = FastOutSlowInEasing), label = "playerControls")
-    Box(Modifier.fillMaxWidth().layout { measurable, constraints ->
-        val child = measurable.measure(constraints)
-        layout(child.width, child.height) {
-            if (visible > 0f) child.placeWithLayer(0, 0) {
-                alpha = visible
-                translationY = (1f - visible) * 12.dp.toPx()
-            }
-        }
-    }) { content() }
-}
+private val showCtl = expandVertically(expandFrom = Alignment.Top, clip = false) + fadeIn()
+private val hideCtl = shrinkVertically(shrinkTowards = Alignment.Top, clip = false) + fadeOut()
 
 /** A phone on its side: while a Canvas plays, as on the desktop (the video over the left half, the cover smaller and
  *  the song centred over it, the lyrics on the right); otherwise the cover as tall as the screen on the left. */
@@ -412,7 +429,7 @@ private fun LandscapeCanvas() {
         val dockW = maxOf(st.solid.dp - start, 220.dp)
         Row(Modifier.fillMaxSize().padding(start = start, top = 8.dp, bottom = 8.dp)) {
             Column(Modifier.width(dockW).fillMaxHeight().ambientOut().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.union(WindowInsets.navigationBarsIgnoringVisibility).only(WindowInsetsSides.Vertical))) {
-                TopBar(side = true, floatNotice = true, noticeGap = false)
+                TopBar(side = true)
                 Spacer(Modifier.weight(1f))
                 TitleRow(big = true, toggles = !barsInstead())
                 SeekRow()
@@ -458,7 +475,7 @@ private fun LandscapeCover() {
                 drawRect(Brush.verticalGradient(0f to Color.Transparent, f * .35f to Color.Black.copy(alpha = .06f), f * .7f to Color.Black.copy(alpha = .22f), f to Color.Black.copy(alpha = .38f), 1f to Color.Black.copy(alpha = .72f), startY = y, endY = size.height),
                     topLeft = Offset(0f, y), size = androidx.compose.ui.geometry.Size(size.width, footH + up))
             }) {
-                TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.padding(top = headIn).padding(horizontal = 10.dp), side = true, floatNotice = true, noticeGap = false)
+                TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.padding(top = headIn).padding(horizontal = 10.dp), side = true)
                 Spacer(Modifier.weight(1f))
                 Column(Modifier.fillMaxWidth().onSizeChanged { footH = it.height.toFloat() }.padding(bottom = footIn).padding(start = 18.dp, end = 18.dp, bottom = 6.dp)) {
                     TitleRow(big = true, toggles = !barsInstead())
@@ -480,7 +497,7 @@ private fun barsInstead() = E.screen == "viz" || noLyrics()
  *  they hide after a few seconds. */
 @Composable
 private fun SideControls() {
-    PlayerControls {
+    AnimatedVisibility(!E.uiHidden, enter = showCtl, exit = hideCtl) {
         Column(Modifier.fillMaxWidth()) { Transport(big = false); BottomBar(big = false) }
     }
 }
@@ -924,14 +941,14 @@ private fun AwayNote(modifier: Modifier) {
 /** The foot of every portrait screen: the song, the seek bar and where the lyrics are from. They stay when the
  *  controls slide away. */
 @Composable
-private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false, name: Boolean = true, restCover: Boolean = false, seek: Boolean = true, stable: Boolean = false) {
+private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = false, lyrics: Boolean = false, name: Boolean = true, restCover: Boolean = false, seek: Boolean = true) {
     Column(Modifier.fillMaxWidth()) {
         if (name) TitleRow(big = big, toggles = toggles, bleed = true, cover = lyrics && S.b("aLyrCover") && !restCover)
         else if (toggles && (Lyr.needTr || Lyr.needRom)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             if (Lyr.needTr) SmallToggle(VIcons.translate, "Translate lyrics", S.tr) { toggleTr() }
             if (Lyr.needRom) SmallToggle(null, "Romanize lyrics", S.romMode != "off", text = "あa") { toggleRom() }
         }
-        if (note && !stable) NoLyricsNote(Modifier.fillMaxWidth())
+        if (note) NoLyricsNote(Modifier.fillMaxWidth())
         if (seek) { Spacer(Modifier.height(if (big) 10.dp else 6.dp)); SeekRow() }
         val c = Lyr.credit
         // on the Lyrics screen, Refined credits under the last line say it already while they're on screen (a break's
@@ -940,15 +957,7 @@ private fun SongInfo(big: Boolean, note: Boolean = false, toggles: Boolean = fal
         val under by remember { derivedStateOf { v.creditsShown() } }
         val refined = lyrics && S.credPos == "lyrics" && S.b("xRefCred") && !restCover &&
             under
-        if (stable) {
-            // Reserve attribution room even while lookup is pending or credits move into the lyrics.
-            // Scales with text size; never clips an unusually long attribution.
-            val creditRoom = with(androidx.compose.ui.platform.LocalDensity.current) { 80.sp.toDp() }
-            Box(Modifier.fillMaxWidth().heightIn(min = creditRoom), contentAlignment = Alignment.TopStart) {
-                if (note) NoLyricsNote(Modifier.fillMaxWidth())
-                else if (c != null && Lyr.lines > 0 && !refined) CreditsLine(c, Modifier.fillMaxWidth().padding(bottom = 4.dp))
-            }
-        } else AnimatedVisibility(c != null && Lyr.lines > 0 && !refined, enter = fadeIn(tween(600)) + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+        AnimatedVisibility(c != null && Lyr.lines > 0 && !refined, enter = fadeIn(tween(600)) + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             if (c != null) CreditsLine(c, Modifier.fillMaxWidth().padding(bottom = 4.dp))
         }
     }
@@ -975,9 +984,8 @@ private fun MoreButton() {
 
 @Composable
 private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = false, like: Boolean = !center, bleed: Boolean = false, cover: Boolean = false,
-                     header: Boolean = false, high: Boolean = false, coverSlot: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
+                     header: Boolean = false, coverSlot: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
                      textSlot: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null, coverTravel: Float = 0f) {
-    val headerHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { headerCoverSize().toPx() }
     val ver = E.trackVer
     // [cover]: the Lyrics screen upright, where the big cover only shows in long breaks: a small one beside the name, so
     // it's always in sight; it steps aside while the big one shows
@@ -997,7 +1005,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
     }
     // Keep the cover's measured slot fixed: a draw-only translation on this Row wasn't reflected reliably in its
     // onGloballyPositioned callback, so the separately travelling cover could jump during a song change.
-    val songText = Modifier.graphicsLayer { alpha = a.value }
+    val songText = Modifier.graphicsLayer { alpha = a.value; translationY = (1 - a.value) * 10f * density }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         if (ck > .01f) {
             // [header]: the Lyrics screen's song at the top, its big cover drawn by MovingCover at the place kept here
@@ -1010,8 +1018,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
         if (header) {
             Column(Modifier.weight(1f)
                 .coverTitleTravel(coverTravel, (headerCoverSize() + 16.dp) * ck)
-                .onGloballyPositioned { textSlot?.invoke(it.boundsInRoot()) }.then(songText)
-                .graphicsLayer { if (high) translationY = -(headerHeightPx - size.height).coerceAtLeast(0f) / 2f }) {
+                .onGloballyPositioned { textSlot?.invoke(it.boundsInRoot()) }.then(songText)) {
                 androidx.compose.runtime.CompositionLocalProvider(LocalSlideGroup provides remember { SlideGroup() }) {
                     val k = when (S.str("aTitle")) { "s" -> .85f; "l" -> 1.18f; else -> 1f }   // Settings → Player screen → Song name size
                     // (they slide out right up to the cover's edge, fading there: from the column's own edge they faded 16 dp short
@@ -1026,7 +1033,7 @@ private fun TitleRow(big: Boolean, center: Boolean = false, toggles: Boolean = f
                     }
                     val by = E.byLine()
                     val heart = (E.src == "spotify" || E.src == "media") && like && S.b("aLike")
-                    Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { if (by.isNotEmpty()) Scrolling(by, 16f.times(k).sp, FontWeight.SemiBold, dim, bleedL = hl, bleedR = if (heart) 0.dp else br, centerProgress = coverTravel) }
                         if (heart) Box(Modifier.coverControlSlot(coverTravel)) {
                             if (coverTravel >= .999f) Spacer(Modifier.size(48.dp))
@@ -1080,7 +1087,7 @@ private fun Modifier.centerDuringCoverTravel(progress: Float): Modifier = this.l
 private fun Modifier.coverControlSlot(progress: Float): Modifier = this.layout { measurable, constraints ->
     val child = measurable.measure(constraints)
     val remaining = 1f - progress.coerceIn(0f, 1f)
-    layout((child.width * remaining).roundToInt(), child.height) {
+    layout((child.width * remaining).roundToInt(), (child.height * remaining).roundToInt()) {
         child.placeWithLayer(0, 0) { alpha = remaining }
     }
 }
