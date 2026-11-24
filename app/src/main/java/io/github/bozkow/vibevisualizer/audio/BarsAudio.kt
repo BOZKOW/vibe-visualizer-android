@@ -40,6 +40,7 @@ object Audio {
     var bass = 0f; private set
     var mxv = 0f; private set
     private val autoGains = Array(3) { AutoGain() }
+    private val rangeGains = FloatArray(3) { 1f }
     private var bands = FrequencyBands(48, 48000)
     private var bandRaw = Array(3) { FloatArray(0) }
     var idleK = 0f; private set
@@ -152,16 +153,17 @@ object Audio {
                 raw[i] = r; if (r > mx) mx = r
             }
             silentFor = if (mx < .004f) silentFor + dt else 0.0   // a source that's connected but silent
-            // A loud bass drum must not turn down the vocal and treble ranges.
-            for (band in 0..2) {
-                val from = bands.ranges[band]; val until = bands.ranges[band + 1]
+            // Learn each range independently, but overlap their gains instead of splicing three shelves together.
+            val auto = S.b("auto")
+            if (auto) for (band in 0..2) {
                 val slice = bandRaw[band]
-                raw.copyInto(slice, 0, from, until)
-                val gain = (if (S.b("auto")) autoGains[band].gain(slice, slice.size, dt) else 1.3f) * boost
-                for (i in from until until) {
-                    val v = min(raw[i] * gain, 1.1f)
-                    vals[i] += (v - vals[i]) * (if (v > vals[i]) aA else aR).toFloat()
-                }
+                raw.copyInto(slice, 0, bands.ranges[band], bands.ranges[band + 1])
+                rangeGains[band] = autoGains[band].gain(slice, slice.size, dt)
+            }
+            for (i in 0 until N) {
+                val amplified = raw[i] * (if (auto) bands.gainAt(i, rangeGains) else 1.3f) * boost
+                val v = if (auto) AutoGain.output(amplified) else min(amplified, 1.1f)
+                vals[i] += (v - vals[i]) * (if (v > vals[i]) aA else aR).toFloat()
             }
         } else if (E.playing() && E.src != "file") {
             val s = t / 1000   // ambient motion: the music app's sound isn't heard

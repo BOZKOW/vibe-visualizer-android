@@ -1,7 +1,6 @@
-Vibe Visualizer for Android 0.62.0 (beta). Android 12 or newer; it installs over 0.61.1.
+Vibe Visualizer for Android 0.62.1 (beta). Android 12 or newer; it installs over 0.62.0.
 
-- **Clearer backgrounds:** optional full Canvas blur while lyrics show, using the background blur setting, with richer colour processing and smooth transitions.
-- **Consistent glass:** fixed missing backdrop updates, Liquid Glass sampling and individual Settings button outlines; reduced repeated rendering work.
-- **Bigger visualizer:** substantially taller bars, independent bass/mid/treble sensitivity, faster video colours and automatic contrast adjustment.
-- **Sharper covers:** retain full artwork, quietly upgrade matching images and keep the last artwork when a lookup fails. Song and artist stay at the top.
-- **Safer local lyrics:** validate Spicy search results and separate file/version caches. “Check this song” tests the current track instead of always reporting the sample song.
+- **Steadier player:** consistent title, timeline, controls and visualizer placement through lyric lookup, breaks and control hiding. Lower non-Canvas header while keeping the Canvas header high.
+- **Staged transitions:** song name, artist and cover change first; lyric entrances and background transitions follow. Keep tablet columns and notice overlays from shifting the player.
+- **More musical sensitivity:** learn recording loudness without flattening every bass hit, give quiet recordings more headroom and soften loud peaks instead of clipping them flat.
+- **Smooth frequency crossovers:** blend bass/mid/treble amplification to remove abrupt shelves and dips at the range boundaries, keeping the measured spectrum intact.

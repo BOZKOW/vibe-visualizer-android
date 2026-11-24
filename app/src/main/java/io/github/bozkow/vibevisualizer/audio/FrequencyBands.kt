@@ -21,4 +21,17 @@ internal class FrequencyBands(val count: Int, sampleRate: Int, private val fftSi
             }
         }
     }
+    /** Overlapping crossover gains, applied to untouched spectral bins. No artificial trough at a range boundary. */
+    fun gainAt(index: Int, gains: FloatArray): Float {
+        fun center(band: Int) = (ranges[band] + ranges[band + 1] - 1) * .5f
+        if (index <= center(0)) return gains[0]
+        if (index >= center(2)) return gains[2]
+        val band = if (index < center(1)) 0 else 1
+        val x = ((index - center(band)) / (center(band + 1) - center(band))).coerceIn(0f, 1f)
+        val k = x * x * (3f - 2f * x)
+        // Interpolate amplification in dB, so a quiet range cannot create an abrupt tall shelf beside it.
+        return kotlin.math.exp(kotlin.math.ln(gains[band].coerceAtLeast(.001f)) * (1f - k) +
+            kotlin.math.ln(gains[band + 1].coerceAtLeast(.001f)) * k)
+    }
+
 }

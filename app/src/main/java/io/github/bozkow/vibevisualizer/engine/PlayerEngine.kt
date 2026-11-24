@@ -49,7 +49,10 @@ object E {
     var year by mutableStateOf("")                 // when the song came out, if known
     var album by mutableStateOf("")                // the album it's on, if known (what an animated cover is found by)
     var status by mutableStateOf("")               // where the cover came from, "Spotify", "Searching for cover…"
-    var trackVer by mutableIntStateOf(0)           // bumps on every new song (the title animates in)
+    private var trackVersion by mutableIntStateOf(0)
+    var trackVer: Int
+        get() = trackVersion
+        set(value) { if (value != trackVersion) { PlayerTransitions.songChanged(); trackVersion = value } }
     var coverTok = 0
         private set
     /** A new song: its token, and whether it came hard on the last (within 1.2 s: skipping through songs), when what's

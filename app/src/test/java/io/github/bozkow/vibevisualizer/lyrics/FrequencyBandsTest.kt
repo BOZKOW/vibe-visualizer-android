@@ -36,4 +36,17 @@ class FrequencyBandsTest {
         assertTrue(bands.edges.all { it in 1..1023 })
         assertTrue((1 until bands.edges.size).all { bands.edges[it - 1] <= bands.edges[it] })
     }
+    @Test fun crossoverDoesNotIntroduceAGainStepOnAFlatSpectrum() {
+        for (n in listOf(24, 48, 128)) {
+            val bands = FrequencyBands(n, 48000)
+            val gains = floatArrayOf(1f, .5f, 6f)
+            val mapped = (0 until n).map { bands.gainAt(it, gains) }
+            assertTrue(mapped.all { it in .499f..6.001f })
+            for (boundary in bands.ranges.drop(1).dropLast(1)) {
+                val ratio = mapped[boundary] / mapped[boundary - 1]
+                assertTrue("crossover $boundary at $n bars: $ratio", ratio in .55f..1.65f)
+            }
+        }
+    }
+
 }

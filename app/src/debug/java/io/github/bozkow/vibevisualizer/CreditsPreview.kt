@@ -49,15 +49,19 @@ object CreditsPreview {
             val oldShown = shown.value
             val old = LyricsResult(Lyr.L, Lyr.lsync, Lyr.label, Lyr.credit)
             val bools = listOf("xFocus", "xRefCred", "aRestCover", "aLyrCover", "aMotionCover").associateWith { S.b(it) }
-            val strings = listOf("credPos", "view", "romMode").associateWith { S.str(it) }
+            val strings = listOf("credPos", "view", "romMode", "uiHide").associateWith { S.str(it) }
             restore = {
                 bools.forEach { (k, v) -> S.set(k, v) }; strings.forEach { (k, v) -> S.set(k, v) }
                 E.notes.remove(fixtureNote); shown.value = oldShown
                 E.src = src; E.title = title; E.artist = artist; E.clockOverride = clock
                 io.github.bozkow.vibevisualizer.engine.Visuals.setCover(cover, quiet = true)
                 if (old.lines.isEmpty()) Lyr.clear("") else apply(old)
+                E.poke()
             }
         }
+        if (mode == "controlsHidden") { S.set("uiHide", "idle"); E.uiHidden = true; return }
+        if (mode == "controlsShown") { E.poke(); return }
+        if (mode == "empty") { Lyr.clear("No lyrics for this song", kind = "none"); E.poke(); return }
         if (mode == "notice") { E.snack(fixtureNote); E.poke(); return }
         if (mode.startsWith("next")) {
             val state = io.github.bozkow.vibevisualizer.engine.Preload::class.java.getDeclaredField("shown\$delegate").apply { isAccessible = true }

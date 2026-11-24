@@ -13,7 +13,7 @@ class AutoGainTest {
         assertEquals(AutoGain.TARGET, .5f * gain, .02f)
     }
 
-    @Test fun quietMusicIsTurnedUpAtMostFourTimes() {
+    @Test fun quietMusicHasBoundedExtraHeadroom() {
         val g = AutoGain(); val gain = run(g, bars(.05f), 30000)
         assertEquals(AutoGain.MAX, gain, .01f)
     }
@@ -33,9 +33,29 @@ class AutoGainTest {
         assertEquals(loud, afterSilence, .01f)
     }
 
-    @Test fun aLouderPartTakesOverInUnderASecond() {
+    @Test fun sustainedLouderPartChangesNormalizationOverSeconds() {
         val g = AutoGain(); run(g, bars(.2f), 5000)
-        run(g, bars(.6f), 900)
+        run(g, bars(.6f), 10000)
         assertTrue(g.level > .5f)
     }
+    @Test fun beatsKeepTheirDynamicsInsteadOfBeingNormalizedToOneHeight() {
+        val g = AutoGain(); run(g, bars(.3f), 5000)
+        val before = g.gain(bars(.3f), 64, 16.0)
+        val quiet = AutoGain.output(.15f * before)
+        val loudGain = run(g, bars(.7f), 160)
+        val loud = AutoGain.output(.7f * loudGain)
+        assertTrue(loud > quiet * 2.5f)
+        assertTrue(loudGain > before * .94f)
+    }
+    @Test fun loudPeaksStayDistinctBelowTheCeiling() {
+        val peaks = listOf(.6f, 1.1f, 1.8f, 3f).map { AutoGain.output(it) }
+        assertTrue(peaks.zipWithNext().all { (a, b) -> b > a })
+        assertTrue(peaks.last() < 1.1f)
+        assertEquals(0f, AutoGain.output(0f), 0f)
+    }
+    @Test fun quietOpeningDoesNotWaitSeveralSecondsForUsefulGain() {
+        val gain = AutoGain().gain(bars(.06f), 64, 16.0)
+        assertTrue(gain >= 5f && gain <= AutoGain.MAX)
+    }
+
 }

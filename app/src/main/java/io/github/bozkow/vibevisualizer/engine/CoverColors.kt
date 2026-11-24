@@ -171,6 +171,7 @@ object Visuals {
     }
 
     fun setCover(img: Bitmap?, quiet: Boolean = false) {
+        if (!quiet && img != null && img !== cover) PlayerTransitions.coverChanged()
         cover = img
         coverLuma = img?.let(::imageLuminance) ?: .1
         if (quiet) quietVer = coverVer + 1
@@ -185,6 +186,7 @@ object Visuals {
     /* ---- palette + bands ---- */
     fun buildPal() {
         val n = Audio.N
+        if (pal.size == n && PlayerTransitions.secondaryDelay() > 0) return
         val st: List<IntArray> = when (S.str("theme")) { "cover" -> canvasBars ?: motionBars ?: barCols; "custom" -> listOf(hex(S.str("c1")), hex(S.str("c2"))); else -> (STOPS[S.str("theme")] ?: STOPS.getValue("aurora")).map(::hex) }
         val background = when {
             CanvasVideo.cvlive -> (canvasLuma ?: coverLuma) * bgBri().coerceIn(0.0, 1.0).pow(2.2) * (if (E.wide) .85 else .55)
@@ -323,6 +325,7 @@ object Visuals {
                 pb.prepareToDraw(); kw.prepareToDraw(); sp.forEach { it.prepareToDraw() }   // to the graphics card before they're drawn
                 Triple(pb, kw, sp)
             } }.onFailure { if (it !is kotlinx.coroutines.CancellationException) android.util.Log.w("VV", "background: $it") }.getOrNull() ?: return@launch
+            if (fade && baked != null) kotlinx.coroutines.delay(PlayerTransitions.secondaryDelay().toLong())
             if (fade && baked != null && !S.low) { bakedPrev = baked; spritesPrev = sprites.copyOf(); fadeAt = now() } else { bakedPrev = null; fadeAt = 0.0 }
             baked = made.first
             if (fade && kwSrc != null && !S.low) { kwPrev = kwSrc; kwAt = now() } else kwPrev = null

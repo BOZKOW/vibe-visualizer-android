@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import io.github.bozkow.vibevisualizer.engine.E
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.core.Vibe
 import io.github.bozkow.vibevisualizer.core.now
@@ -226,7 +227,7 @@ class LyricsRenderer {
 
     fun leave() { if (lines.isNotEmpty() && !S.low) { leaving = true; leaveA.set(0f, now(), 350.0, Ease.ease) } }
 
-    fun enter() { if (!S.low && !S.calm) { enterAt = now() + 16; enterFrom = max(0, li) } }   // (Motion sickness: no drift in)
+    fun enter() { if (!S.low && !S.calm) { enterAt = now() + max(16.0, if (E.inPip || E.ambient) 0.0 else io.github.bozkow.vibevisualizer.engine.PlayerTransitions.secondaryDelay()); enterFrom = max(0, li) } }   // (Motion sickness: no drift in)
 
     private fun release() { lv.forEach { d -> d.layer?.let { l -> releaser?.invoke(l) }; d.inner?.let { l -> releaser?.invoke(l) }; d.layer = null; d.inner = null } }
     var releaser: ((GraphicsLayer) -> Unit)? = null
