@@ -285,6 +285,9 @@ private fun LyricsWithLyrics() {
     // a long break: the cover in the lyrics' place, gone 2 s before the next line (not while you scroll them)
     val rest = restCover()
     val rk by animateFloatAsState(if (rest) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else spring(.85f, if (rest) Spring.StiffnessVeryLow else Spring.StiffnessLow), label = "rest")
+    LaunchedEffect(rest, E.trackVer) {
+        if (rest) E.sharpenCoverForBreak()
+    }
     val over = rk >= .99f
     androidx.compose.runtime.SideEffect { Lyr.view.covered = over }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { Lyr.view.covered = false } }
@@ -1593,7 +1596,7 @@ fun Cover(modifier: Modifier = Modifier) {
             val radius = 22.dp.toPx() * p
             renderEffect = if (radius > .01f) BlurEffect(radius, radius, TileMode.Decal) else null
             clip = true
-        }, contentScale = ContentScale.Crop) }
+        }, contentScale = ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.High) }
         cur?.let { Image(it, "Album cover", Modifier.fillMaxSize().graphicsLayer {
             val p = k.value
             val sc = if (p < .6f) .9f + (1.015f - .9f) * (p / .6f) else 1.015f - .015f * ((p - .6f) / .4f)
@@ -1601,7 +1604,7 @@ fun Cover(modifier: Modifier = Modifier) {
             val radius = 16.dp.toPx() * (1 - (p / .6f).coerceAtMost(1f))
             renderEffect = if (radius > .01f) BlurEffect(radius, radius, TileMode.Decal) else null
             clip = true
-        }, contentScale = ContentScale.Crop) }
+        }, contentScale = ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.High) }
     }
 }
 

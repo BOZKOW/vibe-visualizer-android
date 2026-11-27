@@ -378,18 +378,23 @@ object E {
         mediaArtUrl = u; val tok = coverTok
         Vibe.scope.launch { if (tok == coverTok && setCover(u, "From " + MediaApps.appName(), tok, canApply = { MediaApps.artUrl() == u && !MediaApps.hasCover() })) mediaArt = true }
     }
+    fun sharpenCoverForBreak() { upgradeMediaArtwork(coverTok) }
+
     private fun upgradeMediaArtwork(tok: Int) {
         if (dj || !S.b("online") || (Visuals.cover?.width ?: 0) >= 1200) return
-        val original = MediaApps.artUrl()
-        val want = mediaMeta ?: return
+        val source = src
+        val original = if (source == "media") MediaApps.artUrl() else if (source == "spotify") Spotify.meta?.takeIf { it.title == title && it.artist == artist }?.cover?.takeIf { it.isNotBlank() } ?: SpotifyApp.artUrl() else null
+        val want = (if (source == "media") mediaMeta else Lyr.curSong())?.takeIf { it.title == title && it.artist == artist } ?: return
+        val current = Visuals.cover ?: return
+        val signature = picSig(current)
         val key = original ?: "search:${want.artist}|${want.title}|${want.album}"
         if (mediaArtUrl == key) return
         mediaArtUrl = key
         Vibe.scope.launch {
             if (quickChange) { delay(700); if (tok != coverTok) return@launch }
-            fun stillCurrent() = tok == coverTok && src == "media" && mediaArt && MediaApps.artUrl() == original
+            fun stillCurrent() = tok == coverTok && src == source && (source != "media" || mediaArt && MediaApps.artUrl() == original)
             fun improve(image: android.graphics.Bitmap?): Boolean {
-                if (image == null || !stillCurrent() || !samePic(picSig(image), mediaArtSig) || image.width <= (Visuals.cover?.width ?: 0)) return false
+                if (image == null || !stillCurrent() || !samePic(picSig(image), signature) || image.width <= (Visuals.cover?.width ?: 0)) return false
                 keepPic(image)
                 Visuals.upgradeCover(image)   // identical artwork, sharper: no colour extraction or transition restart
                 return true
