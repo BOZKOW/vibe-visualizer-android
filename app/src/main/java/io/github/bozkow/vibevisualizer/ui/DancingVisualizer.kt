@@ -6,6 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.engine.E
@@ -23,9 +24,21 @@ import kotlin.math.roundToInt
 
 internal fun danceEnabled() = E.wide && S.b("xDance") && !S.low && !E.reduceMotion() && !E.inPip && !E.ambient
 
+private object DancePresence {
+    var track by mutableIntStateOf(-1)
+    var matched by mutableStateOf(false)
+}
+
+@Composable
+internal fun danceProgress(): Float {
+    val shown = danceEnabled() && DancePresence.track == E.trackVer && DancePresence.matched
+    return androidx.compose.animation.core.animateFloatAsState(
+        if (shown) 1f else 0f, androidx.compose.animation.core.tween(if (S.low || E.reduceMotion()) 0 else 450), label = "danceSpace").value
+}
+
 @Composable
 fun BarsView(modifier: Modifier = Modifier) {
-    SpectrumBars(if (danceEnabled()) modifier.padding(end = 88.dp) else modifier)
+    SpectrumBars(if (danceEnabled()) modifier.padding(end = 88.dp * danceProgress()) else modifier)
 }
 
 @Composable
@@ -45,14 +58,17 @@ internal fun DanceCorner(modifier: Modifier) {
         delay(350)   // don't query songs that are only skipped past
         bpm = SongTempo.find(meta, network)?.roundToInt()?.coerceIn(30,300)
     }
+    DisposableEffect(Unit) { onDispose { DancePresence.matched = false } }
+    val progress = danceProgress()
     val prepared by produceState<Pair<Int, android.graphics.drawable.AnimatedImageDrawable>?>(null, bpm, E.quiet, E.visible) {
-        val speed = bpm ?: 120   // gentle fallback while a recording is unknown or its lookup is pending
+        val speed = bpm ?: return@produceState
         if (E.visible && !E.quiet) value = DanceAnimation.load(speed)?.let { speed to it }
     }
-    var image by remember(track) { mutableStateOf<android.graphics.drawable.AnimatedImageDrawable?>(null) }
-    var imageBpm by remember(track) { mutableIntStateOf(120) }
-    var startedAt by remember(track) { mutableDoubleStateOf(0.0) }
-    val active = visible
+    var image by remember { mutableStateOf<android.graphics.drawable.AnimatedImageDrawable?>(null) }
+    var imageBpm by remember { mutableIntStateOf(120) }
+    var startedAt by remember { mutableDoubleStateOf(0.0) }
+    SideEffect { DancePresence.track = track; DancePresence.matched = bpm != null && image != null }
+    val active = visible && progress > .001f
     LaunchedEffect(prepared, visible, track) {
         val (speed,next) = prepared ?: return@LaunchedEffect
         if (image != null && active && image !== next) {
@@ -66,7 +82,7 @@ internal fun DanceCorner(modifier: Modifier) {
         if (active) { startedAt = now(); drawable.start() } else drawable.stop()
         onDispose { drawable.stop() }
     }
-    Canvas(modifier.clipToBounds()) {
+    Canvas(modifier.graphicsLayer { translationX = (size.width + 24.dp.toPx()) * (1f-progress) }.clipToBounds()) {
         // Union of non-transparent pixels across ALL frames of the pinned 932×720 source.
         // Position the visible figure, not the large transparent animation canvas, next to the bezel.
         val scale = minOf(size.width / (416f/932*drawable.intrinsicWidth), size.height / (580f/720*drawable.intrinsicHeight))

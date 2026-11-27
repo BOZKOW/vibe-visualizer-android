@@ -370,7 +370,7 @@ private fun pages(): List<Page> = listOf(
         Item.Txt("Ideas being tried out. They may change, or go away, in a later version. The lyrics ones (the Focus style, Refined credits, Background vocal pop-out, Keep overlapping lines) are in Lyrics, beside what they go with."),
         Item.Sw("xScrub", "Scrub preview", "While you drag the seek bar, a bubble above your finger shows the time it would jump to (and the volume slider, the level). Off, the times show where the song is until you let go. From Spicy Lyrics 6.4.50."),
         Item.Sw("xSkeleton", "Lyrics loading skeleton", "While lyrics load, faint placeholder lines and a small “Loading lyrics” label instead of the big message. From Spicy Lyrics 6.4.0."),
-        Item.Sw("xDance", "Dancing visualizer", "Shigure Ui stays in the bottom-right landscape corner, including with lyrics. Looks up this recording’s BPM from ReccoBeats, without setup or audio capture. Uses a gentle fallback pace if no match is found. Animation by ががめ; web version by Guyutongxue. Downloads a small animation when enabled. Pauses with playback and under Settings."),
+        Item.Sw("xDance", "Dancing visualizer", "Shigure Ui stays in the bottom-right landscape corner, including with lyrics. Looks up this recording’s BPM from ReccoBeats, without setup or audio capture. Slides out when BPM is unavailable and returns when a match arrives. Animation by ががめ; web version by Guyutongxue. Downloads a small animation when enabled. Pauses with playback and under Settings."),
         Item.Custom("Dance animation credits") { Buttons("Animation credits" to { openUrl("https://github.com/guyutongxue/shigure-ui-dance-css") }, "BPM: ReccoBeats" to { openUrl("https://reccobeats.com/docs/documentation/introduction") }) },
         Item.Sw("xLiquid", "Liquid glass", "A clear, slightly darkened material for controls, Settings cards, switches and sheets. Their edges gently bend the view behind them, with soft highlights. Experimental; needs Android 13 or newer."),
     ), sub = "Ideas being tried out", group = 3),
@@ -449,12 +449,12 @@ private fun SettingsContent(background: Backdrop?) {
                     val head = with(density) { listHeaderRest.toDp() }
                     val pad = androidx.compose.foundation.layout.PaddingValues(start = 14.dp, end = 14.dp, top = head + (if (short) 12.dp else 22.dp), bottom = navH + 28.dp)
                     Box(m) {
-                    if (q.isNotEmpty() && !wide) SearchResults(all, q, edges.backdropSource(under, k > 0f && !S.low), head, navH, resState)
-                    else LazyColumn(edges.backdropSource(under, k > 0f && !S.low), state = listState, contentPadding = pad) {
+                    if (q.isNotEmpty() && !wide) SearchResults(all, q, edges.backdropSource(under, (short || k > 0f) && !S.low), head, navH, resState)
+                    else LazyColumn(edges.backdropSource(under, (short || k > 0f) && !S.low), state = listState, contentPadding = pad) {
                         cardPages(all, page, wide) { open(it) }
                     }
                     Column(Modifier.fillMaxWidth().onSizeChanged { if (listHeaderRest == 0 || k < .01f) listHeaderRest = it.height }.windowInsetsPadding(topInset)) {
-                        val close = @Composable { IconButton(onClick = { E.settingsPage = null }, Modifier.then(if (k > .5f) Modifier.padding(4.dp).glassChip(k) else Modifier)) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
+                        val close = @Composable { IconButton(onClick = { E.settingsPage = null }, Modifier.then(if (short) Modifier.padding(4.dp).glassIsland(under, shape = androidx.compose.foundation.shape.CircleShape, baseGlass = true) else if (k > .5f) Modifier.padding(4.dp).glassChip(k) else Modifier)) { Icon(Icons.Rounded.Close, "Close settings", tint = Color.White) } }
                         val search = @Composable { sm: Modifier, x: Boolean ->
                             TextField(q, { q = it }, sm.glassIsland(under, k, baseGlass = true), singleLine = true,
                                 placeholder = { Text(if (wide && short) "Search" else "Search settings", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, color = Color.White.copy(alpha = .55f)) },
@@ -482,7 +482,7 @@ private fun SettingsContent(background: Backdrop?) {
                     var headRest by remember { androidx.compose.runtime.mutableIntStateOf(0) }
                     val head = with(androidx.compose.ui.platform.LocalDensity.current) { headRest.toDp() }
                     Box(Modifier.fillMaxSize()) {
-                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges.backdropSource(under, k > 0f && !S.low), head, navH, st)
+                        ItemsList(pg.items.filterIndexed { i, it -> !(i == 0 && it is Item.Head && pg.items.count { x -> x is Item.Head } == 1) }, edges.backdropSource(under, (short || k > 0f) && !S.low), head, navH, st)
                         // the page's title row: scrolled, an island too (back and the name, smaller, on frosted glass)
                         // (the notice under it belongs to the header: the list starts under both)
                         Column(Modifier.fillMaxWidth().onSizeChanged { if (headRest == 0 || k < .01f) headRest = it.height }.windowInsetsPadding(topInset)) {
