@@ -1,4 +1,4 @@
-Vibe Visualizer for Android 0.63.6 (beta). Android 12 or newer; it installs over earlier versions.
+Vibe Visualizer for Android 0.63.7 (beta). Android 12 or newer; it installs over earlier versions.
 
-- Preserve the current song’s confirmed BPM while metadata and catalog lookups refresh, preventing temporary dancer exits and restarts during the same track. A new song still starts with a fresh lookup.
-- Includes the landscape close-button glass and dancer slide-out changes from 0.63.5.
+- **Per-song dance speed:** choose ½×, 1× or 2× in Settings → Experiments while the song plays. The app remembers the correction for that title, artist and recording version. Choose 1× to reset it.
+- The correction changes animation speed while preserving the catalog BPM. Includes all earlier glass, dancer-presence and metadata-refresh fixes.

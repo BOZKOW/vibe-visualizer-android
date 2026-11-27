@@ -134,3 +134,5 @@ BPM comes from [ReccoBeats](https://reccobeats.com/docs/documentation/introducti
 The figure stays just inside the bottom-right screen edge, including while lyrics show. Low performance/reduced motion disable it; playback pause and Settings stop its motion.
 The small animation is fetched only after opt-in from [Guyutongxue’s project](https://github.com/guyutongxue/shigure-ui-dance-css),
 which credits [ががめ](https://x.com/utsugame) for the original animation/illustration. No copy of that artwork or its CSS is bundled in the APK.
+
+The Dancing visualizer experiment also offers saved ½×, 1× and 2× speed corrections for the current song. The title and artist identify the saved correction, including the full recording-version title.
