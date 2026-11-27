@@ -2,7 +2,10 @@ package io.github.bozkow.vibevisualizer.engine
 
 import kotlin.math.roundToInt
 
-/** Four beats per loop. Only WebP animation duration fields change; encoded pixels/alpha remain untouched. */
+internal const val DANCE_LOOP_BEATS = 8
+internal fun danceLoopMs(bpm: Int) = DANCE_LOOP_BEATS * 60000.0 / bpm.coerceIn(30,300)
+
+/** Eight beats per loop. Only WebP animation duration fields change; encoded pixels/alpha remain untouched. */
 internal fun retimeDance(source: ByteArray, bpm: Int): ByteArray {
     require(source.size >= 12 && String(source, 0, 4, Charsets.US_ASCII) == "RIFF" && String(source, 8, 4, Charsets.US_ASCII) == "WEBP")
     fun uint(at: Int, count: Int): Int {
@@ -24,7 +27,7 @@ internal fun retimeDance(source: ByteArray, bpm: Int): ByteArray {
     }
     require(frames.isNotEmpty())
     val total = frames.sumOf { it.second }.toDouble()
-    val duration = 240000.0 / bpm.coerceIn(30,300)
+    val duration = danceLoopMs(bpm)
     val result = source.copyOf()
     var elapsed = 0; var emitted = 0
     for ((offset,time) in frames) {

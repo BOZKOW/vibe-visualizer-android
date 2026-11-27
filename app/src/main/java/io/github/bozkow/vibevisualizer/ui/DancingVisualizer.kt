@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.engine.E
+import io.github.bozkow.vibevisualizer.engine.danceLoopMs
 import io.github.bozkow.vibevisualizer.engine.DanceAnimation
 import io.github.bozkow.vibevisualizer.engine.SongTempo
 import io.github.bozkow.vibevisualizer.engine.Lyr
@@ -45,22 +46,20 @@ internal fun DanceCorner(modifier: Modifier) {
         bpm = SongTempo.find(meta, network)?.roundToInt()?.coerceIn(30,300)
     }
     val prepared by produceState<Pair<Int, android.graphics.drawable.AnimatedImageDrawable>?>(null, bpm, E.quiet, E.visible) {
-        val speed = bpm ?: 120   // a still preview while listening; never animate at a guessed tempo
+        val speed = bpm ?: 120   // gentle fallback while a recording is unknown or its lookup is pending
         if (E.visible && !E.quiet) value = DanceAnimation.load(speed)?.let { speed to it }
     }
     var image by remember(track) { mutableStateOf<android.graphics.drawable.AnimatedImageDrawable?>(null) }
     var imageBpm by remember(track) { mutableIntStateOf(120) }
     var startedAt by remember(track) { mutableDoubleStateOf(0.0) }
-    var lockedImage by remember(track) { mutableStateOf(false) }
-    val active = visible && bpm != null && lockedImage
+    val active = visible
     LaunchedEffect(prepared, visible, track) {
         val (speed,next) = prepared ?: return@LaunchedEffect
         if (image != null && active && image !== next) {
-            val cycle = 240000.0 / imageBpm
+            val cycle = danceLoopMs(imageBpm)
             delay((cycle - ((now()-startedAt) % cycle)).toLong().coerceAtLeast(1))
         }
         image = next; imageBpm = speed
-        lockedImage = bpm != null && speed == bpm
     }
     val drawable = image ?: return
     DisposableEffect(drawable, active) {

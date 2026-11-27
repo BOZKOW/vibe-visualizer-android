@@ -1,4 +1,5 @@
-Vibe Visualizer for Android 0.63.3 (beta). Android 12 or newer; it installs over 0.63.2.
+Vibe Visualizer for Android 0.63.4 (beta). Android 12 or newer; it installs over earlier versions.
 
-- **Sharper Focus break covers:** request a higher-resolution copy when the cover expands, including artwork supplied by Spotify. The replacement must match the current image and recording, and appears without restarting the cover animation.
-- **Cover scaling:** use high-quality image filtering during cover movement and enlargement.
+- **Slower dance timing:** the full animation now spans eight beats, halving its speed at the same catalog BPM. Tempo changes use the same loop timing to avoid mid-loop jumps.
+- Includes the Focus cover quality fix and all earlier updates.
+- **Continuous dancing:** a gentle fallback pace keeps the animation moving when BPM is unavailable or a lookup is pending. Playback pause and performance safeguards still apply.
