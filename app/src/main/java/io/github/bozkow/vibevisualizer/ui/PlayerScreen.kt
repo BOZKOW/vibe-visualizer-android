@@ -525,7 +525,7 @@ private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 4
             if (bars) { BarsView(Modifier.fillMaxSize().padding(top = 8.dp, bottom = 8.dp, end = if (danceEnabled()) 0.dp else endGap)); AwayNote(Modifier.align(Alignment.Center)) }
             // the lyrics nearer the side than the bars ([lyricsEnd]): the other singer's lines, set at the right, end close to
             // the screen's edge (28 dp in, they sat towards the middle: "move the duet vocals more to the right")
-            else LyricsPane(Modifier.fillMaxSize().padding(end = if (danceEnabled()) maxOf(lyricsEnd, 88.dp) else lyricsEnd), areaHeightPx = areaH, padStart = 4f, padEnd = 6f, problems = false, behind = true, startRoom = startRoom)
+            else LyricsPane(Modifier.fillMaxSize().padding(end = lyricsEnd), areaHeightPx = areaH, padStart = 4f, padEnd = 6f, problems = false, behind = true, startRoom = startRoom)
         }
         if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = if (danceEnabled()) 0.dp else endGap).height(60.dp))
         Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = if (danceEnabled()) maxOf(endGap, 88.dp) else endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }

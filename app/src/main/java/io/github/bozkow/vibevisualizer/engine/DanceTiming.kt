@@ -24,7 +24,7 @@ internal fun retimeDance(source: ByteArray, bpm: Int): ByteArray {
     }
     require(frames.isNotEmpty())
     val total = frames.sumOf { it.second }.toDouble()
-    val duration = 240000.0 / bpm.coerceIn(60,210)
+    val duration = 240000.0 / bpm.coerceIn(30,300)
     val result = source.copyOf()
     var elapsed = 0; var emitted = 0
     for ((offset,time) in frames) {

@@ -130,7 +130,7 @@ code under *Settings → Help & about*.
 ### Dancing visualizer experiment
 
 Settings → Experiments → Dancing visualizer adds Shigure Ui beside the bars in the right-hand landscape corner.
-It estimates tempo from the visualizer’s captured audio and adjusts a four-beat animation loop, with no BPM setup.
-It waits for several seconds of stable rhythm before moving, resets its estimate on song changes, and keeps the last estimated pace through quiet sections. The figure stays just inside the bottom-right screen edge, including while lyrics show. Low performance/reduced motion disable it; playback pause and Settings stop its motion.
+BPM comes from [ReccoBeats](https://reccobeats.com/docs/documentation/introduction), using the exact Spotify ID or ISRC first, otherwise a strict title/artist/duration match. No API key, server or audio capture is required. Only identifiers or title text are sent; local audio files are never uploaded. ReccoBeats supplies its own audio analysis; its catalog metadata originates from Spotify. Results are cached for seven days, with rate-limit backoff. Unknown or ambiguous recordings stay still rather than using a live-audio guess.
+The figure stays just inside the bottom-right screen edge, including while lyrics show. Low performance/reduced motion disable it; playback pause and Settings stop its motion.
 The small animation is fetched only after opt-in from [Guyutongxue’s project](https://github.com/guyutongxue/shigure-ui-dance-css),
 which credits [ががめ](https://x.com/utsugame) for the original animation/illustration. No copy of that artwork or its CSS is bundled in the APK.

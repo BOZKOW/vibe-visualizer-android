@@ -19,7 +19,7 @@ class DanceTimingTest {
         (data[at].toInt() and 255) + ((data[at+1].toInt() and 255) shl 8) + ((data[at+2].toInt() and 255) shl 16)
     }
     @Test fun animationLoopMatchesFourBeatsAtDifferentTempos() {
-        for (bpm in listOf(60,90,120,160,210)) assertEquals(240000.0/bpm,duration(retimeDance(clip(),bpm)).toDouble(),1.0)
+        for (bpm in listOf(30,60,90,120,160,210,250,300)) assertEquals(240000.0/bpm,duration(retimeDance(clip(),bpm)).toDouble(),1.0)
     }
     @Test fun changingTempoPreservesEncodedFramesAlphaAndTheDownloadedOriginal() {
         val source = clip(); val backup = source.copyOf(); val timed = retimeDance(source,160)

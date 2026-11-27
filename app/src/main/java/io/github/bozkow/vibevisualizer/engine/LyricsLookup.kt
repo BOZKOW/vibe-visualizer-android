@@ -94,7 +94,7 @@ object Lyr {
     var filesCount by mutableIntStateOf(0); private set
 
     private class Cur(val m: SongMeta, val key: String, val skip: List<String>)
-    private var cur: Cur? = null
+    private var cur by mutableStateOf<Cur?>(null)   // late recording IDs/tags also refresh metadata consumers
     private val lcache = HashMap<String, LyricsResult>()
     private var lyAskAt = 0L
     private var loadJob: Job? = null
@@ -494,7 +494,14 @@ object Lyr {
                 delay(1500)
                 while (shown == null && tok == E.coverTok) {
                     val pick = done.entries.filter { usable(it.value.r) }.maxWithOrNull(compareBy<Map.Entry<String, Got>> { rank(it.value.r!!) }.thenByDescending { place[it.key] ?: 99 })
-                    if (pick != null) { val r = pick.value.r!!; r.prov = pick.key; shown = r; note(pick.key, "shown early, while a source above it answers"); apply(r); break }
+                    if (pick != null) {
+                        val r = pick.value.r!!
+                        r.prov = pick.key
+                        shown = r
+                        note(pick.key, "shown early, while a source above it answers")
+                        apply(r)
+                        break
+                    }
                     delay(200)
                 }
             }

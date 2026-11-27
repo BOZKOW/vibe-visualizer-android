@@ -54,6 +54,16 @@ class DebugReceiver : BroadcastReceiver() {
                 }
             }
             i.getStringExtra("seek")?.toDoubleOrNull()?.let { io.github.bozkow.vibevisualizer.media.Local.seek((it * 1000).toLong()) }
+            i.getStringExtra("tempoLookup")?.let { id ->
+                io.github.bozkow.vibevisualizer.core.Vibe.scope.launch {
+                    val m = io.github.bozkow.vibevisualizer.lyrics.SongMeta(
+                        id = id.takeIf { it.length == 22 }.orEmpty(), isrc = id.takeIf { it.length == 12 }.orEmpty(),
+                        title = i.getStringExtra("tempoTitle").orEmpty(), artist = i.getStringExtra("tempoArtist").orEmpty(),
+                        duration = i.getStringExtra("tempoDuration")?.toDoubleOrNull() ?: 0.0)
+                    val bpm = io.github.bozkow.vibevisualizer.engine.SongTempo.find(m, i.getStringExtra("tempoNetwork") != "false")
+                    android.util.Log.i("VV-tempo", "Catalog lookup: $id BPM=$bpm")
+                }
+            }
             if (i.hasExtra("debugInfo")) android.util.Log.i("VV-dbg", Lyr.debugInfo())
             i.getStringExtra("canvasLocal")?.let { u ->
                 if (u == "off") { CreditsPreview.stopCanvas(); io.github.bozkow.vibevisualizer.engine.CanvasVideo.clear(false) }

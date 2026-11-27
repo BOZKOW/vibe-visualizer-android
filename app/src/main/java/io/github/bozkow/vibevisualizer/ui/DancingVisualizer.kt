@@ -10,12 +10,17 @@ import androidx.compose.ui.unit.dp
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.engine.E
 import io.github.bozkow.vibevisualizer.engine.DanceAnimation
-import io.github.bozkow.vibevisualizer.audio.Audio
+import io.github.bozkow.vibevisualizer.engine.SongTempo
+import io.github.bozkow.vibevisualizer.engine.Lyr
+import io.github.bozkow.vibevisualizer.engine.tempoKey
+import io.github.bozkow.vibevisualizer.lyrics.SongMeta
+import io.github.bozkow.vibevisualizer.spotify.Spotify
+import io.github.bozkow.vibevisualizer.core.Net
 import io.github.bozkow.vibevisualizer.core.now
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
-internal fun danceEnabled() = E.wide && S.b("xDance") && !Audio.away && !S.low && !E.reduceMotion() && !E.inPip && !E.ambient
+internal fun danceEnabled() = E.wide && S.b("xDance") && !S.low && !E.reduceMotion() && !E.inPip && !E.ambient
 
 @Composable
 fun BarsView(modifier: Modifier = Modifier) {
@@ -25,13 +30,19 @@ fun BarsView(modifier: Modifier = Modifier) {
 @Composable
 internal fun DanceCorner(modifier: Modifier) {
     val track = E.trackVer
-    var bpm by remember(track) { mutableStateOf<Int?>(null) }
+    // Lyrics metadata can still be the previous song during a change; never query it for this title.
+    val meta = sequenceOf(Lyr.curSong(), Spotify.meta.takeIf { E.src == "spotify" }).filterNotNull()
+        .firstOrNull { it.title == E.title && it.artist == E.artist }
+        ?: SongMeta(title = E.title, artist = E.artist, album = E.album, duration = E.curDur())
+    val key = tempoKey(meta)
+    var bpm by remember(track, key) { mutableStateOf<Int?>(null) }
     val visible = E.playingState && E.visible && !E.quiet && E.settingsPage == null && E.sheet == null
-    LaunchedEffect(visible, track) {
-        while (visible) {
-            bpm = Audio.tempoBpm()?.roundToInt()?.coerceIn(60,210)
-            delay(500)
-        }
+    val network = Net.online.value
+    val canLookup = E.visible && !E.quiet && E.settingsPage == null
+    LaunchedEffect(track, key, network, canLookup) {
+        if (!canLookup) return@LaunchedEffect
+        delay(350)   // don't query songs that are only skipped past
+        bpm = SongTempo.find(meta, network)?.roundToInt()?.coerceIn(30,300)
     }
     val prepared by produceState<Pair<Int, android.graphics.drawable.AnimatedImageDrawable>?>(null, bpm, E.quiet, E.visible) {
         val speed = bpm ?: 120   // a still preview while listening; never animate at a guessed tempo

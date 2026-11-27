@@ -1,7 +1,6 @@
-Vibe Visualizer for Android 0.63.1 (beta). Android 12 or newer; it installs over 0.63.0.
+Vibe Visualizer for Android 0.63.2 (beta). Android 12 or newer; it installs over 0.63.1.
 
-- **Better dance tempo:** detects repeating rhythm from audio before bar gain and visual smoothing, checks several seconds of evidence off the UI thread, and resets between songs. No guessed 120 BPM startup or slow sweep through unrelated speeds.
-- **Dancer placement:** stays just inside the bottom-right landscape edge, including while lyrics show. Removed transparent artwork padding; lyrics, bars and credits leave room beside her.
-- **Landscape Canvas:** keeps the sharp stage instead of inheriting portrait’s full lyrics blur.
-- **Landscape cover glass:** samples the rounded, darkened artwork so its glass matches the cover and its edges.
-- **Stronger visualizer:** opaque regular bars, more solid glass-bar colour and a clearer dark edge against Canvas.
+- **Catalog BPM for the dancer:** replaced live-audio tempo estimation with ReccoBeats lookups. Exact Spotify ID or ISRC first, otherwise verified title, artist, recording version and duration. No API key or setup.
+- **No guessed speeds:** unmatched or ambiguous recordings stay still. Removed the background audio-tempo analysis used only by this experiment.
+- **Lightweight lookups:** cached results for seven days, paced requests and rate-limit backoff. Only track identifiers or names are sent; audio and local files are never uploaded.
+- **Landscape lyrics:** restored their original right margin; the dancer no longer narrows or shifts the lyrics column.

@@ -12,10 +12,6 @@ import io.github.bozkow.vibevisualizer.engine.E
 import io.github.bozkow.vibevisualizer.media.Local
 import io.github.bozkow.vibevisualizer.media.Outputs
 import io.github.bozkow.vibevisualizer.spotify.Spotify
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.max
@@ -58,31 +54,6 @@ object Audio {
     private var bassSlow = 0f
     private var lastOnset = 0.0
     private val onsetGaps = ArrayList<Double>()
-    private val danceHistory = TempoHistory()
-    private var danceTrack = -1
-    private var danceSource = ""
-    private var danceLock = TempoLock()
-    private var danceJob: Job? = null
-    private var danceEstimate: Float? = null
-    private var danceCheckAt = 0.0
-
-    private fun sampleTempo(t: Double, spectrum: FloatArray) {
-        val source = if (filePlaying()) "file" else if (micLive()) "mic" else "phone"
-        if (danceTrack != E.trackVer || danceSource != source) {
-            danceTrack = E.trackVer; danceSource = source
-            danceHistory.reset(); danceLock = TempoLock(); danceEstimate = null
-            danceJob?.cancel(); danceJob = null; danceCheckAt = 0.0
-        }
-        danceHistory.add(t, spectrum, curRate())
-        if (t-danceCheckAt < 1000 || danceJob?.isActive == true) return
-        danceCheckAt = t
-        val snapshot = danceHistory.snapshot() ?: return
-        val track = danceTrack
-        danceJob = Vibe.scope.launch {
-            val result = withContext(Dispatchers.Default) { tempoFromNovelty(snapshot) }
-            if (danceTrack == track && danceSource == source) danceEstimate = danceLock.accept(result)
-        }
-    }
 
     var label by mutableStateOf("No audio"); private set      // what the bars follow (the audio chip)
     var labelTip by mutableStateOf(""); private set
@@ -165,7 +136,6 @@ object Audio {
                     for (i in 0 until 1024) { glide[i] += (frame[i] - glide[i]) * k; data[i] = glide[i] }
                 }
             }
-            if (S.b("xDance") && !S.low && !E.quiet && E.playing()) sampleTempo(t, if (pl) frame else data)
             var mx = 0f
             for (i in 0 until N) {
                 var s = 0f; val e0 = edges[i]; val e1 = max(edges[i + 1], e0 + 1)
@@ -236,9 +206,6 @@ object Audio {
         }
         if (t - lastOnset > 4000 && onsetGaps.isNotEmpty()) { onsetGaps.clear(); bgTempo = 0f }
     }
-
-    /** Null until actual audio supports a stable periodicity; visual bar effects and the ambient wave are excluded. */
-    fun tempoBpm(): Float? = if (realAudio && danceTrack == E.trackVer) danceEstimate else null
 
     fun dropBars() { vals.fill(0f) }   // (the auto sensitivity keeps its level: the next song is about as loud)
 
