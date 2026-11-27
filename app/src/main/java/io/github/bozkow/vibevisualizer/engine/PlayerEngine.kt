@@ -985,7 +985,7 @@ object E {
                 // turned on during a song: look for its Canvas now, not from the next song
                 if (k == "canvasOn" && S.canvasOn && src == "spotify" && !CanvasVideo.active) Spotify.meta?.let { CanvasVideo.lookup(it, coverTok) }
             }
-            "bridge", "aCap" -> Audio.applyCapture()
+            "aCap" -> Audio.applyCapture()
             "aSession" -> SpotifyApp.refresh(Vibe.app)
             "volume" -> Local.applyVolume()
             "ljoinMode", "ljoinPace", "lbgBr", "lsimple", "romMode", "lfont" -> Lyr.restyle()

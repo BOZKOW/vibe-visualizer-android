@@ -162,25 +162,8 @@ private fun AudioSheet() {
     }
     opt("phone", Icons.Rounded.PhoneAndroid, "Phone sound", "Everything this phone plays, the Spotify app included. Android asks for microphone access: that’s only how apps may read the sound’s spectrum. Nothing is recorded or sent.")
     opt("mic", Icons.Rounded.Mic, "Microphone", "The sound in the room, for music playing on a speaker nearby.")
-    opt("off", Icons.Rounded.VolumeOff, "Nothing on this phone", "Only your own files, and Vibe Bridge, move the bars.")
+    opt("off", Icons.Rounded.VolumeOff, "Nothing on this phone", "Only your own files move the bars.")
     if (cur == "phone" && Audio.phone.error != null) Hint("Android didn’t let the app listen: ${Audio.phone.error}. Some phones only allow it while music plays; try again then.")
-    Spacer(Modifier.height(6.dp))
-    SheetCard {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Vibe Bridge", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
-            Text("Real bars from the device that plays the music, through your server.", fontSize = 12.5.sp, color = Color.White.copy(alpha = .65f))
-        }
-        VSwitch(S.b("bridge"), { S.set("bridge", it) })
-    }
-    val b = Audio.bridge
-    Hint(when {
-        !S.b("bridge") -> "Off."
-        !Server.set -> "Needs your server (Settings → Server & connection)."
-        Audio.bridgeOn -> "Connected through your server" + (if (b.device.isNotEmpty()) " · listening to ${b.device}" else "") + "."
-        else -> "Not connected. On the device that plays the music, start Vibe Bridge with:  vibe-bridge --server ${Server.base?.removePrefix("https://")}  (see the README)."
-    })
-    }
     Spacer(Modifier.height(8.dp))
     Text(Audio.labelTip, fontSize = 13.sp, color = Color.White.copy(alpha = .8f))
 }

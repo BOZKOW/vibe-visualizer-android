@@ -239,12 +239,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("canvasOn", "Canvas", "Spotify’s short looping video plays as the background behind the player (found by your server, or Spicy Lyrics’ Canvas service)."),
         Item.Sw("cvNoArt", "Hide the cover while a Canvas plays", "Only the Canvas, no cover in front of it."),
         Item.Sw("cvShrink", "Smaller cover while a Canvas plays", "The cover glides to a smaller size in the middle, so more of the Canvas shows around it."),
-        Item.Sub("Blur"),
-        Item.Sw("cvLyrBlur", "Blur the whole Canvas with lyrics", "While lyrics are shown, use the background’s Blur setting over the entire video."),
-        Item.Sw("cvBlur", "Blur the Canvas", "The Canvas behind the player, softly blurred."),
-        Item.Ch("cvBehind", "Behind the controls", listOf("dark" to "Dark gradient", "blur" to "Blur", "both" to "Blur and dark gradient", "none" to "Nothing"),
-            "With a Canvas: what’s under the top bar, the song, the seek bar, the bars and the controls, so they stay readable. Blur frosts the Canvas there."),
-        Item.Sl("cvBlurAmt", "Canvas blur", 5, 100, 5, "How strong: Blur the Canvas, and Blur behind the controls."),
+        Item.Txt("Sharp without lyrics; automatically blurred with lyrics. Adjust the intensity in Look → Blur."),
         Item.Sl("cvLyrA", "Canvas behind the lyrics", 0, 80, 5, "How much of the video shows behind the lyrics, dimmed so they stay readable. 0: only its soft glow. From Spicy Lyrics Mobile 0.17.", fmt = pct),
         Item.Sub("Where it comes from"),
         Item.Sw("cvSpicy", "Spicy Lyrics’ Canvas service", "When your server has no Canvas for a Spotify song (or no server is set), its Spotify ID goes to Spicy Lyrics’ Canvas service (spicylyrics.org), which asks Spotify. Nothing else is sent. Unofficial: it may stop working."),
@@ -254,8 +249,6 @@ private fun pages(): List<Page> = listOf(
     Page("viz", "Visualizer", VIcons.bars, listOf(
         Item.Sub("What the bars hear"),
         Item.Custom("Audio for the bars phone sound microphone") { AudioChoice() },
-        Item.Sw("bridge", "Vibe Bridge", "Bars from the device that plays the music, through your server: it hears everything that device plays, the Spotify app included."),
-        Item.Custom("bridge status") { Hint(if (!S.b("bridge")) "Off." else if (Audio.bridgeOn) "Connected through your server" + (Audio.bridge.device.takeIf { it.isNotEmpty() }?.let { " · listening to $it" } ?: "") + "." else "Not connected. Start Vibe Bridge with --server ${Server.base?.removePrefix("https://") ?: "<your server>"} on the device that plays the music.") },
         Item.Sub("Where"),
         Item.Custom("Bars under the lyrics and the cover") { SwitchRow("The bars", "A strip of bars moving with the music, under the lyrics (and the cover when a song has none). Off: only the cover and the lyrics.", S.view == "both") { S.set("view", if (it) "both" else "lyrics") } },
         Item.Sub("Movement"),
@@ -269,7 +262,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("glow", "Glow"),
         Item.Sw("round", "Rounded bars"),
         Item.Sw("barGlass", "Glass bars", "Frosted glass like the seek bar and the buttons, tinted with the song's colours."),
-    ), sub = "What the bars hear, Vibe Bridge, where and how they look", group = 0),
+    ), sub = "Audio capture and bar appearance", group = 0),
     Page("lyrics", "Lyrics", VIcons.lyrics, listOf(
         Item.Sub("Sources"),
         Item.Custom("Sources, in priority order Spicy Lyrics LRCLIB NetEase AMLL Spotify your lyrics files") { Sources() },
@@ -315,7 +308,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sl("loff", "All songs (ms)", -3000, 3000, 50, "Lyrics behind the music? Raise it. Below: this output’s, this music app’s and this song’s own, added to it.", fmt = { (if (it > 0) "+" else "") + it + " ms" }),
         Item.Custom("this output headphones car speaker this music app player delay this song resync now") { TimingParts() },
         Item.Sub("Desync"),
-        Item.Ch("lDesync", "Desync detection", listOf("ask" to "Ask before fixing", "auto" to "Fix automatically", "off" to "Off"), "Listens to the music and checks that the singing lines up with the lyrics. Needs real sound for the bars (phone sound, Vibe Bridge, the microphone or your own file). A fix only applies to the song playing."),
+        Item.Ch("lDesync", "Desync detection", listOf("ask" to "Ask before fixing", "auto" to "Fix automatically", "off" to "Off"), "Listens to the music and checks that the singing lines up with the lyrics. Needs real sound for the bars (phone sound, the microphone or your own file). A fix only applies to the song playing."),
         Item.Custom("desync status", shown = { Desync.stat.isNotEmpty() }) { if (Desync.stat.isNotEmpty()) Hint(Desync.stat) },
         Item.Sw("lseekFade", "Seek fade-in compensation", "Tapping a line starts Spotify 300 ms before it, so its fade-in doesn’t clip the first word."),
     ), sub = "All songs, this output, this music app, this song, the desync fix", group = 1),
@@ -377,6 +370,8 @@ private fun pages(): List<Page> = listOf(
         Item.Txt("Ideas being tried out. They may change, or go away, in a later version. The lyrics ones (the Focus style, Refined credits, Background vocal pop-out, Keep overlapping lines) are in Lyrics, beside what they go with."),
         Item.Sw("xScrub", "Scrub preview", "While you drag the seek bar, a bubble above your finger shows the time it would jump to (and the volume slider, the level). Off, the times show where the song is until you let go. From Spicy Lyrics 6.4.50."),
         Item.Sw("xSkeleton", "Lyrics loading skeleton", "While lyrics load, faint placeholder lines and a small “Loading lyrics” label instead of the big message. From Spicy Lyrics 6.4.0."),
+        Item.Sw("xDance", "Dancing visualizer", "Shigure Ui dances beside the landscape visualizer at the estimated song tempo, using the visualizer’s audio. No setup. Animation by ががめ; web version by Guyutongxue. Downloads a small animation when enabled. Pauses with playback and under Settings."),
+        Item.Custom("Dance animation credits") { Buttons("Animation credits" to { openUrl("https://github.com/guyutongxue/shigure-ui-dance-css") }) },
         Item.Sw("xLiquid", "Liquid glass", "A clear, slightly darkened material for controls, Settings cards, switches and sheets. Their edges gently bend the view behind them, with soft highlights. Experimental; needs Android 13 or newer."),
     ), sub = "Ideas being tried out", group = 3),
     Page("help", "Help & about", Icons.AutoMirrored.Rounded.Help, listOf(
@@ -587,14 +582,11 @@ private fun needs(k: String): String? = when (k) {
     "aHideSec" -> if (S.str("uiHide") == "never") "Only when the controls hide (above)" else null
     "aAmbientSec", "aAmbClock", "aAmbBattery", "aAmbCover", "aAmbSong", "aAmbLyrics", "aAmbBars", "aAmbBg", "aAmbBright", "aAmbShift" ->
         if (!S.b("aAmbient")) "Turn on Ambient mode first" else null
-    "cvNoArt", "cvBehind", "cvSpicy" -> if (!S.canvasOn) "Turn on Canvas first" else null
-    "cvBlur", "cvLyrBlur" -> if (!S.canvasOn) "Turn on Canvas first" else if (S.low) "Off in Low performance mode" else null
+    "cvNoArt", "cvSpicy" -> if (!S.canvasOn) "Turn on Canvas first" else null
     "cvShrink" -> if (!S.canvasOn) "Turn on Canvas first" else if (S.b("cvNoArt")) "Not while the cover is hidden" else null
-    "cvBlurAmt" -> if (!S.canvasOn) "Turn on Canvas first" else if (!S.b("cvBlur") && S.str("cvBehind") !in setOf("blur", "both")) "Needs Blur the Canvas, or a blur behind the controls" else null
-    "bridge" -> if (!Server.set) "Needs your server" else null
     "glow", "blur" -> if (S.low) "Off in Low performance mode" else null
     "bgspeed" -> if (S.str("bgStyle") != "dynamic") "Only with the Dynamic background" else if (S.low) "Still in Low performance mode" else null
-    "bgblur" -> if (S.str("bgStyle") in setOf("color", "none") && !(S.canvasOn && S.b("cvLyrBlur"))) "Not with this background" else null
+    "bgblur" -> if (S.str("bgStyle") in setOf("color", "none") && !S.canvasOn) "Not with this background" else null
     "fpscap" -> if (S.low) "Low performance mode keeps it at 30 fps" else null
     // the Focus style (Lyrics → Lyrics style) places, fades and blurs the lines its own way: what it does instead is greyed while
     // it's on, and the cover in long breaks goes with it
@@ -610,6 +602,7 @@ private fun needs(k: String): String? = when (k) {
     "lcredLast" -> if (!S.b("xRefCred") || S.credPos != "lyrics") "Needs Refined credits under the lyrics" else null
     "aMotionCover" -> if (S.low) "Off in Low performance mode" else null
     "ljoinPace" -> if (S.joinMode == "off") "Turn on Join split words first" else null
+    "xDance" -> if (S.low) "Off in Low performance mode" else if (E.reduceMotion()) "Off with reduced motion" else null
     "xLiquid" -> if (android.os.Build.VERSION.SDK_INT < 33) "Needs Android 13 or newer" else if (S.low) "Off in Low performance mode" else if (S.calm) "Off with Motion sickness" else null
     "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
     "cvLyrA" -> if (!S.canvasOn) "Turn on Canvas first" else null
@@ -976,7 +969,7 @@ private fun SpotifySection() {
         Text(if (!Spotify.connected) (if (id.isNotEmpty()) "Client ID saved. Press Connect." else "Not connected.") else if (E.src == "spotify") (if (Spotify.meta != null) "Connected · " + (if (Spotify.isPlaying) "playing" else "paused") else "Connected · nothing playing") else "Connected. Tap the Spotify chip to use it.",
             Modifier.padding(top = 8.dp), fontSize = 13.5.sp, color = Color.White)
         Hint("Setup: in the Spotify dashboard, add the Redirect URI above to your app (with a server set, it’s your server’s address, the one the web app already uses), paste the Client ID and press Connect. In development mode, add your own account under the app’s User Management.")
-        Hint("Bars for the Spotify app on this phone come from “Phone sound” (Visualizer settings). For music playing on another device, run Vibe Bridge there.")
+        Hint("Bars for the Spotify app on this phone come from “Phone sound” (Visualizer settings). For a nearby speaker, use the microphone.")
     }
 }
 
@@ -1159,10 +1152,12 @@ private fun GlassBackdrop() {
  *  edge, Android's the brighter tonal surface on the page's darker one. */
 @Composable
 private fun SegGroup(n: Int, row: @Composable (Int) -> Unit) {
-    Column(Modifier.fillMaxWidth().widthIn(max = 760.dp).padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(vertical = 6.dp)
+        .glass(RoundedCornerShape(24.dp), lift = false)) {
         for (i in 0 until n) {
-            val sh = segShape(i, n)
-            Box(Modifier.fillMaxWidth().glass(sh, lift = false)) { row(i) }   // (tiles that touch: no shadow between them)
+            if (i > 0) Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(1.dp)
+                .background(Color.White.copy(alpha = .07f)))
+            Box(Modifier.fillMaxWidth()) { row(i) }
         }
     }
 }
@@ -1208,6 +1203,24 @@ private fun LazyListScope.cardItems(items: List<Item>) {
 
 /** Settings' pages in four cards (how it looks, the lyrics, music and connections, the app): each with its icon
  *  on a soft tile, what's on it, and an arrow, as Android's own settings. */
+private fun pageSummary(page: Page): String = when (page.id) {
+    "look" -> "Colour and background"
+    "player" -> "Controls and artwork"
+    "ambient" -> "Dimmed listening screen"
+    "canvas" -> "Video background"
+    "viz" -> "Audio and bar appearance"
+    "lyrics" -> "Sources, files and appearance"
+    "timing" -> "Sync and delay"
+    "tr" -> "Translation and romanization"
+    "spotify" -> "Playback and connections"
+    "server" -> "Helper server and services"
+    "small" -> "PiP and home-screen widgets"
+    "perf" -> "Smoothness and power"
+    "exp" -> "Optional experiments"
+    "help" -> "Updates, support and credits"
+    else -> page.sub
+}
+
 private fun LazyListScope.cardPages(all: List<Page>, page: String?, wide: Boolean, pick: (String) -> Unit) {
     all.groupBy { it.group }.toSortedMap().values.forEachIndexed { gi, g ->
         item(key = "g$gi") {
@@ -1215,7 +1228,7 @@ private fun LazyListScope.cardPages(all: List<Page>, page: String?, wide: Boolea
                 run {
                     val on = wide && (page ?: SettingsUi.last) == p.id
                     Row(Modifier.fillMaxWidth().background(if (on) Color.White.copy(alpha = .1f) else Color.Transparent).squishClick(segShape(i, g.size), .985f) { E.haptic(); pick(p.id) }
-                        .heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        .heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = .1f)), contentAlignment = Alignment.Center) {
                             Icon(p.icon, null, Modifier.size(20.dp), tint = Color.White.copy(alpha = .92f))
                         }
@@ -1223,7 +1236,7 @@ private fun LazyListScope.cardPages(all: List<Page>, page: String?, wide: Boolea
                         // what's on the page, so a setting isn't hidden in plain sight
                         Column(Modifier.weight(1f)) {
                             Text(p.name, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (p.sub.isNotEmpty()) Text(p.sub, fontSize = 13.sp, lineHeight = 17.sp, color = Color.White.copy(alpha = .58f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            if (p.sub.isNotEmpty()) Text(pageSummary(p), fontSize = 13.sp, lineHeight = 17.sp, color = Color.White.copy(alpha = .58f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, Modifier.size(20.dp), tint = Color.White.copy(alpha = .35f))
                     }

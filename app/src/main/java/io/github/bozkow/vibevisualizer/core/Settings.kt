@@ -33,9 +33,9 @@ private fun navLang(): String {
 object Defaults {
     val S: Map<String, Any> = linkedMapOf(
         "lstyle" to "spicy",    // the lyrics' style: spicy, simple (lsimple) or focus (xFocus), one of them (kept in step)
-        "bridge" to true, "xFocus" to false, "bgStyle" to "dynamic", "lfont" to "vv", "lsimple" to false, "lminimal" to false,
+        "xFocus" to false, "bgStyle" to "dynamic", "lfont" to "vv", "lsimple" to false, "lminimal" to false,
         "lhover" to true, "lduet" to true, "lcredLast" to false, "lsmooth" to true, "learly" to false, "learlyMs" to 250,
-        "lseekFade" to true, "lnotice" to true, "aRestCover" to true, "aPreload" to true, "aCoverLine" to true, "volshow" to true, "fpscap" to "60", "credPos" to "corner", "cvNoArt" to false, "cvBlur" to false, "cvLyrBlur" to false, "cvBlurAmt" to 50, "cvShrink" to true, "cvSpicy" to true, "cvBehind" to "both",
+        "lseekFade" to true, "lnotice" to true, "aRestCover" to true, "aPreload" to true, "aCoverLine" to true, "volshow" to true, "fpscap" to "60", "credPos" to "corner", "cvNoArt" to false, "cvShrink" to true, "cvSpicy" to true,
         "capDev" to "", "romMode" to "below", "tr" to false, "trTo" to navLang(), "trSkip" to "", "theme" to "cover",
         "c1" to "#ff5a5f", "c2" to "#4f8cff", "auto" to true, "boost" to 100, "resp" to 25, "blur" to 0, "bars" to 72,
         "gap" to 28, "glow" to false, "barGlass" to false, "round" to true, "scale" to "1", "fps" to false, "bgblur" to 60, "bri" to 70,
@@ -43,7 +43,7 @@ object Defaults {
         "lprov" to "spicy:1,spotify:1,lrclib:1,netease:1", "loff" to 0, "lsize" to 100, "lblur" to true,
         "canvasOn" to true, "low" to false, "perfAsk" to true, "anim" to "system", "lDesync" to "ask", "design" to "glass",
         "uiHide" to "idle", "xRefCred" to true, "xScrub" to true, "xSkeleton" to true, "xKeep" to true, "xBgPop" to true,
-        "xRefSimple" to true, "ljoin" to false, "lbgBr" to false,   // (xRefSimple: Bloom is always refreshed since 0.52.0; ljoin: ljoinMode != "off", for backups)
+        "xDance" to false, "xRefSimple" to true, "ljoin" to false, "lbgBr" to false,   // (xRefSimple: Bloom is always refreshed since 0.52.0; ljoin: ljoinMode != "off", for backups)
         // Android only
         "aCap" to "phone",      // what the bars hear: phone (everything the phone plays), mic, off
         "aKeepOn" to true,      // keep the screen on while music plays
@@ -135,10 +135,8 @@ class Settings(ctx: Context) {
             v.getValue("xBgPop").value = true
             sp.edit().putString("S", toJson().toString()).putInt("mig", 3).apply()
         }
-        // once (0.58.0): behind the song at the top and the controls the Canvas is blurred, and shaded, as in Spicy Lyrics Mobile
-        // (the owner: "make the blur behind the controls and cover stronger"); the old default was the shade alone
+        // Migration 4 once changed the control-region blur. That mode is retired; retain the migration marker.
         if (sp.getInt("mig", 0) < 4) {
-            if (s("cvBehind") == "dark") v.getValue("cvBehind").value = "both"
             sp.edit().putString("S", toJson().toString()).putInt("mig", 4).apply()
         }
         if (s("aDesign") != "glass") v.getValue("aDesign").value = "glass"   // Glass only since 0.50.0 (saved settings or a backup may say "android")

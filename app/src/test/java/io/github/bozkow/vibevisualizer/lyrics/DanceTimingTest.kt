@@ -1,0 +1,31 @@
+package io.github.bozkow.vibevisualizer.lyrics
+
+import io.github.bozkow.vibevisualizer.engine.retimeDance
+import org.junit.Assert.*
+import org.junit.Test
+
+class DanceTimingTest {
+    private val durationOffsets = listOf(32,60,88)
+    private fun clip(): ByteArray = ByteArray(96) { 0x45 }.apply {
+        "RIFF".toByteArray().copyInto(this,0); "WEBP".toByteArray().copyInto(this,8)
+        for ((i,start) in listOf(12,40,68).withIndex()) {
+            "ANMF".toByteArray().copyInto(this,start)
+            for (k in 0..3) this[start+4+k] = (20 shr (8*k)).toByte()
+            val offset = durationOffsets[i]
+            for (k in 0..2) this[offset+k] = ((40*(i+1)) shr (8*k)).toByte()
+        }
+    }
+    private fun duration(data: ByteArray) = durationOffsets.sumOf { at ->
+        (data[at].toInt() and 255) + ((data[at+1].toInt() and 255) shl 8) + ((data[at+2].toInt() and 255) shl 16)
+    }
+    @Test fun animationLoopMatchesFourBeatsAtDifferentTempos() {
+        for (bpm in listOf(60,90,120,160,210)) assertEquals(240000.0/bpm,duration(retimeDance(clip(),bpm)).toDouble(),1.0)
+    }
+    @Test fun changingTempoPreservesEncodedFramesAlphaAndTheDownloadedOriginal() {
+        val source = clip(); val backup = source.copyOf(); val timed = retimeDance(source,160)
+        assertArrayEquals(backup,source)
+        val timingBytes = durationOffsets.flatMap { listOf(it,it+1,it+2) }.toSet()
+        for (i in source.indices) if (i !in timingBytes) assertEquals("pixel/container byte $i",source[i],timed[i])
+    }
+    @Test(expected = IllegalArgumentException::class) fun corruptAnimationIsRejected() { retimeDance(ByteArray(16),120) }
+}

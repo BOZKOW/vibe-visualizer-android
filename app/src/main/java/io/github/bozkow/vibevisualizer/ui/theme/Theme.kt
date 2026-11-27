@@ -9,6 +9,9 @@ import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.em
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -39,6 +42,7 @@ fun inter(): FontFamily {
 }
 
 val Bg = Color(0xFF07070C)
+private val GlassShapes = Shapes(extraSmall = RoundedCornerShape(16.dp))
 
 private fun typography(f: FontFamily): Typography {
     val b = Typography()
@@ -70,7 +74,7 @@ fun VibeTheme(content: @Composable () -> Unit) {
     val typo = remember(fam) { typography(fam) }
     val body = remember(typo) { typo.bodyLarge.copy(lineHeight = 1.38.em, letterSpacing = 0.sp) }
     val motion = remember { MotionScheme.expressive() }
-    MaterialExpressiveTheme(colorScheme = scheme, motionScheme = motion, typography = typo) {
+    MaterialExpressiveTheme(colorScheme = scheme, motionScheme = motion, typography = typo, shapes = GlassShapes) {
         // text sized by hand everywhere: its line height follows its size, no extra letter spacing
         CompositionLocalProvider(LocalTextStyle provides body, content = content)
     }

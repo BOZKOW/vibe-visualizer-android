@@ -123,6 +123,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.CircleShape
@@ -1602,9 +1603,8 @@ fun Cover(modifier: Modifier = Modifier) {
  *  phone on its side, as the stage's backdrop there: flat, brightness .65 at the default slider. A colour you picked stays as it is. */
 @Composable
 private fun ScreenGrade(wide: Boolean, stage: Boolean) {
-    val behindLyrics = !wide && E.screen == "lyrics" && !noLyrics()
-    val behind = S.str("cvBehind")
-    val dark = behind == "dark" || behind == "both" || (behind == "blur" && S.low)
+    val behindLyrics = !wide && E.screen == "lyrics" && Lyr.lines > 0
+    val dark = true
     // as much of the shade as the Canvas's, which is part of its video: faint behind the lyrics
     val shade = if (!dark || wide) 0f else if (behindLyrics) S.i("cvLyrA").coerceIn(0, 80) / 100f else 1f
     val top = TopArea.bottom + with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.toPx() }
@@ -1623,48 +1623,30 @@ private fun ScreenGrade(wide: Boolean, stage: Boolean) {
  *  the video's first frame (which reveals it) can only be drawn into one. */
 @Composable
 private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStage? = null, stageStart: Dp = 0.dp) {
-    val behindLyrics = !wide && E.screen == "lyrics" && !noLyrics()
+    val behindLyrics = !wide && E.screen == "lyrics" && Lyr.lines > 0
     val a by animateFloatAsState(if (!CanvasVideo.cvmode) 0f else if (behindLyrics) S.i("cvLyrA").coerceIn(0, 80) / 100f else 1f, if (stage != null) tween(900, easing = androidx.compose.animation.core.CubicBezierEasing(.23f, 1f, .32f, 1f)) else tween(800), label = "canvas")
     // Spicy Lyrics' stage: a veil that deepens while the controls show
     val ctl by animateFloatAsState(if (E.uiHidden) 0f else 1f, if (S.low) tween(0) else tween(300), label = "cvctl")
     // side by side without lyrics, the video glides to the middle and fades out on both sides (moved, not laid out
     // again: the video's crop is set for its size)
     val c by animateFloatAsState(if (centred) 1f else 0f, if (S.low || E.reduceMotion()) tween(0) else tween(700, easing = FastOutSlowInEasing), label = "cvcentre")
-    // behind the top bar, the song and the controls: the dark gradient, the Canvas blurred there, both or nothing
-    val behind = S.str("cvBehind")
-    val dark = behind == "dark" || behind == "both" || (behind == "blur" && S.low)   // Low performance: no blur, the gradient instead
-    // only while the video shows (not while it loads, nor once it's gone): the whole Canvas blurred already, nothing to add
-    val frost = (behind == "blur" || behind == "both") && !S.low && !S.b("cvBlur") && !lyricsCanvasBlur() && CanvasVideo.cvmode && !wide && !E.quiet   // side by side nothing sits on the video (the desktop's)
-    // the blur reaches up to the song while the controls show, and sinks with them when they hide
-    val sink by animateFloatAsState(if (E.uiHidden) 1f else 0f, tween(600, easing = FastOutSlowInEasing), label = "cvsink")
-    val from = when { wide -> .52f; behindLyrics -> .6f; else -> .5f } + .12f * sink
+    // The Canvas is automatically soft only when lyrics exist. Controls keep their own material;
+    // there is no separate control-region blur or competing stored Canvas blur mode.
+    val dark = true
     val d = androidx.compose.ui.platform.LocalDensity.current
-    val topPx = TopArea.bottom; val rampPx = with(d) { 28.dp.toPx() }; val softPx = with(d) { 96.dp.toPx() }
-    val r = with(d) { (S.i("cvBlurAmt").coerceIn(5, 100) / 100f * 72f).dp.toPx() }   // (stronger since 0.58.0, as Spicy Lyrics Mobile's)
-    // the top's blur, shade and softening behind the top line (always there, on its side over the Canvas side). Two
-    // sizes: just behind the line, or down past what's wrong under it (it follows the error space as it opens and closes)
+    val topPx = TopArea.bottom; val rampPx = with(d) { 28.dp.toPx() }
     val topK = 1f
 
     // the video, recorded as it's drawn, so the background can draw it again blurred (on the GPU, see CanvasBlur)
     val vid = rememberGraphicsLayer()
     var vidSize by remember { mutableStateOf(IntSize.Zero) }
-    val bandSmall = rememberGraphicsLayer()
-    val bandDone = rememberGraphicsLayer()
-    bandDone.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
-    val bandBlur = remember(r) { BlurEffect(r / 4f, r / 4f, TileMode.Clamp) }
-    val bandMask = remember(vidSize.height, topPx, softPx, from, topK) {
-        val height = vidSize.height.toFloat().coerceAtLeast(1f)
-        frostBandMask(topPx / height, softPx / height, from, topK)
-    }
-    // Capture the displayed composite after Canvas blur/shading, shared by every glass surface.
-    // A raw-video replay here would bypass both the global and behind-controls blur settings.
-    val alreadyBlurred = S.b("cvBlur") || lyricsCanvasBlur() || (!wide && (behind == "blur" || behind == "both"))
-    Box(Modifier.fillMaxSize().liveCanvasFrost(!S.low, alreadyBlurred)) {
+    val alreadyBlurred = lyricsCanvasBlur()
+    val fullBlur = alreadyBlurred
+    val fullBlurMix by animateFloatAsState(if (fullBlur) 1f else 0f, tween(if (Pop.calm) 0 else 260), label = "canvasSceneBlur")
+    Box(Modifier.fillMaxSize().liveCanvasFrost(!S.low, alreadyBlurred, reduced = fullBlur && fullBlurMix >= .999f)) {
     CanvasBlur(vid, { vidSize }, wide, stage != null)
     // on its side the sharp video first blurs where it is, then fades into the blurred background (straight from sharp to the
     // blurred copy, which sits elsewhere, the two showed as an edge)
-    val sideR = with(d) { 28.dp.toPx() }
-    val soft = wide && stage == null && !S.low && c <= 0f && !E.quiet
     val stageW = stage?.let { stageStart + it.width.dp }; val featherPx = stage?.let { with(d) { it.feather.dp.toPx() } } ?: 0f
     // (.75: translucent, so the blurred backdrop carries through the video and the two read as one surface; Low performance mode has
     // no such backdrop, and it was the cover's colours that came through)
@@ -1698,72 +1680,25 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
             } else {
                 // the video softens into the blurred Canvas at the top too, as it does (longer) toward the controls
                 val fade = arrayOf(0f to Color.Black.copy(alpha = 1 - .65f * topK), .08f to Color.Black.copy(alpha = 1 - .3f * topK), .2f to Color.Black, .45f to Color.Black, .58f to Color.Black.copy(alpha = .85f), .74f to Color.Black.copy(alpha = .5f), .88f to Color.Black.copy(alpha = .18f), 1f to Color.Transparent)
-                drawRect(Brush.verticalGradient(*fade), blendMode = BlendMode.DstIn)
+                if (Lyr.lines > 0) drawRect(Brush.verticalGradient(*fade), blendMode = BlendMode.DstIn)
                 if (dark) drawRect(shade)
             }
         }) {
-        Box(Modifier.fillMaxSize().graphicsLayer { renderEffect = if (size.height < 1f || size.width < 1f) null else if (soft) sideBlur(size.width, sideR) else null }
-            .drawWithContent {
+        Box(Modifier.fillMaxSize().drawWithContent {
                 vid.record { this@drawWithContent.drawContent() }; drawLayer(vid)
                 if (vid.size != vidSize) vidSize = vid.size
-                if (frost && size.width > 0f && size.height > 0f) {
-                    val sw = (size.width / 4f).roundToInt().coerceAtLeast(1)
-                    val sh = (size.height / 4f).roundToInt().coerceAtLeast(1)
-                    bandSmall.renderEffect = bandBlur
-                    bandSmall.record(IntSize(sw, sh)) {
-                        scale(sw / vid.size.width.toFloat(), sh / vid.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(vid) }
-                    }
-                    bandDone.record(IntSize(sw, sh)) {
-                        drawLayer(bandSmall)
-                        drawRect(bandMask, blendMode = BlendMode.DstIn)
-                    }
-                    scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(bandDone) }
-                }
             }) { CanvasVideoView() }
     }
     }
 }
 
-/** The Canvas frosted where the controls are: a blurred copy of it over the sharp one, shown through a mask that's opaque at
- *  the top (down to [top0], where the top's text ends; [topK] of it, fading while nothing's there), clear in the middle, and
- *  opaque again from a little below [from] (under the song, the seek bar and the controls). Long, eased ends, so the blur
- *  melts into the video: a short straight ramp showed where it stopped. Blur and mask share a small finished GPU layer. */
-private fun frostBandMask(top0: Float, ramp0: Float, from: Float, topK: Float): Brush {
-    val ramp = ramp0.coerceIn(.001f, .25f)
-    val low0 = from - .08f; val low1 = minOf(from + .14f, .99f)
-    val top = top0.coerceIn(0f, maxOf(0f, low0 - ramp - .02f))
-    val up = topK.coerceIn(0f, 1f)
-    val stops = ArrayList<Pair<Float, Color>>()
-    stops.add(0f to Color.Black.copy(alpha = up))
-    for (k in 0..SOFT_STEPS) { val f = k / SOFT_STEPS.toFloat(); stops.add(top + ramp * f to Color.Black.copy(alpha = up * (1 - softStep(f)))) }
-    for (k in 0..SOFT_STEPS) { val f = k / SOFT_STEPS.toFloat(); stops.add(low0 + (low1 - low0) * f to Color.Black.copy(alpha = softStep(f))) }
-    stops.add(1f to Color.Black)
-    return Brush.verticalGradient(*stops.toTypedArray())
-}
-
-/** On its side: the video, blurred more and more to the right, one blur pass on the GPU with the Canvas band mask. */
-private fun sideBlur(w: Float, r: Float): androidx.compose.ui.graphics.RenderEffect {
-    val blur = android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
-    val on = android.graphics.Color.BLACK; val off = android.graphics.Color.TRANSPARENT
-    val from = .58f; val to = .92f   // sharp up to [from], eased: the transition stays, in the last part of the video
-    val cols = IntArray(SOFT_STEPS + 3); val at = FloatArray(SOFT_STEPS + 3)
-    cols[0] = off; at[0] = 0f
-    for (k in 0..SOFT_STEPS) { val u = k / SOFT_STEPS.toFloat(); cols[k + 1] = android.graphics.Color.argb((softStep(u) * 255).toInt(), 0, 0, 0); at[k + 1] = from + (to - from) * u }
-    cols[SOFT_STEPS + 2] = on; at[SOFT_STEPS + 2] = 1f
-    val mask = android.graphics.RenderEffect.createShaderEffect(android.graphics.LinearGradient(0f, 0f, w, 0f, cols, at, android.graphics.Shader.TileMode.CLAMP))
-    val frosted = android.graphics.RenderEffect.createBlendModeEffect(blur, mask, android.graphics.BlendMode.DST_IN)
-    return android.graphics.RenderEffect.createBlendModeEffect(android.graphics.RenderEffect.createOffsetEffect(0f, 0f), frosted, android.graphics.BlendMode.SRC_OVER).asComposeRenderEffect()
-}
-
 private val EASE_AT = floatArrayOf(0f, .214f, .429f, .629f, .814f, 1f)   // the eased fade's steps (where, how opaque)
 private val EASE_A = floatArrayOf(1f, .9f, .66f, .38f, .14f, 0f)
 
-/** The Canvas video filling its box: sharp, or (Blur the Canvas) drawn at a quarter of the size, blurred there and
- *  stretched back, which is cheap, unlike a full-screen blur every frame. */
+/** A stable decoder view: sharp without lyrics, or softened once in a 96px GPU texture while lyrics show. */
 @Composable
 private fun CanvasVideoView() {
-    val lyricsBlur = lyricsCanvasBlur()
-    val enabled = (S.b("cvBlur") || lyricsBlur) && !S.low
+    val enabled = lyricsCanvasBlur()
     val blend by animateFloatAsState(if (enabled) 1f else 0f,
         tween(if (Pop.calm) 0 else 260), label = "canvasBlur")
     val raw = rememberGraphicsLayer()
@@ -1772,27 +1707,22 @@ private fun CanvasVideoView() {
     done.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
     // Keep the native TextureView and its crop stable. Resizing/recreating it when lyrics arrive
     // causes a missing frame and a sudden quality jump; only the shared GPU copy changes here.
-    val recipe = remember { floatArrayOf(0f, 7f) }
-    if (enabled) {
-        recipe[0] = if (lyricsBlur) 96f else 0f
-        recipe[1] = if (lyricsBlur) backgroundBlurRadius(S.bgblur, E.wide) else S.i("cvBlurAmt").coerceIn(5, 100) / 100f * 14f
-    }
-    val factor = recipe[0]; val radius = recipe[1]
-    val effect = remember(radius) { BlurEffect(radius, radius, TileMode.Clamp) }
-    Box(Modifier.fillMaxSize().drawWithContent {
-        if (S.low || blend <= .001f) { drawContent(); return@drawWithContent }
-        raw.record { this@drawWithContent.drawContent() }
-        if (blend < .999f) drawLayer(raw)
-        val k = if (factor > 0f) factor / maxOf(size.width, size.height).coerceAtLeast(1f) else .25f
-        val sw = (size.width * k).roundToInt().coerceAtLeast(1)
-        val sh = (size.height * k).roundToInt().coerceAtLeast(1)
-        small.renderEffect = effect
-        small.record(IntSize(sw, sh)) {
-            scale(sw / raw.size.width.toFloat().coerceAtLeast(1f), sh / raw.size.height.toFloat().coerceAtLeast(1f), pivot = Offset.Zero) { drawLayer(raw) }
+    val radius = backgroundBlurRadius(S.bgblur, E.wide)
+    val factor = 96f
+    Box(Modifier.fillMaxSize().drawWithCache {
+        val (sw, sh) = canvasTextureSize(size.width, size.height, factor.toInt())
+        small.renderEffect = BlurEffect(radius, radius, TileMode.Clamp)
+        onDrawWithContent {
+            if (S.low || blend <= .001f) { drawContent(); return@onDrawWithContent }
+            raw.record { this@onDrawWithContent.drawContent() }
+            if (blend < .999f) drawLayer(raw)
+            small.record(IntSize(sw, sh)) {
+                scale(sw / raw.size.width.toFloat().coerceAtLeast(1f), sh / raw.size.height.toFloat().coerceAtLeast(1f), pivot = Offset.Zero) { drawLayer(raw) }
+            }
+            done.record(IntSize(sw, sh)) { drawLayer(small) }
+            done.alpha = blend
+            scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(done) }
         }
-        done.record(IntSize(sw, sh)) { drawLayer(small) }
-        done.alpha = blend
-        scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(done) }
     }) { CanvasView() }
 }
 
@@ -1867,4 +1797,4 @@ fun toggleRom() {
 @Suppress("unused") private val keep = listOf(Server, ColumnScope::class)
 
 /** Same condition for the displayed video and the shared glass/ambient sources. */
-internal fun lyricsCanvasBlur() = !S.low && S.b("cvLyrBlur") && Lyr.lines > 0 && (E.screen == "lyrics" || E.inPip)
+internal fun lyricsCanvasBlur() = !S.low && Lyr.lines > 0 && (E.screen == "lyrics" || E.inPip)

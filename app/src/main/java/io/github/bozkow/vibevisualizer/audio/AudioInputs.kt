@@ -12,14 +12,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.audio.TeeAudioProcessor
-import io.github.bozkow.vibevisualizer.core.Net
 import io.github.bozkow.vibevisualizer.core.now
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import okio.ByteString
-import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
@@ -175,50 +168,4 @@ class Mic {
     }
 
     fun stop() { val r = rec; rec = null; r?.let { runCatching { it.stop() }; runCatching { it.release() } }; th = null }
-}
-
-/** Vibe Bridge through your server: the computer playing the music sends its analyser frames, every device listens. */
-class BridgeRelay {
-    private var ws: WebSocket? = null
-    private var url: String? = null
-    private val buf = FloatArray(1024)
-    @Volatile var at = 0.0; private set          // last frame
-    @Volatile var on = false; private set        // connected to the relay
-    @Volatile var device = ""; private set
-    private var want = false
-    private val main = android.os.Handler(android.os.Looper.getMainLooper())
-
-    fun start(u: String) {
-        want = true
-        if (ws != null && u == url) return
-        stop(); want = true; url = u
-        open()
-    }
-
-    private fun open() {
-        val u = url ?: return
-        if (!want || ws != null) return
-        ws = Net.http.newWebSocket(Request.Builder().url(u).build(), object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) { on = true }
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                runCatching { val m = JSONObject(text); if (m.has("device")) device = m.optString("device"); if (m.optString("type") == "bye") at = 0.0 }
-            }
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                val a = bytes.toByteArray(); val n = min(1024, a.size)
-                synchronized(buf) { for (i in 0 until n) buf[i] = (a[i].toInt() and 0xff).toFloat() }
-                at = now()
-            }
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { webSocket.close(1000, null) }
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = gone(webSocket)
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = gone(webSocket)
-        })
-    }
-
-    private fun gone(w: WebSocket) {
-        main.post { if (ws === w) { ws = null; on = false; if (want) main.postDelayed({ open() }, 5000) } }
-    }
-
-    fun stop() { want = false; ws?.let { val w = it; ws = null; runCatching { w.cancel() } }; on = false; at = 0.0 }
-    fun live() = on && now() - at < 600
-    fun copy(dst: FloatArray) = synchronized(buf) { System.arraycopy(buf, 0, dst, 0, 1024) }
 }

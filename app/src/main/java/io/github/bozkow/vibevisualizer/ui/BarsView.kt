@@ -31,7 +31,7 @@ import kotlin.math.pow
 /** The bar visualizer, drawn as the web app draws it: a soft dark edge so the bars never melt into the background, an
  *  optional glow, rounded bars that rest as small dots, the colors of the cover, and optional motion blur. */
 @Composable
-fun BarsView(modifier: Modifier = Modifier) {
+internal fun SpectrumBars(modifier: Modifier = Modifier) {
     val st = remember { BarsState() }
     // the music plays on another device that the bars can't hear: they fade away
     val k by androidx.compose.animation.core.animateFloatAsState(if (Audio.away) 0f else 1f, androidx.compose.animation.core.tween(600), label = "baraway")

@@ -223,7 +223,7 @@ fun ServerChoice() {
             RadioButton(on, null)
         }
     }
-    card(!local, "With my server", "Your Vibe Visualizer server (the web app's helper) adds Spicy Lyrics, Spotify's own lyrics and Canvas videos, Vibe Bridge for the bars, and keeps your settings and error log.") { Vibe.cfg.saveLocal(false); Ping.kick(); Lyr.refreshCounts() }
+    card(!local, "With my server", "Your Vibe Visualizer server (the web app's helper) adds Spicy Lyrics, Spotify's own lyrics and Canvas videos, and keeps your settings and error log.") { Vibe.cfg.saveLocal(false); Ping.kick(); Lyr.refreshCounts() }
     card(local, "Without a server", "Everything runs on this phone: no server, no Tailscale. A few things need a server and are left out (below).") { Vibe.cfg.saveLocal(true); Lyr.refreshCounts() }
 }
 
@@ -231,7 +231,7 @@ fun ServerChoice() {
 @Composable
 fun WithoutServer() {
     P("Works on the phone: your files and Spotify (with its Canvas from Spicy Lyrics' Canvas service), other music apps, lyrics from LRCLIB, NetEase, AMLL, Unison, LRCMux, lrc.red, KuGou, QQ Music and Kuwo and your own .lrc and .ttml files, translation and romanization, the bars from this phone's sound, the widget, picture-in-picture, Ambient mode and everything else.")
-    Hint("Needs a server, so it's left out: Spicy Lyrics (its key may only be kept on a server), Spotify's own lyrics (they need a Spotify cookie kept on the server), Vibe Bridge (it relays through the server), and settings and the error log kept on the server (Back up settings still copies them).")
+    Hint("Needs a server, so it's left out: Spicy Lyrics (its key may only be kept on a server), Spotify's own lyrics (they need a Spotify cookie kept on the server), settings and the error log kept on the server (Back up settings still copies them).")
 }
 
 @Composable
@@ -287,7 +287,6 @@ private fun SoundStep() {
     Step(2, "Exact timing and controls from the Spotify app on this phone (no Premium needed for play, pause, skip and seek): allow notification access. No notification is read; it only lets the app see the Spotify app’s player.", ok = acc) {
         if (!acc) VTonalButton(onClick = { Perms.notificationAccess() }, Modifier.padding(top = 6.dp)) { Text("Open notification access") }
     }
-    if (!Vibe.cfg.local) Step(3, "Music on another device: run Vibe Bridge there with your server’s address, and the bars here follow it too.", ok = Audio.bridgeOn)
     LaunchedEffect(Unit) { SpotifyApp.refresh(Vibe.app) }
 }
 

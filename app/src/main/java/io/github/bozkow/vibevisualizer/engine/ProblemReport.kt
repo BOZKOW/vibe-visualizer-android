@@ -16,7 +16,7 @@ object ProblemReport {
             append("- App: ${details.version}\n- Device: ${details.device}\n- Android: ${details.android}\n")
             append("- Orientation: ${details.orientation}\n- Glass: ${details.glass}\n- Frame cap: ${details.fps.takeIf { it.matches(Regex("[0-9]{1,3}")) } ?: "unknown"}\n")
             append("- Low performance mode: ${details.low}\n- Background: ${details.background.takeIf { it in setOf("dynamic", "cover", "artist", "color", "none") } ?: "other"}\n")
-            append("- Canvas blur: ${details.canvasBlur}\n- Behind controls: ${details.controlsBackdrop.takeIf { it in setOf("none", "dark", "blur", "both") } ?: "other"}\n- Blur amount: ${details.blurAmount}%\n")
+            append("- Canvas blur: ${details.canvasBlur}\n- Behind controls: ${details.controlsBackdrop.takeIf { it in setOf("none", "dark", "blur", "both", "automatic") } ?: "other"}\n- Blur amount: ${details.blurAmount}%\n")
         }
     }
 

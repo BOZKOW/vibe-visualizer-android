@@ -13,7 +13,7 @@ Music, SoundCloud, Apple Music or Deezer, and your own audio files. No Spotify a
 > ported from the Spicy Lyrics source code, and it uses the [Spicy Lyrics API](https://developers.spicylyrics.org)
 > through your own server (see [Credits](#credits) and [License](#license)).
 
-The web app, the server helper, the macOS app and Vibe Bridge live in the main repository,
+The web app, the server helper, and the macOS app live in the main repository,
 [BOZKOW/vibe-visualizer](https://github.com/BOZKOW/vibe-visualizer).
 
 ## Install
@@ -29,7 +29,7 @@ Android 12 or newer. The app is a beta.
    - **With your Vibe Visualizer server** (set up as in the [main repository](https://github.com/BOZKOW/vibe-visualizer#setup)):
      enter its address (`NAME.your-tailnet.ts.net`) and keep Tailscale connected on the phone; if the server can't be
      found, turn off Android's Private DNS (it hides Tailscale names). The server is only asked for what needs it:
-     Spicy Lyrics, Spotify's own lyrics, your Canvas source and Vibe Bridge.
+     Spicy Lyrics, Spotify's own lyrics, your Canvas source.
    - **Without a server**: everything else runs on the phone (lyrics from LRCLIB, NetEase, AMLL, Unison, LRCMux,
      lrc.red and the Chinese catalogues, Canvas from Spicy Lyrics' Canvas service, the bars, the widget…).
 
@@ -54,14 +54,13 @@ Updates install from inside the app: *Settings → Help & about → Update now*.
 - **The player**: the song at the top, the lyrics, the bars and the controls on one screen; held sideways, the lyrics
   get the right side. Picture-in-picture, a home screen widget, Ambient mode (an always-on display while music plays),
   Spotify Canvas, Apple Music's animated covers (free, no account or key), Up next in a song's last 30 seconds, and
-  frosted glass throughout (Liquid glass as an experiment). **Settings → Canvas → Blur the whole Canvas with lyrics**
-  applies the background’s Blur intensity while lyrics are shown.
+  frosted glass throughout (clear Liquid Glass as an experiment). Canvas stays sharp without lyrics and automatically
+  uses the background’s blur intensity while lyrics are shown.
 - **Buttons you pick**: choose what goes under the controls, including one tap to add a lyrics file or play songs from
   your phone.
 - **The bars** hear everything the phone plays (Android's Visualizer; it needs the microphone permission, and nothing
-  is recorded or sent), the microphone, or [Vibe Bridge](https://github.com/BOZKOW/vibe-visualizer#vibe-bridge-bars-from-the-spotify-app)
-  through your server. Bass (40–250 Hz), mids (250 Hz–4 kHz) and treble (4–16 kHz, limited by the recording’s sample rate)
-  have separate automatic sensitivity. Colours follow the video quickly and adjust for light or dark backgrounds.
+  is recorded or sent), the microphone, or files playing inside the app. Bass (40–250 Hz), mids (250 Hz–4 kHz) and treble (4–16 kHz, limited by the recording’s sample rate)
+  have separate automatic sensitivity. Colours update five times per second while video plays and adjust for light or dark backgrounds.
 - **Ready before they play**: the next songs in the music app's queue (or your files') get their lyrics, Canvas and
   cover while the song before plays.
 - **Only errors interrupt**: something that's broken shows at the top of the player; tap it to see what it means and
@@ -127,3 +126,11 @@ the dictionaries of [pinyin](https://github.com/hotoo/pinyin) 4.0.0 by 闲耘 (M
 Vibe Visualizer for Android is free software, licensed under the [GNU Affero General Public License v3.0](LICENSE)
 (AGPL-3.0), because it includes code ported from Spicy Lyrics and Spicy Lyrics Mobile. The app links to its source
 code under *Settings → Help & about*.
+
+### Dancing visualizer experiment
+
+Settings → Experiments → Dancing visualizer adds Shigure Ui beside the bars in the right-hand landscape corner.
+It estimates tempo from the visualizer’s captured audio and adjusts a four-beat animation loop, with no BPM setup.
+It starts at 120 BPM and keeps the last estimated pace through quiet sections. Low performance/reduced motion disable it; playback pause and Settings stop its motion.
+The small animation is fetched only after opt-in from [Guyutongxue’s project](https://github.com/guyutongxue/shigure-ui-dance-css),
+which credits [ががめ](https://x.com/utsugame) for the original animation/illustration. No copy of that artwork or its CSS is bundled in the APK.

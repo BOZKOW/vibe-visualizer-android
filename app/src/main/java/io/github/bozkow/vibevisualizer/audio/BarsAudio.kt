@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.bozkow.vibevisualizer.core.S
-import io.github.bozkow.vibevisualizer.core.Server
 import io.github.bozkow.vibevisualizer.core.Vibe
 import io.github.bozkow.vibevisualizer.core.now
 import io.github.bozkow.vibevisualizer.engine.E
@@ -29,7 +28,6 @@ object Audio {
     private val analyser = Analyser()
     val phone = PhoneSound()
     val mic = Mic()
-    val bridge = BridgeRelay()
 
     // bars
     var N = 0; private set
@@ -59,7 +57,6 @@ object Audio {
 
     var label by mutableStateOf("No audio"); private set      // what the bars follow (the audio chip)
     var labelTip by mutableStateOf(""); private set
-    var bridgeOn by mutableStateOf(false); private set
     /** The music plays on another device (Spotify on a computer or a speaker, a music app casting): the visualizer steps
      *  aside, unless the bars listen to the microphone (the music may play in the room). */
     var away by mutableStateOf(false); private set
@@ -77,32 +74,27 @@ object Audio {
 
     private fun curRate() = if (E.src == "file" && Local.playing()) FileTap.sampleRate else 48000
 
-    /** Starts or stops the capture the settings ask for (phone sound or microphone) and the bridge. */
+    /** Starts or stops the capture the settings ask for (phone sound or microphone) only. */
     fun applyCapture() {
         val cap = S.str("aCap")
         if (cap == "phone" && permitted() && E.visible) phone.start() else phone.stop()
         if (cap == "mic" && permitted() && E.visible) mic.start(Vibe.app) else mic.stop()
-        val relay = Server.base?.replaceFirst("https://", "wss://")?.replaceFirst("http://", "ws://")?.plus("/api/bridge/listen")
-        if (S.b("bridge") && relay != null && E.visible) bridge.start(relay) else bridge.stop()
     }
 
-    fun stopAll() { phone.stop(); mic.stop(); bridge.stop() }
+    fun stopAll() { phone.stop(); mic.stop() }
 
     private fun filePlaying() = E.src == "file" && Local.playing()
     private fun phoneLive() = phone.running && now() - phone.heardAt < 1500
     private fun micLive() = mic.running
     fun liveAudio() = filePlaying() || micLive() || phoneLive()
-    /** The music plays on this phone (your files, or the Spotify app playing here): a computer's Vibe Bridge hears
-     *  something else then, so the bars and their label leave it out. */
+    /** Whether the followed player uses this phone's audio output. */
     private fun playsHere() = Outputs.here(E.src)
-    fun bridgeLive() = bridge.live() && !playsHere()
 
     /** Seconds the measured sound lags behind what you hear (for the desync detection). */
     fun lag(): Double = when {
         filePlaying() -> 0.0
         micLive() -> .06
         phoneLive() -> .05
-        bridgeLive() -> .22
         else -> 0.0
     }
 
@@ -131,16 +123,15 @@ object Audio {
         if (bandRate != curRate()) setupBands()
         val aA = 1 - exp(-dt / (6 + S.i("resp") * .5)); val aR = 1 - exp(-dt / (30 + S.i("resp") * 3.5)); val boost = S.i("boost") / 100f
         val fp = filePlaying(); val ml = !fp && micLive(); val pl = !fp && !ml && phoneLive()
-        val viaBridge = !fp && !ml && !pl && bridgeLive()
-        val live = fp || ml || pl || viaBridge
+        val live = fp || ml || pl
         realAudio = live
         if (live) {
             val tau = .35.pow(dt / 16.7).toFloat()   // the analyser smooths once per read: scaled to the frame time, the same at 60 and 120 fps
             when {
                 fp -> { val pos = Local.positionMs(); FileTap.sync(pos); FileTap.read(pos, pcm); analyser.compute(pcm, tau, data) }
                 ml -> { mic.ring.read(mic.ring.written, pcm); analyser.compute(pcm, tau, data) }
-                else -> {   // Visualizer and Vibe Bridge readings come 20-50 times a second: glide between them instead of jumping
-                    if (pl) phone.copy(frame) else bridge.copy(frame)
+                else -> {   // Visualizer readings come 20-50 times a second: glide between them instead of jumping
+                    phone.copy(frame)
                     val k = (1 - exp(-dt / 20)).toFloat()
                     for (i in 0 until 1024) { glide[i] += (frame[i] - glide[i]) * k; data[i] = glide[i] }
                 }
@@ -196,7 +187,11 @@ object Audio {
     }
 
     // beats: a bass hit clearly above the recent bass level; drives the background push
+    private var tempoTrack = -1
     fun beatTick(t: Double, dt: Double) {
+        if (tempoTrack != E.trackVer) {
+            tempoTrack = E.trackVer; onsetGaps.clear(); lastOnset = 0.0; bgTempo = 0f
+        }
         bgEnergy += (mxv - bgEnergy) * (1 - exp(-dt / 500)).toFloat()
         bassSlow += (bass - bassSlow) * (1 - exp(-dt / 350)).toFloat()
         if (bass - bassSlow > .07f && t - lastOnset > 240) {
@@ -212,20 +207,20 @@ object Audio {
         if (t - lastOnset > 4000 && onsetGaps.isNotEmpty()) { onsetGaps.clear(); bgTempo = 0f }
     }
 
+    /** Null until actual audio has supplied enough beat intervals; the ambient wave is never a tempo source. */
+    fun tempoBpm(): Float? = if (realAudio) tempoFromOnsets(onsetGaps) else null
+
     fun dropBars() { vals.fill(0f) }   // (the auto sensitivity keeps its level: the next song is about as loud)
 
     private fun updLabel() {
-        val br = bridge.live() || (bridge.on && now() - bridge.at < 1500)
-        if (br != bridgeOn) bridgeOn = br
         val (t, tip) = when {
             filePlaying() -> "This file" to "Bars follow: the file that’s playing."
             micLive() -> "Microphone" to "Bars follow: the microphone (the sound in the room)."
             phoneLive() -> "Phone sound" to "Bars follow: everything this phone plays, the Spotify app included."
-            bridgeLive() -> "Vibe Bridge" to ("Bars follow: Vibe Bridge through your server" + (if (bridge.device.isNotEmpty()) " · listening to ${bridge.device}" else "") + ".")
             E.playing() && E.src != "file" -> "Ambient" to when {
                 playsHere() && phone.running -> "Bars follow: a gentle ambient motion until Phone sound hears the Spotify app on this phone."
                 playsHere() || !phone.running -> "Bars follow: a gentle ambient motion (Spotify’s audio can’t be read). Allow “Phone sound” for real bars from the Spotify app on this phone."
-                else -> "Bars follow: a gentle ambient motion. The music plays on another device; Vibe Bridge there gives real bars."
+                else -> "Bars follow: a gentle ambient motion. The music plays on another device; use the microphone to hear a nearby speaker."
             }
             phone.running -> "Phone sound" to "Waiting for sound: the bars follow everything this phone plays."
             else -> "No audio" to "Nothing for the bars to follow. Tap to choose what the bars hear."

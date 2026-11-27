@@ -58,7 +58,7 @@ half4 main(float2 p) {
 """
 
 /** One cached shader/effect per surface; every corner and the actual visible size participates in its cache key. */
-class Lens internal constructor(private val shader: Any?, private val density: Float = 1f, private val diffusion: Float = 0f) {
+class Lens internal constructor(private val shader: Any?, private val density: Float = 1f) {
     private var w = -1f; private var h = -1f
     private var tl = -1f; private var tr = -1f; private var br = -1f; private var bl = -1f
     private var fx: RenderEffect? = null
@@ -74,18 +74,16 @@ class Lens internal constructor(private val shader: Any?, private val density: F
             sh.setFloatUniform("corners", a, b, c, d)
             sh.setFloatUniform("rim", minOf(minOf(width, height) * .32f, 18f * density).coerceAtLeast(1f))
             val refract = android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content")
-            fx = (if (diffusion > 0f) android.graphics.RenderEffect.createChainEffect(refract,
-                android.graphics.RenderEffect.createBlurEffect(diffusion, diffusion, android.graphics.Shader.TileMode.CLAMP))
-                else refract).asComposeRenderEffect()
+            fx = refract.asComposeRenderEffect()
         }
         return fx
     }
 }
 
-@Composable fun rememberLens(diffusion: Dp = 1.25.dp): Lens {
+@Composable fun rememberLens(): Lens {
     val enabled = liquidOn()
     val density = androidx.compose.ui.platform.LocalDensity.current.density
-    return remember(enabled, density, diffusion) { Lens(if (enabled) RuntimeShader(LENS) else null, density, diffusion.value * density) }
+    return remember(enabled, density) { Lens(if (enabled) RuntimeShader(LENS) else null, density) }
 }
 
 fun liquidOn(): Boolean = Build.VERSION.SDK_INT >= 33 && S.b("xLiquid") && !S.low && !S.calm

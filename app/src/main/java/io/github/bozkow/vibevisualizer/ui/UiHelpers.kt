@@ -96,7 +96,7 @@ val GlassEdge = Color.White.copy(alpha = .22f)
 // (0.56.1, the owner: "too bright… get the glass from Spicy Lyrics Mobile", its 0.19's: SpicyGlass in SpicyTokens.kt: a 1 px ring
 // at .16 white, a bright line along the top at .36 and a fainter one at the foot at .18)
 private val FrostRim: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha = .36f), .14f to Color.White.copy(alpha = .16f), .86f to Color.White.copy(alpha = .16f), 1f to Color.White.copy(alpha = .18f))
-private val LiquidRim: Brush = Brush.linearGradient(0f to Color.White.copy(alpha = .55f), .3f to Color.White.copy(alpha = .14f), .62f to Color.White.copy(alpha = .04f), 1f to Color.White.copy(alpha = .25f))
+private val LiquidRim: Brush = Brush.linearGradient(0f to Color.White.copy(alpha = .44f), .3f to Color.White.copy(alpha = .12f), .62f to Color.White.copy(alpha = .04f), 1f to Color.White.copy(alpha = .25f))
 val GlassRim: Brush get() = if (liquidOn()) LiquidRim else FrostRim
 /** The rim of something switched off or quiet. */
 val GlassRimFaint: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha = .2f), .5f to Color.White.copy(alpha = .06f), 1f to Color.White.copy(alpha = .1f))
@@ -106,8 +106,7 @@ val GlassRimFaint: Brush = Brush.verticalGradient(0f to Color.White.copy(alpha =
 fun androidx.compose.ui.graphics.drawscope.DrawScope.glassBody(shade: Float = .16f, k: Float = 1f) {
     // Liquid glass: a slight neutral dark tint, no colour wash, and restrained light/shadow at its edges.
     if (liquidOn()) {
-        drawRect(Color.Black.copy(alpha = .24f * k))
-        drawRect(Color.White.copy(alpha = .025f * k))
+        drawRect(Color.Black.copy(alpha = .18f * k))
         val e = minOf(size.height * .22f, 14.dp.toPx())
         drawRect(Brush.verticalGradient(0f to Color.White.copy(alpha = .1f * k), 1f to Color.Transparent, endY = e), size = androidx.compose.ui.geometry.Size(size.width, e))
         drawRect(Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black.copy(alpha = .1f * k), startY = size.height - e, endY = size.height),
@@ -252,7 +251,7 @@ fun Modifier.glassIsland(b: Backdrop?, k: Float = 1f, shape: Shape = RoundedCorn
     val at = remember { floatArrayOf(0f, 0f) }
     val fx = remember { androidx.compose.ui.graphics.BlurEffect(6f, 6f, androidx.compose.ui.graphics.TileMode.Clamp) }
     val liquid = liquidOn()
-    val lens = rememberLens(6.dp)   // readable over scrolling text, with the same refraction/tint/rim
+    val lens = rememberLens()   // clear refraction; ordinary glass alone uses the frosted material
     if (k <= 0f || S.low) return if (baseGlass || k > 0f) this.glass(shape, lift = false) else this
     return this.shadow(10.dp * k, shape, clip = false, ambientColor = Color.Black, spotColor = Color.Black)
         .onGloballyPositioned { val p = it.positionInRoot(); at[0] = p.x; at[1] = p.y }

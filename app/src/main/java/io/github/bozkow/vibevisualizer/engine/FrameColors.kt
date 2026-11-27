@@ -27,16 +27,18 @@ internal class FrameColors(private val view: () -> TextureView?, private val mov
         job = Vibe.scope.launch {
             val w = 48; val h = 85
             val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            var n = 0
+            var sampled = false
+            var nextSample = io.github.bozkow.vibevisualizer.core.now() + 200.0
             while (true) {
-                // quick to take the video's colours (a quarter second in, then twice more as it fades in from black), then
-                // every 0.8 s while it moves: the bars follow its cuts (every 5 s, three frames mixed, they lagged and blended)
-                delay(when (n++) { 0 -> 250L; 1 -> 500L; 2 -> 750L; else -> 800L })
-                if (n > 3 && (!moving() || E.quiet || !E.visible)) continue   // held still (paused, or not on screen): nothing new to see
+                delay((nextSample - io.github.bozkow.vibevisualizer.core.now()).toLong().coerceAtLeast(1L))
+                nextSample = io.github.bozkow.vibevisualizer.core.now() + 200.0
+                // Five color samples per second; a cancelled/hidden player makes no readback requests
+                if ((!moving() && sampled) || E.quiet || !E.visible || S.low || E.ambient) continue
                 val f = copyFrame(bitmap) ?: continue
                 // Only the tiny GPU readback runs on main; colour extraction and luminance run together off it.
                 val palette = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Visuals.barsFrom(f) } ?: continue
                 set(palette)
+                sampled = true
             }
         }
     }
@@ -53,7 +55,7 @@ internal class FrameColors(private val view: () -> TextureView?, private val mov
                 PixelCopy.request(surface, bitmap, { result ->
                     surface.release()
                     if (io.github.bozkow.vibevisualizer.BuildConfig.BUILD_TYPE == "debug")
-                        android.util.Log.d("VV-palette", "Async frame copy: $result")
+                        android.util.Log.i("VV-palette", "Async frame copy: $result")
                     if (continuation.isActive) continuation.resume(if (result == PixelCopy.SUCCESS) bitmap else null)
                 }, Handler(Looper.getMainLooper()))
             } catch (_: IllegalArgumentException) {

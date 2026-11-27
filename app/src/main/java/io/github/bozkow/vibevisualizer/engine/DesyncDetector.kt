@@ -22,7 +22,7 @@ import kotlin.math.sqrt
 /* Desync detection: listens to the music and checks that the singing lines up with the lyrics. Singing starts show up
    as sudden rises in the voice range (300-3400 Hz); they're compared with where the lyrics expect words to start (or
    lines, without word timing), trying every shift from -3 to +3 s. Only a clear, repeated answer counts. Needs real
-   sound (phone sound, Vibe Bridge, the microphone, a file); Spotify's ambient bars carry none. */
+   sound (phone sound, the microphone, a file); Spotify's ambient bars carry none. */
 object Desync {
     private val prev = FloatArray(1024)
     private var ft = 0.0; private var acc = 0f; private var lv = 0f; private var ln = 0; private var bt = 0.0
@@ -40,7 +40,7 @@ object Desync {
     fun tick(t: Double) {
         if (S.str("lDesync") == "off") { st(""); return }
         if (!Lyr.lsync || Lyr.L.isEmpty() || ign || !E.playing()) { lastT = null; st(if (ign) "Ignored for this song." else ""); return }
-        if (!Audio.realAudio) { lastT = null; st("Waiting for real sound (phone sound, Vibe Bridge, the microphone or a file)."); return }
+        if (!Audio.realAudio) { lastT = null; st("Waiting for real sound (phone sound, the microphone or a file)."); return }
         val pos = Lyr.lyrT()
         if ((lastT != null && abs(pos - lastT!!) > .35) || off != S.loff) { reset(); off = S.loff }   // a seek, a jump or a new offset: start over
         lastT = pos

@@ -33,7 +33,7 @@ fun ReportProblemSheet() {
         "${Build.MANUFACTURER} ${Build.MODEL}", "${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}",
         if (config.orientation == Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait",
         if (liquidOn()) "Liquid" else "Frosted", S.str("fpscap"), S.low, S.bgStyle,
-        S.b("cvBlur"), S.str("cvBehind"), S.i("cvBlurAmt"))
+        lyricsCanvasBlur(), "automatic", S.bgblur)
     val report = ProblemReport.body(description, details.takeIf { include })
     val url = ProblemReport.draftUrl(title, report)
     val ready = title.isNotBlank() && description.isNotBlank()

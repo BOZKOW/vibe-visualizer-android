@@ -303,6 +303,9 @@ object Frost {
     var canvasAlreadyBlurred by mutableStateOf(false)
     var sceneReady by mutableStateOf(false)
     var sceneBlurReady by mutableStateOf(false)
+    var sceneTextureSize by mutableStateOf(IntSize.Zero)
+    var sceneBlurTextureSize by mutableStateOf(IntSize.Zero)
+    var sceneSize by mutableStateOf(IntSize.Zero)
     var videoAt by mutableStateOf(Offset.Zero)
     var screen = IntSize.Zero                           // the size that's drawn at
     var cover by mutableStateOf(Rect.Zero)              // where the cover is, in the window
@@ -361,7 +364,7 @@ fun Modifier.liveCoverFrost(): Modifier = composed {
 }
 
 /** Share the displayed Canvas: inherit its blur; add material frost only where it is still sharp. */
-fun Modifier.liveCanvasFrost(enabled: Boolean, alreadyBlurred: Boolean): Modifier = composed {
+fun Modifier.liveCanvasFrost(enabled: Boolean, alreadyBlurred: Boolean, reduced: Boolean = false): Modifier = composed {
     if (!enabled) return@composed Modifier
     val scene = rememberGraphicsLayer()
     val small = rememberGraphicsLayer()
@@ -379,10 +382,20 @@ fun Modifier.liveCanvasFrost(enabled: Boolean, alreadyBlurred: Boolean): Modifie
             if (Frost.videoSceneBlur === done) { Frost.videoSceneBlur = null; Frost.sceneBlurReady = false }
         }
     }
-    Modifier.onGloballyPositioned { Frost.videoAt = it.positionInWindow() }.drawWithContent {
-        scene.record { this@drawWithContent.drawContent() }
-        if (Frost.videoScene === scene) Frost.sceneReady = scene.size.width > 0
-        drawLayer(scene)
+    Modifier.onGloballyPositioned { Frost.videoAt = it.positionInWindow() }.onSizeChanged { Frost.sceneSize = it }.drawWithContent {
+        // Once the entire Canvas is blurred, its finished scene needs no full-screen offscreen texture.
+        // Sharp video and blur transitions retain full resolution. All glass reuses this ONE finished result.
+        val (sw, sh) = if (reduced) canvasTextureSize(size.width, size.height, 384) else size.width.roundToInt() to size.height.roundToInt()
+        if (sw < 1 || sh < 1) return@drawWithContent
+        val displayW = size.width; val displayH = size.height
+        scene.record(IntSize(sw, sh)) {
+            scale(sw / displayW, sh / displayH, pivot = Offset.Zero) { this@drawWithContent.drawContent() }
+        }
+        if (Frost.videoScene === scene) {
+            Frost.sceneTextureSize = IntSize(sw, sh)
+            Frost.sceneReady = true
+        }
+        scale(size.width / sw, size.height / sh, pivot = Offset.Zero) { drawLayer(scene) }
         if (needsBlur && !E.quiet && size.width > 0f && size.height > 0f) {
             val f = 8f
             val sw = (size.width / f).roundToInt().coerceAtLeast(1)
@@ -390,7 +403,10 @@ fun Modifier.liveCanvasFrost(enabled: Boolean, alreadyBlurred: Boolean): Modifie
             small.renderEffect = blur
             small.record(IntSize(sw, sh)) { scale(1f / f, 1f / f, pivot = Offset.Zero) { drawLayer(scene) } }
             done.record(IntSize(sw, sh)) { drawLayer(small) }
-            if (Frost.videoSceneBlur === done) Frost.sceneBlurReady = true
+            if (Frost.videoSceneBlur === done) {
+                Frost.sceneBlurTextureSize = IntSize(sw, sh)
+                Frost.sceneBlurReady = true
+            }
         }
     }
 }
@@ -413,8 +429,11 @@ private fun DrawScope.drawFrost(img: ImageBitmap?, stillImg: ImageBitmap?, at: O
         val finished = if (liquidOn() || Frost.canvasAlreadyBlurred) scene
             else if (Frost.sceneBlurReady) Frost.videoSceneBlur ?: scene else scene
         translate(-at.x, -at.y) { Frost.bg?.let { drawLayer(it) } }
+        // Cache builders must observe the recording size as well as readiness. Switching between
+        // sharp/full-size and blurred/reduced-size scenes otherwise leaves a stale sampling transform.
+        val texture = if (finished === scene) Frost.sceneTextureSize else Frost.sceneBlurTextureSize
         translate(Frost.videoAt.x - at.x, Frost.videoAt.y - at.y) {
-            scale(scene.size.width / finished.size.width.toFloat(), scene.size.height / finished.size.height.toFloat(), pivot = Offset.Zero) { drawLayer(finished) }
+            scale(Frost.sceneSize.width / texture.width.coerceAtLeast(1).toFloat(), Frost.sceneSize.height / texture.height.coerceAtLeast(1).toFloat(), pivot = Offset.Zero) { drawLayer(finished) }
         }
         if (Frost.upright) Frost.lyrics?.let { l -> if (l.size.width > 0) translate(-at.x, Frost.lyricsY - at.y) { scale(8f, 8f, pivot = Offset.Zero) { drawLayer(l) } } }
         return
