@@ -49,14 +49,16 @@ internal fun DanceCorner(modifier: Modifier) {
         .firstOrNull { it.title == E.title && it.artist == E.artist }
         ?: SongMeta(title = E.title, artist = E.artist, album = E.album, duration = E.curDur())
     val key = tempoKey(meta)
-    var bpm by remember(track, key) { mutableStateOf<Int?>(null) }
+    var bpm by remember(track) { mutableStateOf<Int?>(null) }
     val visible = E.playingState && E.visible && !E.quiet && E.settingsPage == null && E.sheet == null
     val network = Net.online.value
     val canLookup = E.visible && !E.quiet && E.settingsPage == null
     LaunchedEffect(track, key, network, canLookup) {
         if (!canLookup) return@LaunchedEffect
         delay(350)   // don't query songs that are only skipped past
-        bpm = SongTempo.find(meta, network)?.roundToInt()?.coerceIn(30,300)
+        // Recording details can arrive again during the same song. Hold its confirmed pace while
+        // refining the lookup so a metadata refresh cannot interrupt the animation.
+        SongTempo.find(meta, network)?.roundToInt()?.coerceIn(30,300)?.let { bpm = it }
     }
     DisposableEffect(Unit) { onDispose { DancePresence.matched = false } }
     val progress = danceProgress()
