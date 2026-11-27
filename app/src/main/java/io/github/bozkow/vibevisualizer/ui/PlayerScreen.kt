@@ -222,6 +222,11 @@ fun PlayerScreen() {
                 androidx.compose.runtime.CompositionLocalProvider(LocalFrost provides !S.low) { Box(Modifier.widthIn(max = 600.dp).fillMaxSize()) { LyricsScreen() } }
             }
         }
+        if (danceEnabled() && E.src != "none") {
+            DanceCorner(Modifier.align(Alignment.BottomEnd)
+                .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Right))
+                .padding(end = 3.dp, bottom = 3.dp).size(width = 76.dp, height = 106.dp))
+        }
     }
 }
 
@@ -460,13 +465,13 @@ private fun LandscapeCover() {
     val footIn = (with(dn) { WindowInsets.navigationBarsIgnoringVisibility.getBottom(dn).toDp() } - gapY).coerceAtLeast(0.dp)
     // further in on the camera's side: the owner's phone still had the cover in the hole with the room it reports
     Row(Modifier.fillMaxSize().padding(start = if (cameraOnLeft()) 48.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        val coverShape = RoundedCornerShape(18.dp * (S.i("aCoverR").coerceIn(0, 40) / 22f))
         Box(Modifier.size(side).ambientOut().onGloballyPositioned { Frost.cover = it.boundsInWindow() }) {
-            CoverArt(Modifier.fillMaxSize().liveCoverFrost(), corner = 18.dp)
             var headH by remember { mutableFloatStateOf(0f) }
             var footH by remember { mutableFloatStateOf(0f) }
-            // drawn behind both, reaching past them and fading out over the cover (nothing at the head: no shade there);
-            // the same corners as the cover's (Settings → Player screen → Cover corners)
-            Column(Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp * (S.i("aCoverR").coerceIn(0, 40) / 22f))).drawBehind {
+            // Glass samples the finished, rounded and shaded artwork, before the controls are drawn.
+            Box(Modifier.fillMaxSize().liveCoverFrost().clip(coverShape).drawWithContent {
+                drawContent()
                 // (eased at their ends: from clear straight to dark, the edge showed as a line across a bright cover)
                 val down = 36.dp.toPx(); val up = 72.dp.toPx()
                 val h0 = headH / (headH + down); val f = up / (footH + up)
@@ -475,7 +480,8 @@ private fun LandscapeCover() {
                 val y = size.height - footH - up
                 drawRect(Brush.verticalGradient(0f to Color.Transparent, f * .35f to Color.Black.copy(alpha = .06f), f * .7f to Color.Black.copy(alpha = .22f), f to Color.Black.copy(alpha = .38f), 1f to Color.Black.copy(alpha = .72f), startY = y, endY = size.height),
                     topLeft = Offset(0f, y), size = androidx.compose.ui.geometry.Size(size.width, footH + up))
-            }) {
+            }) { CoverArt(Modifier.fillMaxSize(), corner = 18.dp) }
+            Column(Modifier.fillMaxSize().clip(coverShape)) {
                 TopBar(Modifier.onSizeChanged { headH = it.height.toFloat() }.padding(top = headIn).padding(horizontal = 10.dp), side = true)
                 Spacer(Modifier.weight(1f))
                 Column(Modifier.fillMaxWidth().onSizeChanged { footH = it.height.toFloat() }.padding(bottom = footIn).padding(start = 18.dp, end = 18.dp, bottom = 6.dp)) {
@@ -516,13 +522,13 @@ private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 4
         if (bars && E.screen != "viz") NoLyricsNote(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)).padding(end = endGap))
         var areaH by remember { mutableFloatStateOf(0f) }
         Box(Modifier.weight(1f).fillMaxWidth().zIndex(-1f).onSizeChanged { areaH = it.height.toFloat() }) {
-            if (bars) { BarsView(Modifier.fillMaxSize().padding(top = 8.dp, bottom = 8.dp, end = endGap)); AwayNote(Modifier.align(Alignment.Center)) }
+            if (bars) { BarsView(Modifier.fillMaxSize().padding(top = 8.dp, bottom = 8.dp, end = if (danceEnabled()) 0.dp else endGap)); AwayNote(Modifier.align(Alignment.Center)) }
             // the lyrics nearer the side than the bars ([lyricsEnd]): the other singer's lines, set at the right, end close to
             // the screen's edge (28 dp in, they sat towards the middle: "move the duet vocals more to the right")
-            else LyricsPane(Modifier.fillMaxSize().padding(end = lyricsEnd), areaHeightPx = areaH, padStart = 4f, padEnd = 6f, problems = false, behind = true, startRoom = startRoom)
+            else LyricsPane(Modifier.fillMaxSize().padding(end = if (danceEnabled()) maxOf(lyricsEnd, 88.dp) else lyricsEnd), areaHeightPx = areaH, padStart = 4f, padEnd = 6f, problems = false, behind = true, startRoom = startRoom)
         }
-        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = endGap).height(60.dp))
-        Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }
+        if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = if (danceEnabled()) 0.dp else endGap).height(60.dp))
+        Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = if (danceEnabled()) maxOf(endGap, 88.dp) else endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }
     }
 }
 
@@ -1797,4 +1803,4 @@ fun toggleRom() {
 @Suppress("unused") private val keep = listOf(Server, ColumnScope::class)
 
 /** Same condition for the displayed video and the shared glass/ambient sources. */
-internal fun lyricsCanvasBlur() = !S.low && Lyr.lines > 0 && (E.screen == "lyrics" || E.inPip)
+internal fun lyricsCanvasBlur() = !E.wide && !S.low && Lyr.lines > 0 && (E.screen == "lyrics" || E.inPip)

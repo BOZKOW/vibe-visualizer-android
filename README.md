@@ -54,8 +54,8 @@ Updates install from inside the app: *Settings → Help & about → Update now*.
 - **The player**: the song at the top, the lyrics, the bars and the controls on one screen; held sideways, the lyrics
   get the right side. Picture-in-picture, a home screen widget, Ambient mode (an always-on display while music plays),
   Spotify Canvas, Apple Music's animated covers (free, no account or key), Up next in a song's last 30 seconds, and
-  frosted glass throughout (clear Liquid Glass as an experiment). Canvas stays sharp without lyrics and automatically
-  uses the background’s blur intensity while lyrics are shown.
+  frosted glass throughout (clear Liquid Glass as an experiment). Canvas stays sharp without lyrics and in landscape; portrait uses
+  the background’s blur intensity while lyrics are shown.
 - **Buttons you pick**: choose what goes under the controls, including one tap to add a lyrics file or play songs from
   your phone.
 - **The bars** hear everything the phone plays (Android's Visualizer; it needs the microphone permission, and nothing
@@ -131,6 +131,6 @@ code under *Settings → Help & about*.
 
 Settings → Experiments → Dancing visualizer adds Shigure Ui beside the bars in the right-hand landscape corner.
 It estimates tempo from the visualizer’s captured audio and adjusts a four-beat animation loop, with no BPM setup.
-It starts at 120 BPM and keeps the last estimated pace through quiet sections. Low performance/reduced motion disable it; playback pause and Settings stop its motion.
+It waits for several seconds of stable rhythm before moving, resets its estimate on song changes, and keeps the last estimated pace through quiet sections. The figure stays just inside the bottom-right screen edge, including while lyrics show. Low performance/reduced motion disable it; playback pause and Settings stop its motion.
 The small animation is fetched only after opt-in from [Guyutongxue’s project](https://github.com/guyutongxue/shigure-ui-dance-css),
 which credits [ががめ](https://x.com/utsugame) for the original animation/illustration. No copy of that artwork or its CSS is bundled in the APK.

@@ -3,7 +3,6 @@ package io.github.bozkow.vibevisualizer.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.nativeCanvas
@@ -15,50 +14,42 @@ import io.github.bozkow.vibevisualizer.audio.Audio
 import io.github.bozkow.vibevisualizer.core.now
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
-import kotlin.math.abs
+
+internal fun danceEnabled() = E.wide && S.b("xDance") && !Audio.away && !S.low && !E.reduceMotion() && !E.inPip && !E.ambient
 
 @Composable
 fun BarsView(modifier: Modifier = Modifier) {
-    if (!E.wide || !S.b("xDance") || Audio.away || S.low || E.reduceMotion() || E.inPip || E.ambient) {
-        SpectrumBars(modifier); return
-    }
-    BoxWithConstraints(modifier) {
-        val danceWidth = minOf(if (E.wide) 112.dp else 88.dp, maxWidth * .28f)
-        val danceHeight = minOf(maxHeight, 112.dp)
-        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.Bottom) {
-            SpectrumBars(Modifier.weight(1f).fillMaxHeight())
-            ShigureDance(Modifier.width(danceWidth).height(danceHeight))
-        }
-    }
+    SpectrumBars(if (danceEnabled()) modifier.padding(end = 88.dp) else modifier)
 }
 
 @Composable
-private fun ShigureDance(modifier: Modifier) {
-    var bpm by remember { mutableIntStateOf(120) }
-    var smoothed by remember { mutableFloatStateOf(120f) }
-    val active = E.playingState && E.visible && !E.quiet && E.settingsPage == null && E.sheet == null
-    LaunchedEffect(active) {
-        while (active) {
-            delay(1000)
-            val measured = Audio.tempoBpm() ?: continue
-            smoothed += (measured - smoothed) * .35f
-            val candidate = ((smoothed / 5).roundToInt() * 5).coerceIn(60,210)
-            if (abs(candidate - bpm) >= 10) bpm += (candidate - bpm).coerceIn(-10,10)
+internal fun DanceCorner(modifier: Modifier) {
+    val track = E.trackVer
+    var bpm by remember(track) { mutableStateOf<Int?>(null) }
+    val visible = E.playingState && E.visible && !E.quiet && E.settingsPage == null && E.sheet == null
+    LaunchedEffect(visible, track) {
+        while (visible) {
+            bpm = Audio.tempoBpm()?.roundToInt()?.coerceIn(60,210)
+            delay(500)
         }
     }
-    val prepared by produceState<android.graphics.drawable.AnimatedImageDrawable?>(null, bpm, E.quiet, E.visible) {
-        if (E.visible && !E.quiet) value = DanceAnimation.load(bpm)
+    val prepared by produceState<Pair<Int, android.graphics.drawable.AnimatedImageDrawable>?>(null, bpm, E.quiet, E.visible) {
+        val speed = bpm ?: 120   // a still preview while listening; never animate at a guessed tempo
+        if (E.visible && !E.quiet) value = DanceAnimation.load(speed)?.let { speed to it }
     }
-    var image by remember { mutableStateOf<android.graphics.drawable.AnimatedImageDrawable?>(null) }
-    var imageBpm by remember { mutableIntStateOf(120) }
-    var startedAt by remember { mutableDoubleStateOf(0.0) }
-    LaunchedEffect(prepared, active) {
-        val next = prepared ?: return@LaunchedEffect
+    var image by remember(track) { mutableStateOf<android.graphics.drawable.AnimatedImageDrawable?>(null) }
+    var imageBpm by remember(track) { mutableIntStateOf(120) }
+    var startedAt by remember(track) { mutableDoubleStateOf(0.0) }
+    var lockedImage by remember(track) { mutableStateOf(false) }
+    val active = visible && bpm != null && lockedImage
+    LaunchedEffect(prepared, visible, track) {
+        val (speed,next) = prepared ?: return@LaunchedEffect
         if (image != null && active && image !== next) {
             val cycle = 240000.0 / imageBpm
             delay((cycle - ((now()-startedAt) % cycle)).toLong().coerceAtLeast(1))
         }
-        image = next; imageBpm = bpm
+        image = next; imageBpm = speed
+        lockedImage = bpm != null && speed == bpm
     }
     val drawable = image ?: return
     DisposableEffect(drawable, active) {
@@ -66,9 +57,13 @@ private fun ShigureDance(modifier: Modifier) {
         onDispose { drawable.stop() }
     }
     Canvas(modifier.clipToBounds()) {
-        val scale = minOf(size.width / drawable.intrinsicWidth, size.height / drawable.intrinsicHeight)
+        // Union of non-transparent pixels across ALL frames of the pinned 932×720 source.
+        // Position the visible figure, not the large transparent animation canvas, next to the bezel.
+        val scale = minOf(size.width / (416f/932*drawable.intrinsicWidth), size.height / (580f/720*drawable.intrinsicHeight))
         val w = drawable.intrinsicWidth * scale; val h = drawable.intrinsicHeight * scale
-        drawable.setBounds(((size.width - w) / 2).toInt(), (size.height - h).toInt(), ((size.width + w) / 2).toInt(), size.height.toInt())
+        val left = size.width - w * (686f/932)
+        val top = size.height - h * (679f/720)
+        drawable.setBounds(left.toInt(), top.toInt(), (left+w).toInt(), (top+h).toInt())
         drawable.draw(drawContext.canvas.nativeCanvas)
     }
 }

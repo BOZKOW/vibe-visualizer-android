@@ -62,7 +62,7 @@ internal fun SpectrumBars(modifier: Modifier = Modifier) {
         if (glassy) {
             val p = pass(vals, 0f)
             if (paintFrost != null) clipPath(p) { paintFrost(this, at) }
-            drawPath(p, brush, alpha = .45f)   // tinted with the song's colours, or they'd all be one grey
+            drawPath(p, brush, alpha = .85f)   // tinted with the song's colours, or they'd all be one grey
             drawPath(p, GlassFill)
             drawPath(p, brush, alpha = .8f, style = Stroke(1.dp.toPx()))
             return@Canvas
@@ -76,10 +76,10 @@ internal fun SpectrumBars(modifier: Modifier = Modifier) {
             for (k in 1 until st.hist.size) { if (a < .03f) break; drawPath(pass(st.hist[st.hist.size - 1 - k], 0f), brush, alpha = a); a *= keep }
         } else st.hist.clear()
         if (!S.low) clipRect(0f, 0f, W, H) {
-            drawPath(pass(vals, max(1f, bw * .14f)), Color.Black, alpha = .14f)
+            drawPath(pass(vals, max(1f, bw * .14f)), Color.Black, alpha = .3f)
             if (glow) drawPath(pass(vals, bw * .4f), brush, alpha = .16f)
         }
-        drawPath(pass(vals, 0f), brush, alpha = .95f)
+        drawPath(pass(vals, 0f), brush)
     }
 }
 

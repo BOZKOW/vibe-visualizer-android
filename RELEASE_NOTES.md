@@ -1,8 +1,7 @@
-Vibe Visualizer for Android 0.63.0 (beta). Android 12 or newer; it installs over 0.62.2.
+Vibe Visualizer for Android 0.63.1 (beta). Android 12 or newer; it installs over 0.63.0.
 
-- **Automatic Canvas:** sharp without lyrics, Spicy-style blur with lyrics. Removed the conflicting Canvas and behind-controls blur options; reduced the pixel budget of fully blurred scenes.
-- **Clear Liquid Glass:** removed material diffusion, softened the tint and highlights, and kept regular frosted glass separate.
-- **Cleaner Settings:** simpler groups, consistent glass cards, quieter separators and concise category descriptions, retaining Vibe’s design.
-- **Dancing visualizer:** optional Shigure Ui animation beside the bars, in the right corner in landscape, with automatic audio-derived tempo. Off by default and paused when not needed.
-- **Faster colours:** video palette updates at five samples per second while visible and playing, with smooth transitions.
-- **Vibe Bridge removed:** Android now uses phone sound, microphone or local-file audio; its relay, controls and setup instructions are gone.
+- **Better dance tempo:** detects repeating rhythm from audio before bar gain and visual smoothing, checks several seconds of evidence off the UI thread, and resets between songs. No guessed 120 BPM startup or slow sweep through unrelated speeds.
+- **Dancer placement:** stays just inside the bottom-right landscape edge, including while lyrics show. Removed transparent artwork padding; lyrics, bars and credits leave room beside her.
+- **Landscape Canvas:** keeps the sharp stage instead of inheriting portrait’s full lyrics blur.
+- **Landscape cover glass:** samples the rounded, darkened artwork so its glass matches the cover and its edges.
+- **Stronger visualizer:** opaque regular bars, more solid glass-bar colour and a clearer dark edge against Canvas.
