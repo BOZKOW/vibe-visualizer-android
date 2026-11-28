@@ -99,7 +99,7 @@ object BlendDonors {
     }
 
     /** A line's syllables split into the lead and its bracketed backing vocals (`_ne_bg`). */
-    fun splitBackground(syllables: List<BlendSyllable>): Pair<List<BlendSyllable>, List<BlendGroup>> {
+    fun splitBackground(syllables: List<BlendSyllable>, openBrackets: Set<Char> = PAIRS.keys): Pair<List<BlendSyllable>, List<BlendGroup>> {
         val lead = mutableListOf<BlendSyllable>()
         val groups = mutableListOf<List<BlendSyllable>>()
         var cur: MutableList<BlendSyllable>? = null
@@ -111,7 +111,7 @@ object BlendDonors {
             val text = y.text
             val open = cur
             if (open == null) {
-                val at = text.indexOfFirst { it in PAIRS }
+                val at = text.indexOfFirst { it in PAIRS && it in openBrackets }
                 if (at < 0) { lead += y; continue }
                 val (before, after) = cut(y, at)
                 if (before != null && before.text.isNotBlank()) lead += before

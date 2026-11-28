@@ -1,3 +1,3 @@
-Vibe Visualizer for Android 0.64.1 (beta). Android 12 or newer; it installs over earlier versions.
+Vibe Visualizer for Android 0.64.2 (beta). Android 12 or newer; it installs over earlier versions.
 
-- Fixed repeated provider names and accumulated “merged timing” text in lyric credits. Previously cached credits are cleaned when loaded, while writer, maker and uploader attribution is preserved.
+- Parenthesized vocals in word-synced lyrics from other online sources appear as background vocals with their word timing. Authored Spicy Lyrics community syncs and local TTML retain their vocal structure.

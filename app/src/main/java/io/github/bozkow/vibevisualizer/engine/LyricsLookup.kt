@@ -675,7 +675,8 @@ object Lyr {
         Desync.song()
         credit = r.credit ?: if (r.label.isNotEmpty()) Credit(null) else null
         shownProv = r.prov ?: if (r.credit?.source == "file") "local" else null
-        L = (if (r.sync) interludes(r.lines) else r.lines.filter { !it.dots }).map { it.copy() }
+        val vocalLines = io.github.bozkow.vibevisualizer.lyrics.parenthesizedVocals(r)
+        L = (if (r.sync) interludes(vocalLines) else vocalLines.filter { !it.dots }).map { it.copy() }
         lsync = r.sync
         romDone = false; romJob = null
         msg = null; empty = false
