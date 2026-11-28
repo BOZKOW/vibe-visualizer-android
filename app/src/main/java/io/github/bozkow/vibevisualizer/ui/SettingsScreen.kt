@@ -240,6 +240,7 @@ private fun pages(): List<Page> = listOf(
         Item.Sw("cvNoArt", "Hide the cover while a Canvas plays", "Only the Canvas, no cover in front of it."),
         Item.Sw("cvShrink", "Smaller cover while a Canvas plays", "The cover glides to a smaller size in the middle, so more of the Canvas shows around it."),
         Item.Txt("Portrait: sharp without lyrics, blurred with lyrics (Look → Blur). Landscape keeps its sharp Canvas stage."),
+        Item.Sw("cvCameraSoft", "Soften Canvas behind camera", "A soft blur behind a centred camera cutout in portrait, while Canvas is sharp."),
         Item.Sl("cvLyrA", "Canvas behind the lyrics", 0, 80, 5, "How much of the video shows behind the lyrics, dimmed so they stay readable. 0: only its soft glow. From Spicy Lyrics Mobile 0.17.", fmt = pct),
         Item.Sub("Where it comes from"),
         Item.Sw("cvSpicy", "Spicy Lyrics’ Canvas service", "When your server has no Canvas for a Spotify song (or no server is set), its Spotify ID goes to Spicy Lyrics’ Canvas service (spicylyrics.org), which asks Spotify. Nothing else is sent. Unofficial: it may stop working."),
@@ -609,6 +610,7 @@ private fun needs(k: String): String? = when (k) {
     "xDance" -> if (S.low) "Off in Low performance mode" else if (E.reduceMotion()) "Off with reduced motion" else null
     "xLiquid" -> if (android.os.Build.VERSION.SDK_INT < 33) "Needs Android 13 or newer" else if (S.low) "Off in Low performance mode" else if (S.calm) "Off with Motion sickness" else null
     "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null
+    "cvCameraSoft" -> if (!S.canvasOn) "Turn on Canvas first" else if (S.low) "Off in Low performance mode" else null
     "cvLyrA" -> if (!S.canvasOn) "Turn on Canvas first" else null
     "spRevive" -> if (!S.b("aSession")) "Needs Exact timing and controls from the Spotify app" else null
     else -> null

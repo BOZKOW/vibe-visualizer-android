@@ -1645,6 +1645,13 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
     val d = androidx.compose.ui.platform.LocalDensity.current
     val topPx = TopArea.bottom; val rampPx = with(d) { 28.dp.toPx() }
     val topK = 1f
+    val view = androidx.compose.ui.platform.LocalView.current
+    val cutoutHeight = WindowInsets.displayCutout.getTop(d).toFloat()
+    val centredCutout = view.rootWindowInsets?.displayCutout?.boundingRects.orEmpty().any {
+        it.top == 0 && kotlin.math.abs(it.exactCenterX()-view.width/2f) < view.width*.15f
+    }
+    val cameraFadeEnd = if (S.b("cvCameraSoft") && !wide && !lyricsCanvasBlur() && !S.low && centredCutout && cutoutHeight > 0f)
+        cutoutHeight + with(d) { 32.dp.toPx() } else 0f
 
     // the video, recorded as it's drawn, so the background can draw it again blurred (on the GPU, see CanvasBlur)
     val vid = rememberGraphicsLayer()
@@ -1664,7 +1671,7 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
             drawContent()
             // as dark at the top (behind the status bar and the top bar) as behind the controls at the bottom
             val tf = ((topPx + rampPx * 2) / size.height).coerceIn(.02f, .45f)
-            val shade = Brush.verticalGradient(0f to Color.Black.copy(alpha = .45f * topK), tf to Color.Transparent, .55f to Color.Transparent, 1f to Color.Black.copy(alpha = .45f))
+            val shade = Brush.verticalGradient(0f to Color.Black.copy(alpha = (if (cameraFadeEnd > 0f) .12f else .45f) * topK), tf to Color.Transparent, .55f to Color.Transparent, 1f to Color.Black.copy(alpha = .45f))
             if (stage != null) {
                 // a black veil at 1 - b is the picture at brightness b, without a filter pass per frame; darker to the foot for the
                 // dock (eased: a short straight ramp showed as a band; over .75, as all of this is); and a soft edge only toward
@@ -1691,12 +1698,45 @@ private fun CanvasBackdrop(wide: Boolean, centred: Boolean, stage: LandscapeStag
                 val fade = arrayOf(0f to Color.Black.copy(alpha = 1 - .65f * topK), .08f to Color.Black.copy(alpha = 1 - .3f * topK), .2f to Color.Black, .45f to Color.Black, .58f to Color.Black.copy(alpha = .85f), .74f to Color.Black.copy(alpha = .5f), .88f to Color.Black.copy(alpha = .18f), 1f to Color.Transparent)
                 if (Lyr.lines > 0) drawRect(Brush.verticalGradient(*fade), blendMode = BlendMode.DstIn)
                 if (dark) drawRect(shade)
+
             }
         }) {
         Box(Modifier.fillMaxSize().drawWithContent {
                 vid.record { this@drawWithContent.drawContent() }; drawLayer(vid)
                 if (vid.size != vidSize) vidSize = vid.size
             }) { CanvasVideoView() }
+    }
+    if (cameraFadeEnd > 0f && !E.quiet) {
+        // A tiny, ungraded video crop: softness must not inherit the backdrop's dark grade.
+        val soft = rememberGraphicsLayer()
+        val cameraRadius = with(d) { 10.dp.toPx() }
+        val effect = remember(cameraRadius, vidSize.width) {
+            android.graphics.RenderEffect.createBlurEffect(cameraRadius * 128f / vidSize.width.coerceAtLeast(1),
+                cameraRadius * 128f / vidSize.width.coerceAtLeast(1), android.graphics.Shader.TileMode.CLAMP).asComposeRenderEffect()
+        }
+        Canvas(Modifier.fillMaxWidth().height(with(d) { cameraFadeEnd.toDp() })
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
+            if (vidSize.width > 0 && vidSize.height > 0) {
+                val k = 128f / size.width
+                soft.renderEffect = effect
+                soft.record(IntSize(128, kotlin.math.ceil((size.height + cameraRadius * 3f) * k).toInt())) {
+                    scale(k, k, pivot = Offset.Zero) { drawLayer(vid) }
+                }
+                scale(1f/k, 1f/k, pivot = Offset.Zero) { drawLayer(soft) }
+                val start = (cutoutHeight/cameraFadeEnd).coerceIn(0f, .9f)
+                drawRect(Brush.verticalGradient(0f to Color.Black,
+                    *Array(9) { i ->
+                        val t = i / 8f
+                        (start + (1f-start)*t) to Color.Black.copy(alpha = 1f-t*t*(3f-2f*t))
+                    }), blendMode = BlendMode.DstIn)
+                // Tint after the blur mask so the feather does not attenuate the shade twice.
+                drawRect(Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = .5f),
+                    .45f to Color.Black.copy(alpha = .32f),
+                    .8f to Color.Black.copy(alpha = .08f),
+                    1f to Color.Transparent))
+            }
+        }
     }
     }
 }

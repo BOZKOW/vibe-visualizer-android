@@ -1,4 +1,5 @@
-Vibe Visualizer for Android 0.64.3 (beta). Android 12 or newer; it installs over earlier versions.
+Vibe Visualizer for Android 0.64.4 (beta). Android 12 or newer; it installs over earlier versions.
 
-- Dance speed now defaults to Auto, using faster subdivisions for low catalog BPM values. For example, a 128 BPM track uses a 256 BPM movement cadence. The catalog BPM itself stays intact.
-- Pick explicit 1× for the original catalog pace, or keep a saved ½× / 2× correction. Choose Auto to reset the song’s correction.
+- Sharp Canvas in portrait now softly blurs behind a centred camera cutout, blending smoothly back into the video with a dark gradient toward the top.
+- Toggle the effect in Canvas settings with “Soften Canvas behind camera”. It stays off in landscape, with fully blurred lyrics backgrounds, and in Low performance mode.
+- The camera effect uses a tiny live GPU crop without video frame readback. Previewed and tuned on the Galaxy S21 FE using Spotify Canvas.

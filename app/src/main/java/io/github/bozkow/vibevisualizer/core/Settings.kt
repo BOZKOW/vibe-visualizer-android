@@ -41,7 +41,7 @@ object Defaults {
         "gap" to 28, "glow" to false, "barGlass" to false, "round" to true, "scale" to "1", "fps" to false, "bgblur" to 60, "bri" to 70,
         "sat" to 170, "bgspeed" to 100, "online" to true, "volume" to 100, "view" to "both",
         "lprov" to "spicy:1,spotify:1,lrclib:1,netease:1", "loff" to 0, "lsize" to 100, "lblur" to true,
-        "canvasOn" to true, "low" to false, "perfAsk" to true, "anim" to "system", "lDesync" to "ask", "design" to "glass",
+        "canvasOn" to true, "cvCameraSoft" to true, "low" to false, "perfAsk" to true, "anim" to "system", "lDesync" to "ask", "design" to "glass",
         "uiHide" to "idle", "xRefCred" to true, "xScrub" to true, "xSkeleton" to true, "xKeep" to true, "xBgPop" to true,
         "xDance" to false, "xDancePart" to "all", "xDanceBeat" to true, "xRefSimple" to true, "ljoin" to false, "lbgBr" to false,   // (xRefSimple: Bloom is always refreshed since 0.52.0; ljoin: ljoinMode != "off", for backups)
         // Android only
