@@ -8,14 +8,26 @@ class AutoGainTest {
     private fun bars(v: Float, n: Int = 64) = FloatArray(n) { v }
     private fun run(g: AutoGain, raw: FloatArray, ms: Int): Float { var x = 0f; repeat(ms / 16) { x = g.gain(raw, raw.size, 16.0) }; return x }
 
-    @Test fun loudMusicComesToTheTarget() {
-        val g = AutoGain(); val gain = run(g, bars(.5f), 3000)
-        assertEquals(AutoGain.TARGET, .5f * gain, .02f)
+    @Test fun sustainedSectionsKeepTheirLoudnessDifference() {
+        val g = AutoGain()
+        val quiet = AutoGain.output(.05f * run(g,bars(.05f),40000))
+        val loud = AutoGain.output(.5f * run(g,bars(.5f),40000))
+        assertTrue("quiet=$quiet loud=$loud", loud > quiet*2)
+        val quietAgain = AutoGain.output(.05f * run(g,bars(.05f),40000))
+        assertTrue(quietAgain < loud*.5f)
+    }
+
+    @Test fun aLoudTrackAfterAQuietTrackDoesNotInheritExcessiveGain() {
+        val g = AutoGain()
+        run(g,bars(.03f),10000)
+        g.reset()
+        val output = AutoGain.output(.7f*g.gain(bars(.7f),64,16.0))
+        assertTrue(output > .5f && output < .95f)
     }
 
     @Test fun quietMusicHasBoundedExtraHeadroom() {
         val g = AutoGain(); val gain = run(g, bars(.05f), 30000)
-        assertEquals(AutoGain.MAX, gain, .01f)
+        assertTrue(gain > 1f && gain <= AutoGain.MAX)
     }
 
     @Test fun oneSpikeDoesNotTurnEverythingDown() {
@@ -55,7 +67,7 @@ class AutoGainTest {
     }
     @Test fun quietOpeningDoesNotWaitSeveralSecondsForUsefulGain() {
         val gain = AutoGain().gain(bars(.06f), 64, 16.0)
-        assertTrue(gain >= 5f && gain <= AutoGain.MAX)
+        assertTrue(gain >= 3.5f && gain <= AutoGain.MAX)
     }
 
 }

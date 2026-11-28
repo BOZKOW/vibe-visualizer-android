@@ -132,7 +132,9 @@ code under *Settings → Help & about*.
 Settings → Experiments → Dancing visualizer adds Shigure Ui beside the bars in the right-hand landscape corner.
 BPM comes from [ReccoBeats](https://reccobeats.com/docs/documentation/introduction), using the exact Spotify ID or ISRC first, otherwise a strict title/artist/duration match. No API key, server or audio capture is required. Only identifiers or title text are sent; local audio files are never uploaded. ReccoBeats supplies its own audio analysis; its catalog metadata originates from Spotify. Results are cached for seven days, with rate-limit backoff. When catalog tempo is unavailable, the dancer slides offscreen and the bars and credits expand into her space. A matching BPM brings her back.
 The figure stays just inside the bottom-right screen edge, including while lyrics show. Low performance/reduced motion disable it; playback pause and Settings stop its motion.
-The small animation is fetched only after opt-in from [Guyutongxue’s project](https://github.com/guyutongxue/shigure-ui-dance-css),
+The full animations (about 6 MB together) are fetched only after opt-in from [Guyutongxue’s project](https://github.com/guyutongxue/shigure-ui-dance-css),
 which credits [ががめ](https://x.com/utsugame) for the original animation/illustration. No copy of that artwork or its CSS is bundled in the APK.
 
 The Dancing visualizer experiment also offers saved ½×, 1× and 2× speed corrections for the current song. The title and artist identify the saved correction, including the full recording-version title.
+
+The part selector appears directly below the enabled Dancing visualizer toggle. All plays the complete first and second parts in order. Native playback uses prebuilt blended joins and cached frames, including the return to the beginning. Preparing the full animations happens once in the background and is cached on the phone. Follow audio beats adds a small movement from actual captured audio hits, while catalog BPM controls animation speed.

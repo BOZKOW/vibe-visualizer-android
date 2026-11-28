@@ -27,5 +27,8 @@ class DanceTimingTest {
         val timingBytes = durationOffsets.flatMap { listOf(it,it+1,it+2) }.toSet()
         for (i in source.indices) if (i !in timingBytes) assertEquals("pixel/container byte $i",source[i],timed[i])
     }
+    @Test fun fullSequencesKeepTheOriginalExcerptPlaybackRate() {
+        assertEquals(8000.0,duration(retimeDance(clip(),120,120.0)).toDouble(),1.0)
+    }
     @Test(expected = IllegalArgumentException::class) fun corruptAnimationIsRejected() { retimeDance(ByteArray(16),120) }
 }

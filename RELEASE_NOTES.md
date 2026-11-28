@@ -1,4 +1,5 @@
-Vibe Visualizer for Android 0.63.7 (beta). Android 12 or newer; it installs over earlier versions.
+Vibe Visualizer for Android 0.64.0 (beta). Android 12 or newer; it installs over earlier versions.
 
-- **Per-song dance speed:** choose ½×, 1× or 2× in Settings → Experiments while the song plays. The app remembers the correction for that title, artist and recording version. Choose 1× to reset it.
-- The correction changes animation speed while preserving the catalog BPM. Includes all earlier glass, dancer-presence and metadata-refresh fixes.
+- **Full dance sequence:** both complete animation parts play in order with prebuilt blended joins. The part selector appears directly below the enabled experiment, with All, Part 1 and Part 2 choices. Frames are prepared and cached before native playback, including smooth loop joins and removal of the original end hold.
+- **Audio beat pulses:** optional movements follow detected audio attacks. Catalog BPM and saved per-song speed corrections continue to set animation speed.
+- **Visualizer dynamics:** automatic sensitivity now retains more difference between sustained quiet and loud passages instead of normalizing them to similar heights.

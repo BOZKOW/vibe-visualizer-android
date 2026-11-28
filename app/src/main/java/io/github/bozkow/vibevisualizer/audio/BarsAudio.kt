@@ -46,6 +46,17 @@ object Audio {
     /** How long (ms) the sound being heard has been silent (0 while nothing's heard: then nothing's known). */
     fun silentMs() = silentFor
     var realAudio = false; private set
+    private val danceBeats = BeatHits()
+    private var danceBeatTrack = -1
+    val danceHitAt get() = danceBeats.hitAt
+    private fun danceBeat(t: Double, bins: FloatArray) {
+        if (danceBeatTrack != E.trackVer) { danceBeatTrack = E.trackVer; danceBeats.reset() }
+        val from = (50.0*2048/curRate()).toInt().coerceAtLeast(1)
+        val to = (250.0*2048/curRate()).toInt().coerceIn(from+1,bins.size)
+        var energy = 0f
+        for (i in from until to) { val v = bins[i]/255f; energy += v*v }
+        danceBeats.add(t,energy/(to-from))
+    }
 
     // the background follows the music: loudness, bass hits, tempo
     var bgEnergy = 0f; private set
@@ -136,6 +147,7 @@ object Audio {
                     for (i in 0 until 1024) { glide[i] += (frame[i] - glide[i]) * k; data[i] = glide[i] }
                 }
             }
+            if (S.b("xDance") && S.b("xDanceBeat") && E.visible && !E.quiet && !S.low && E.playing()) danceBeat(t,if (pl) frame else data)
             var mx = 0f
             for (i in 0 until N) {
                 var s = 0f; val e0 = edges[i]; val e1 = max(edges[i + 1], e0 + 1)
@@ -207,7 +219,7 @@ object Audio {
         if (t - lastOnset > 4000 && onsetGaps.isNotEmpty()) { onsetGaps.clear(); bgTempo = 0f }
     }
 
-    fun dropBars() { vals.fill(0f) }   // (the auto sensitivity keeps its level: the next song is about as loud)
+    fun dropBars() { vals.fill(0f); autoGains.forEach { it.reset() } }   // a new track learns its own level
 
     private fun updLabel() {
         val (t, tip) = when {

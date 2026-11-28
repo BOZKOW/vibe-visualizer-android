@@ -10,7 +10,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.engine.E
-import io.github.bozkow.vibevisualizer.engine.danceLoopMs
 import io.github.bozkow.vibevisualizer.engine.DanceAnimation
 import io.github.bozkow.vibevisualizer.engine.SongTempo
 import io.github.bozkow.vibevisualizer.engine.Lyr
@@ -53,6 +52,15 @@ internal fun DanceSpeedSettings() {
     }.toTypedArray())
 }
 
+@Composable
+internal fun DancePartSettings() {
+    val selected = S.str("xDancePart")
+    Hint("Animation parts")
+    Buttons(*listOf("all" to "All · 1 → 2", "1" to "Part 1", "2" to "Part 2").map { (value,label) ->
+        (if (selected==value) "✓ $label" else label) to { S.set("xDancePart",value) }
+    }.toTypedArray())
+}
+
 private object DancePresence {
     var track by mutableIntStateOf(-1)
     var matched by mutableStateOf(false)
@@ -67,7 +75,7 @@ internal fun danceProgress(): Float {
 
 @Composable
 fun BarsView(modifier: Modifier = Modifier) {
-    SpectrumBars(if (danceEnabled()) modifier.padding(end = 88.dp * danceProgress()) else modifier)
+    SpectrumBars(if (danceEnabled()) modifier.padding(end = 138.dp * danceProgress()) else modifier)
 }
 
 @Composable
@@ -89,36 +97,53 @@ internal fun DanceCorner(modifier: Modifier) {
     DisposableEffect(Unit) { onDispose { DancePresence.matched = false } }
     val progress = danceProgress()
     val pace = DancePace.get(meta)
-    val prepared by produceState<Pair<Int, android.graphics.drawable.AnimatedImageDrawable>?>(null, bpm, pace, E.quiet, E.visible) {
+    val part = S.str("xDancePart")
+    val prepared by produceState<DanceAnimation.Clip?>(null, bpm, pace, part, E.quiet, E.visible) {
         val speed = bpm?.let { (it * pace).roundToInt().coerceIn(15,600) } ?: return@produceState
-        if (E.visible && !E.quiet) value = DanceAnimation.load(speed)?.let { speed to it }
+        if (E.visible && !E.quiet) value = DanceAnimation.load(speed, part)
     }
     var image by remember { mutableStateOf<android.graphics.drawable.AnimatedImageDrawable?>(null) }
-    var imageBpm by remember { mutableIntStateOf(120) }
-    var startedAt by remember { mutableDoubleStateOf(0.0) }
+    var previousImage by remember { mutableStateOf<android.graphics.drawable.AnimatedImageDrawable?>(null) }
+    val blend = remember { androidx.compose.animation.core.Animatable(1f) }
     SideEffect { DancePresence.track = track; DancePresence.matched = bpm != null && image != null }
     val active = visible && progress > .001f
     LaunchedEffect(prepared, visible, track) {
-        val (speed,next) = prepared ?: return@LaunchedEffect
-        if (image != null && active && image !== next) {
-            val cycle = danceLoopMs(imageBpm)
-            delay((cycle - ((now()-startedAt) % cycle)).toLong().coerceAtLeast(1))
-        }
-        image = next; imageBpm = speed
+        val next = prepared?.image ?: return@LaunchedEffect
+        if (image === next) { blend.snapTo(1f); previousImage = null; return@LaunchedEffect }
+        previousImage = image
+        image = next
+        blend.snapTo(if (previousImage == null) 1f else 0f)
+        blend.animateTo(1f, androidx.compose.animation.core.tween(160))
+        previousImage = null
     }
     val drawable = image ?: return
     DisposableEffect(drawable, active) {
-        if (active) { startedAt = now(); drawable.start() } else drawable.stop()
+        if (active) drawable.start() else drawable.stop()
         onDispose { drawable.stop() }
     }
-    Canvas(modifier.graphicsLayer { translationX = (size.width + 24.dp.toPx()) * (1f-progress) }.clipToBounds()) {
-        // Union of non-transparent pixels across ALL frames of the pinned 932×720 source.
+    Canvas(modifier.graphicsLayer {
+        translationX = (size.width + 24.dp.toPx()) * (1f-progress)
+        val pulse = if (active && S.b("xDanceBeat")) {
+            E.drawTick.longValue
+            val elapsed = now()-io.github.bozkow.vibevisualizer.audio.Audio.danceHitAt
+            if (elapsed in 0.0..400.0) kotlin.math.exp(-elapsed/100).toFloat() else 0f
+        } else 0f
+        translationY = -3.dp.toPx()*pulse
+        scaleY = 1f+.025f*pulse
+        scaleX = 1f-.01f*pulse
+    }.clipToBounds()) {
+        // Union of non-transparent pixels across both complete 932×720 source parts.
         // Position the visible figure, not the large transparent animation canvas, next to the bezel.
-        val scale = minOf(size.width / (416f/932*drawable.intrinsicWidth), size.height / (580f/720*drawable.intrinsicHeight))
-        val w = drawable.intrinsicWidth * scale; val h = drawable.intrinsicHeight * scale
-        val left = size.width - w * (686f/932)
-        val top = size.height - h * (679f/720)
-        drawable.setBounds(left.toInt(), top.toInt(), (left+w).toInt(), (top+h).toInt())
-        drawable.draw(drawContext.canvas.nativeCanvas)
+        fun drawPart(partImage: android.graphics.drawable.AnimatedImageDrawable, alpha: Float) {
+            val scale = minOf(size.width / (691f/932*partImage.intrinsicWidth), size.height / (581f/720*partImage.intrinsicHeight))
+            val w = partImage.intrinsicWidth * scale; val h = partImage.intrinsicHeight * scale
+            val left = size.width - w * (844f/932)
+            val top = size.height - h * (680f/720)
+            partImage.setBounds(left.toInt(), top.toInt(), (left+w).toInt(), (top+h).toInt())
+            partImage.alpha = (alpha*255).roundToInt().coerceIn(0,255)
+            partImage.draw(drawContext.canvas.nativeCanvas)
+        }
+        previousImage?.let { drawPart(it,1f-blend.value) }
+        drawPart(drawable,blend.value)
     }
 }

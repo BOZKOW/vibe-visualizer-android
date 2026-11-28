@@ -3,6 +3,7 @@ package io.github.bozkow.vibevisualizer.audio
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 /** Track-level normalization, not a beat follower: learn the initial level, then adapt over seconds.
  * The spectrum remains free to express the music's dynamics. Each frequency range owns an instance.
@@ -13,17 +14,20 @@ class AutoGain {
     private var initialized = false
     private var heardMs = 0.0
 
+    fun reset() { level = .3f; initialized = false; heardMs = 0.0 }
+
     /** The gain for this frame's bars [raw] (0 and up), [dt] ms after the last. */
     fun gain(raw: FloatArray, n: Int, dt: Double): Float {
         val l = topQuarter(raw, n)
         if (l > QUIET && dt > 0) {
-            if (!initialized) { level = max(l, TARGET / MAX); initialized = true }
+            if (!initialized) { level = max(l, TARGET / (MAX * MAX)); initialized = true }
             val settling = heardMs < 1500.0
             val tau = if (l > level) { if (settling) 350.0 else RISE_MS } else { if (settling) 900.0 else FALL_MS }
             level += (l - level) * (1 - exp(-dt / tau)).toFloat()
             heardMs += dt
         }
-        return min(MAX, TARGET / max(level, TARGET / MAX))
+        // Partial normalization preserves sustained loud/quiet differences as well as transient hits.
+        return min(MAX, 1.25f * sqrt(TARGET / max(level, TARGET / (MAX * MAX))))
     }
 
     private fun topQuarter(raw: FloatArray, n: Int): Float {

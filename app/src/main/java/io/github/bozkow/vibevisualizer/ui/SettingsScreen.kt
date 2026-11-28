@@ -370,7 +370,9 @@ private fun pages(): List<Page> = listOf(
         Item.Txt("Ideas being tried out. They may change, or go away, in a later version. The lyrics ones (the Focus style, Refined credits, Background vocal pop-out, Keep overlapping lines) are in Lyrics, beside what they go with."),
         Item.Sw("xScrub", "Scrub preview", "While you drag the seek bar, a bubble above your finger shows the time it would jump to (and the volume slider, the level). Off, the times show where the song is until you let go. From Spicy Lyrics 6.4.50."),
         Item.Sw("xSkeleton", "Lyrics loading skeleton", "While lyrics load, faint placeholder lines and a small “Loading lyrics” label instead of the big message. From Spicy Lyrics 6.4.0."),
-        Item.Sw("xDance", "Dancing visualizer", "Shigure Ui stays in the bottom-right landscape corner, including with lyrics. Looks up this recording’s BPM from ReccoBeats, without setup or audio capture. Slides out when BPM is unavailable and returns when a match arrives. Animation by ががめ; web version by Guyutongxue. Downloads a small animation when enabled. Pauses with playback and under Settings."),
+        Item.Sw("xDance", "Dancing visualizer", "Shigure Ui stays in the bottom-right landscape corner, including with lyrics. Looks up this recording’s BPM from ReccoBeats, without setup or audio capture. Slides out when BPM is unavailable and returns when a match arrives. Animation by ががめ; web version by Guyutongxue. Downloads and prepares the full animations on first use. Pauses with playback and under Settings."),
+        Item.Custom("Dance animation parts sequence", shown = { S.b("xDance") }) { DancePartSettings() },
+        Item.Sw("xDanceBeat", "Follow audio beats", "A small movement on detected audio hits. Uses the visualizer’s audio input."),
         Item.Custom("Dance speed for this song half normal double") { DanceSpeedSettings() },
         Item.Custom("Dance animation credits") { Buttons("Animation credits" to { openUrl("https://github.com/guyutongxue/shigure-ui-dance-css") }, "BPM: ReccoBeats" to { openUrl("https://reccobeats.com/docs/documentation/introduction") }) },
         Item.Sw("xLiquid", "Liquid glass", "A clear, slightly darkened material for controls, Settings cards, switches and sheets. Their edges gently bend the view behind them, with soft highlights. Experimental; needs Android 13 or newer."),
@@ -603,6 +605,7 @@ private fun needs(k: String): String? = when (k) {
     "lcredLast" -> if (!S.b("xRefCred") || S.credPos != "lyrics") "Needs Refined credits under the lyrics" else null
     "aMotionCover" -> if (S.low) "Off in Low performance mode" else null
     "ljoinPace" -> if (S.joinMode == "off") "Turn on Join split words first" else null
+    "xDanceBeat" -> if (!S.b("xDance")) "Turn on Dancing visualizer first" else null
     "xDance" -> if (S.low) "Off in Low performance mode" else if (E.reduceMotion()) "Off with reduced motion" else null
     "xLiquid" -> if (android.os.Build.VERSION.SDK_INT < 33) "Needs Android 13 or newer" else if (S.low) "Off in Low performance mode" else if (S.calm) "Off with Motion sickness" else null
     "aPipSize", "aPipTop" -> if (!S.b("aPip")) "Turn on picture-in-picture first" else null

@@ -225,7 +225,7 @@ fun PlayerScreen() {
         if (danceEnabled() && E.src != "none") {
             DanceCorner(Modifier.align(Alignment.BottomEnd)
                 .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Right))
-                .padding(end = 3.dp, bottom = 3.dp).size(width = 76.dp, height = 106.dp))
+                .padding(end = 3.dp, bottom = 3.dp).size(width = 126.dp, height = 106.dp))
         }
     }
 }
@@ -531,7 +531,7 @@ private fun SideColumn(modifier: Modifier, endGap: Dp = 20.dp, startRoom: Dp = 4
             else LyricsPane(Modifier.fillMaxSize().padding(end = lyricsEnd), areaHeightPx = areaH, padStart = 4f, padEnd = 6f, problems = false, behind = true, startRoom = startRoom)
         }
         if (!bars && S.view == "both") ExtraBars(Modifier.fillMaxWidth().padding(end = if (danceEnabled()) endGap * (1f-danceProgress()) else endGap).height(60.dp))
-        Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = if (danceEnabled()) endGap + (88.dp-endGap) * danceProgress() else endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }
+        Box(Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)).padding(end = if (danceEnabled()) endGap + (138.dp-endGap) * danceProgress() else endGap)) { SongInfo(big = false, lyrics = !bars, name = false, seek = false) }
     }
 }
 

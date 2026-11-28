@@ -3,6 +3,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity android:name=".ui.GlassPreviewActivity" android:exported="true" />
+        <activity android:name=".DancePreviewActivity" android:exported="true" />
         <receiver android:name=".DebugReceiver" android:exported="true" />
     </application>
 </manifest>

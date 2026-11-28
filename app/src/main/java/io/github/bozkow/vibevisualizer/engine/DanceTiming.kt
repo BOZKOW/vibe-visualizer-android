@@ -6,7 +6,8 @@ internal const val DANCE_LOOP_BEATS = 8
 internal fun danceLoopMs(bpm: Int) = DANCE_LOOP_BEATS * 60000.0 / bpm.coerceIn(15,600)
 
 /** Eight beats per loop. Only WebP animation duration fields change; encoded pixels/alpha remain untouched. */
-internal fun retimeDance(source: ByteArray, bpm: Int): ByteArray {
+internal fun retimeDance(source: ByteArray, bpm: Int, referenceDurationMs: Double? = null): ByteArray {
+    require(referenceDurationMs == null || referenceDurationMs.isFinite() && referenceDurationMs > 0)
     require(source.size >= 12 && String(source, 0, 4, Charsets.US_ASCII) == "RIFF" && String(source, 8, 4, Charsets.US_ASCII) == "WEBP")
     fun uint(at: Int, count: Int): Int {
         var n = 0L
@@ -27,7 +28,7 @@ internal fun retimeDance(source: ByteArray, bpm: Int): ByteArray {
     }
     require(frames.isNotEmpty())
     val total = frames.sumOf { it.second }.toDouble()
-    val duration = danceLoopMs(bpm)
+    val duration = danceLoopMs(bpm) * (if (referenceDurationMs != null) total / referenceDurationMs else 1.0)
     val result = source.copyOf()
     var elapsed = 0; var emitted = 0
     for ((offset,time) in frames) {
@@ -38,4 +39,19 @@ internal fun retimeDance(source: ByteArray, bpm: Int): ByteArray {
         emitted += value
     }
     return result
+}
+
+internal fun danceDurationMs(source: ByteArray): Long {
+    var total = 0L
+    var at = 12
+    while (at+8 <= source.size) {
+        val length = (0..3).fold(0) { value, i -> value or ((source[at+4+i].toInt() and 255) shl (8*i)) }
+        require(length >= 0 && length <= source.size-at-8)
+        if (String(source,at,4,Charsets.US_ASCII)=="ANMF") {
+            require(length>=16)
+            total += (0..2).fold(0) { value,i -> value or ((source[at+20+i].toInt() and 255) shl (8*i)) }
+        }
+        at += 8+length+(length and 1)
+    }
+    return total
 }
