@@ -16,6 +16,12 @@ class LyricsMergeTest {
         Line(a, a + 3.6, t, ws.mapIndexed { k, w -> Word(a + k * step, a + (k + 1) * step, w, k != ws.lastIndex) })
     }, true, "Timing donor", Credit("netease"), prov = "netease")
 
+    @Test fun oldRepeatedMergeCreditsAreFlattenedWhenLoaded() {
+        val credit = Credit("apple", via = "Spicy Lyrics + KuGou · Spicy Lyrics · merged timing + KuGou · merged timing")
+        assertEquals("Spicy Lyrics + KuGou", credit.via)
+        assertNull(Credit("apple",via="merged timing").via)
+    }
+
     @Test fun matchingTimingKeepsPreferredWordsTranslationAndAttribution() {
         val b = base()
         val r = LyricsMerge.merge(b, listOf(donor()), "Nobody", "Made up")

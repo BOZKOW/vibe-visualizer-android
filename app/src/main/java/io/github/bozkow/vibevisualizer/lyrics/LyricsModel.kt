@@ -48,8 +48,19 @@ class Credit(
     val uploader: Person? = null,
     val maker: Person? = null,
     val writers: List<String> = emptyList(),
-    val via: String? = null,
-)
+    via: String? = null,
+) {
+    val via: String? = cleanCreditVia(via)
+}
+
+/** Flatten repeated merge provenance, including entries saved by older builds. */
+internal fun cleanCreditVia(value: String?): String? = value
+    ?.split(Regex("\\s+[+·]\\s+"))
+    ?.map { it.trim() }
+    ?.filter { it.isNotEmpty() && !it.equals("merged timing", ignoreCase = true) }
+    ?.distinctBy { it.lowercase(java.util.Locale.ROOT) }
+    ?.joinToString(" + ")
+    ?.takeIf { it.isNotEmpty() }
 
 class LyricsResult(
     val lines: List<Line>,

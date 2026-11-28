@@ -11,9 +11,9 @@ object LyricsMerge {
     fun merge(base: LyricsResult, donors: List<LyricsResult>, title: String, artist: String): LyricsResult? {
         if (!needsTiming(base)) return null
         val usable = donors.filter { it !== base && it.lines.any { l -> !l.words.isNullOrEmpty() } }
-        val shaped = usable.mapNotNull { r -> BlendDonors.shape(document(r), title, artist)?.let { BlendDonor(it, r.label, r.prov ?: r.label) } }
+        val shaped = usable.mapNotNull { r -> BlendDonors.shape(document(r), title, artist)?.let { BlendDonor(it, cleanCreditVia(r.label) ?: r.label, r.prov ?: r.label) } }
         val first = shaped.firstOrNull() ?: return null
-        val outcome = LyricsBlender.blended(document(base), base.label, base.prov ?: base.label, first, shaped.getOrNull(1)) ?: return null
+        val outcome = LyricsBlender.blended(document(base), cleanCreditVia(base.label) ?: base.label, base.prov ?: base.label, first, shaped.getOrNull(1)) ?: return null
         if (outcome.via == null || outcome.quality != BlendQuality.SYLLABLE) return null
         val lines = outcome.doc.lines.map { line ->
             val text = BlendText.lineText(line)
@@ -25,12 +25,12 @@ object LyricsMerge {
         }
         // A Spicy timing donor still requires its linked maker/uploader, even when another source supplies words.
         val c = if (base.credit?.source == "spicy_lyrics") base.credit else usable.firstOrNull {
-            it.credit?.source == "spicy_lyrics" && outcome.via.contains(it.label)
+            it.credit?.source == "spicy_lyrics" && outcome.via.contains(cleanCreditVia(it.label) ?: it.label)
         }?.credit ?: base.credit
         val credit = Credit(c?.source, c?.name, c?.uploader, c?.maker,
             (c?.writers.orEmpty() + outcome.doc.songwriters).distinct(),
             listOfNotNull(c?.via, outcome.via).distinct().joinToString(" · "))
-        return LyricsResult(lines, true, "${base.label} · merged timing", credit, base.srcDur, base.prov)
+        return LyricsResult(lines, true, "${cleanCreditVia(base.label) ?: base.label} · merged timing", credit, base.srcDur, base.prov)
     }
 
     private fun words(g: BlendGroup) = g.syllables.map { Word(it.start, it.end, it.text, !it.partOfWord) }
