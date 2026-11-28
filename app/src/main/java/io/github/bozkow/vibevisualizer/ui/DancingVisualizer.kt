@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import io.github.bozkow.vibevisualizer.core.S
 import io.github.bozkow.vibevisualizer.engine.E
+import io.github.bozkow.vibevisualizer.engine.dancePlaybackBpm
 import io.github.bozkow.vibevisualizer.engine.DanceAnimation
 import io.github.bozkow.vibevisualizer.engine.SongTempo
 import io.github.bozkow.vibevisualizer.engine.Lyr
@@ -33,10 +34,10 @@ private object DancePace {
     private fun key(m: SongMeta) = io.github.bozkow.vibevisualizer.lyrics.Match.key(m.title) + "|" + io.github.bozkow.vibevisualizer.lyrics.Match.key(io.github.bozkow.vibevisualizer.lyrics.firstArtist(m.artist))
     fun get(m: SongMeta): Float {
         revision
-        return prefs.getFloat(key(m), 1f).takeIf { it == .5f || it == 1f || it == 2f } ?: 1f
+        return prefs.getFloat(key(m), 0f).takeIf { it == 0f || it == .5f || it == 1f || it == 2f } ?: 0f
     }
     fun set(m: SongMeta, value: Float) {
-        if (value == 1f) prefs.edit().remove(key(m)).apply() else prefs.edit().putFloat(key(m), value).apply()
+        if (value == 0f) prefs.edit().remove(key(m)).apply() else prefs.edit().putFloat(key(m), value).apply()
         revision++
     }
 }
@@ -47,7 +48,7 @@ internal fun DanceSpeedSettings() {
     if (E.src == "none" || meta.title.isBlank()) { Hint("Play a song to set its dance speed."); return }
     val pace = DancePace.get(meta)
     Hint("Dance speed · " + meta.title)
-    Buttons(*listOf(.5f to "½×", 1f to "1×", 2f to "2×").map { (value, label) ->
+    Buttons(*listOf(0f to "Auto", .5f to "½×", 1f to "1×", 2f to "2×").map { (value, label) ->
         (if (pace == value) "✓ $label" else label) to { DancePace.set(meta, value) }
     }.toTypedArray())
 }
@@ -99,7 +100,7 @@ internal fun DanceCorner(modifier: Modifier) {
     val pace = DancePace.get(meta)
     val part = S.str("xDancePart")
     val prepared by produceState<DanceAnimation.Clip?>(null, bpm, pace, part, E.quiet, E.visible) {
-        val speed = bpm?.let { (it * pace).roundToInt().coerceIn(15,600) } ?: return@produceState
+        val speed = bpm?.let { dancePlaybackBpm(it,pace) } ?: return@produceState
         if (E.visible && !E.quiet) value = DanceAnimation.load(speed, part)
     }
     var image by remember { mutableStateOf<android.graphics.drawable.AnimatedImageDrawable?>(null) }

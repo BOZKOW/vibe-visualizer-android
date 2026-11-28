@@ -138,3 +138,5 @@ which credits [ががめ](https://x.com/utsugame) for the original animation/ill
 The Dancing visualizer experiment also offers saved ½×, 1× and 2× speed corrections for the current song. The title and artist identify the saved correction, including the full recording-version title.
 
 The part selector appears directly below the enabled Dancing visualizer toggle. All plays the complete first and second parts in order. Native playback uses prebuilt blended joins and cached frames, including the return to the beginning. Preparing the full animations happens once in the background and is cached on the phone. Follow audio beats adds a small movement from actual captured audio hits, while catalog BPM controls animation speed.
+
+Dance speed Auto doubles low catalog tempos into a 160–320 BPM movement cadence. Explicit ½×, 1× and 2× choices use the original catalog tempo and bypass Auto. Auto replaces the earlier default 1× behavior; saved non-default corrections are retained.

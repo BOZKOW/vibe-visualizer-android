@@ -55,3 +55,11 @@ internal fun danceDurationMs(source: ByteArray): Long {
     }
     return total
 }
+
+/** Choose a quicker subdivision for low catalog tempos; explicit per-song multipliers bypass Auto. */
+internal fun dancePlaybackBpm(catalogBpm: Int, correction: Float): Int {
+    if (correction > 0f) return (catalogBpm*correction).roundToInt().coerceIn(15,600)
+    var cadence = catalogBpm.coerceIn(30,300)
+    while (cadence < 160) cadence *= 2
+    return cadence
+}

@@ -18,6 +18,14 @@ class DanceTimingTest {
     private fun duration(data: ByteArray) = durationOffsets.sumOf { at ->
         (data[at].toInt() and 255) + ((data[at+1].toInt() and 255) shl 8) + ((data[at+2].toInt() and 255) shl 16)
     }
+    @Test fun automaticCadenceFollowsFasterSubdivisionsForLowCatalogTempos() {
+        assertEquals(230,io.github.bozkow.vibevisualizer.engine.dancePlaybackBpm(115,0f))
+        assertEquals(256,io.github.bozkow.vibevisualizer.engine.dancePlaybackBpm(128,0f))
+        assertEquals(296,io.github.bozkow.vibevisualizer.engine.dancePlaybackBpm(148,0f))
+        assertEquals(168,io.github.bozkow.vibevisualizer.engine.dancePlaybackBpm(168,0f))
+        assertEquals(115,io.github.bozkow.vibevisualizer.engine.dancePlaybackBpm(115,1f))
+        assertEquals(230,io.github.bozkow.vibevisualizer.engine.dancePlaybackBpm(115,2f))
+    }
     @Test fun animationLoopMatchesEightBeatsAtDifferentTempos() {
         for (bpm in listOf(15,30,60,90,120,160,210,250,300,600)) assertEquals(480000.0/bpm,duration(retimeDance(clip(),bpm)).toDouble(),1.0)
     }
